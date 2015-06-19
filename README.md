@@ -1,4 +1,4 @@
-# Linux 4.1 samus
+# Linux 4.1 samus (Chromebook Pixel 2015)
 
 This repository contains scripts that create a linux kernel patch from the
 ChromiumOS 3.14 tree (that's the version used to create the Pixel 2 kernel)
