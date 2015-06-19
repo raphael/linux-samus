@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 1. Install new kernel packages
-sudo pacman -U --noconfirm linux-*.xz
+sudo pacman -U --noconfirm ../../build/archlinux/linux-*.xz
 if [ $? -ne 0 ]; then
   exit 1
 fi
@@ -17,4 +17,4 @@ if [ -e /boot/grub/grub.cfg ]; then
 fi
 
 # 3. Profit
-echo linux-samus-4 packages successfully installed
+echo linux-samus4 packages successfully installed
