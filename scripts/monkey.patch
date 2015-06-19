@@ -1,0 +1,130 @@
+diff -Nau linux-head/sound/soc/codecs/rt5677.c chromiumos-chromeos-3.14/sound/soc/codecs/rt5677.c
+--- linux-head/sound/soc/codecs/rt5677.c	2015-06-18 18:56:44.686665895 -0700
++++ chromiumos-chromeos-3.14/sound/soc/codecs/rt5677.c	2015-06-15 23:15:50.876647997 -0700
+@@ -4820,11 +4820,8 @@
+ static void rt5677_free_gpio(struct i2c_client *i2c)
+ {
+ 	struct rt5677_priv *rt5677 = i2c_get_clientdata(i2c);
+-	int ret;
+ 
++	gpiochip_remove(&rt5677->gpio_chip);
+-	ret = gpiochip_remove(&rt5677->gpio_chip);
+-	if (ret != 0)
+-		dev_err(&i2c->dev, "Failed to remove GPIOs: %d\n", ret);
+ }
+ #else
+ static void rt5677_gpio_config(struct rt5677_priv *rt5677, unsigned offset,
+diff -Nau linux-head/sound/soc/intel/boards/bdw-rt5677.c chromiumos-chromeos-3.14/sound/soc/intel/bdw-rt5677.c
+--- linux-head/sound/soc/intel/boards/bdw-rt5677.c	2015-06-18 18:52:58.953332967 -0700
++++ chromiumos-chromeos-3.14/sound/soc/intel/bdw-rt5677.c	2015-06-15 23:15:50.903314664 -0700
+@@ -12,10 +12,10 @@
+ #include <sound/pcm_params.h>
+ #include <sound/jack.h>
+ 
++#include "../common/sst-dsp.h"
++#include "../haswell/sst-haswell-ipc.h"
+-#include "sst-dsp.h"
+-#include "sst-haswell-ipc.h"
+ 
++#include "../../codecs/rt5677.h"
+-#include "../codecs/rt5677.h"
+ 
+ /* GPIO indexes defined by ACPI */
+ enum {
+diff -Nau linux-head/sound/soc/intel/boards/broadwell.c chromiumos-chromeos-3.14/sound/soc/intel/broadwell.c
+--- linux-head/sound/soc/intel/boards/broadwell.c	2015-06-18 19:08:15.913331320 -0700
++++ chromiumos-chromeos-3.14/sound/soc/intel/broadwell.c	2015-06-15 23:15:50.903314664 -0700
+@@ -22,10 +22,10 @@
+ #include <sound/jack.h>
+ #include <sound/pcm_params.h>
+ 
++#include "../common/sst-dsp.h"
++#include "../haswell/sst-haswell-ipc.h"
+-#include "sst-dsp.h"
+-#include "sst-haswell-ipc.h"
+ 
++#include "../../codecs/rt286.h"
+-#include "../codecs/rt286.h"
+ 
+ static struct snd_soc_jack broadwell_hp;
+ static struct snd_soc_jack broadwell_mic;
+diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-dsp.c chromiumos-chromeos-3.14/sound/soc/intel/sst-haswell-dsp.c
+--- linux-head/sound/soc/intel/haswell/sst-haswell-dsp.c	2015-06-18 18:53:46.543332882 -0700
++++ chromiumos-chromeos-3.14/sound/soc/intel/sst-haswell-dsp.c	2015-06-15 23:15:50.903314664 -0700
+@@ -28,10 +28,10 @@
+ #include <linux/firmware.h>
+ #include <linux/pm_runtime.h>
+ 
++#include "../common/sst-dsp.h"
++#include "../common/sst-dsp-priv.h"
+-#include "sst-dsp.h"
+-#include "sst-dsp-priv.h"
+ #include "sst-haswell-ipc.h"
++#include "../common/sst-debugfs.h"
+-#include "sst-debugfs.h"
+ 
+ #include <trace/events/hswadsp.h>
+ 
+diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-ipc.c chromiumos-chromeos-3.14/sound/soc/intel/sst-haswell-ipc.c
+--- linux-head/sound/soc/intel/haswell/sst-haswell-ipc.c	2015-06-18 18:53:59.033332859 -0700
++++ chromiumos-chromeos-3.14/sound/soc/intel/sst-haswell-ipc.c	2015-06-15 23:15:50.903314664 -0700
+@@ -37,8 +37,8 @@
+ 
+ 
+ #include "sst-haswell-ipc.h"
++#include "../common/sst-dsp.h"
++#include "../common/sst-dsp-priv.h"
+-#include "sst-dsp.h"
+-#include "sst-dsp-priv.h"
+ 
+ /* Global Message - Generic */
+ #define IPC_GLB_TYPE_SHIFT	24
+@@ -2129,7 +2129,7 @@
+ 	int i;
+ 	struct snd_dma_buffer *dma_buf[2];
+ 	static struct dentry *fwdir;
++
+-	
+ 	dma_buf[0] = devm_kzalloc(hsw->dsp->dev, sizeof(*dma_buf[0]), GFP_KERNEL);
+ 	dma_buf[1] = devm_kzalloc(hsw->dsp->dev, sizeof(*dma_buf[1]), GFP_KERNEL);
+ 	memset(log_stream->config, 0xFF, sizeof(log_stream->config));
+diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-pcm.c chromiumos-chromeos-3.14/sound/soc/intel/sst-haswell-pcm.c
+--- linux-head/sound/soc/intel/haswell/sst-haswell-pcm.c	2015-06-18 18:55:53.169999321 -0700
++++ chromiumos-chromeos-3.14/sound/soc/intel/sst-haswell-pcm.c	2015-06-15 23:15:50.903314664 -0700
+@@ -30,9 +30,9 @@
+ #include <sound/compress_driver.h>
+ 
+ #include "sst-haswell-ipc.h"
++#include "../common/sst-dsp-priv.h"
++#include "../common/sst-dsp.h"
++#include "../common/sst-debugfs.h"
+-#include "sst-dsp-priv.h"
+-#include "sst-dsp.h"
+-#include "sst-debugfs.h"
+ 
+ #define HSW_PCM_COUNT		6
+ #define HSW_VOLUME_MAX		0x7FFFFFFF	/* 0dB */
+@@ -977,10 +977,12 @@
+ 		goto err_comp;
+ 
+ #ifdef CONFIG_DEBUG_FS
++#ifdef CONFIG_PM_RUNTIME
+ 	priv_data->hsw = sst_pdata->dsp;
+ 	sst_debugfs_get_root(&root);
+ 	sst_hsw_dbg_enable(priv_data->hsw, &root);
+ #endif
++#endif
+ 
+ 	return 0;
+ 
+@@ -1158,8 +1160,8 @@
+ #define hsw_pcm_runtime_idle		NULL
+ #define hsw_pcm_runtime_suspend		NULL
+ #define hsw_pcm_runtime_resume		NULL
++#define hsw_pcm_complete	NULL
++#define hsw_pcm_prepare		NULL
+-#define hsw_pcm_runtime_complete	NULL
+-#define hsw_pcm_runtime_prepare		NULL
+ #endif
+ 
+ static const struct dev_pm_ops hsw_pcm_pm = {
