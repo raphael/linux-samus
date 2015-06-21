@@ -65,12 +65,13 @@ load-module module-udev-detect
 The TPM module must be loaded for resume to work after suspend. The config
 included in this repository enables it by default.
 
-### 3. Swap doesn't work
+### 3. Hibernate/Swap doesn't work
 
 The kernel config included in this repository disables swap as the Pixel 2
-is generous on memory but not so much on disk space. If you need support
-for swap simply edit the config using e.g. `make nconfig` in the
-`build/linux` directory.
+is generous on memory but not so much on disk space. Hibernate requires
+swap. If you need support for swap simply edit the config using e.g.
+`make nconfig` in the `build/linux` directory, go to `General setup` and
+enable `Support for paging of anonymous memory (swap)`.
 
 ## Contributions
 
