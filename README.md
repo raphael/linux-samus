@@ -27,7 +27,8 @@ cd scripts/archlinux
 ```
 cd build/linux
 make nconfig
-make
+make -j4
+sudo make modules_install
 sudo make install
 ```
 > *NOTE* The steps above are just the standard kernel build steps and may
