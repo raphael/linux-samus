@@ -4,7 +4,7 @@
 
 pkgbase=linux-samus4
 _srcname=linux-head
-pkgver=4.1rc8
+pkgver=4.1
 pkgrel=1
 arch=('i686' 'x86_64')
 url="http://www.kernel.org/"
@@ -24,7 +24,6 @@ prepare() {
     ln -s ${DIR}/../${_srcname} ${srcdir}/${_srcname}
   fi
   cp ${DIR}/linux.preset ${srcdir}
-  cp ${DIR}/../config ${srcdir}/${_srcname}/.config
 }
 
 build() {

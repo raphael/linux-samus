@@ -3,7 +3,7 @@
 This repository contains scripts that create a linux kernel patch from the
 ChromiumOS 3.14 tree (that's the version used to create the Pixel 2 kernel)
 and a small set of custom changes necessary to make the code compatible
-with the 4.1 tree. The current version is `4.1-rc8`.
+with the 4.1 tree. The current version is `4.1`.
 
 The main features the patches enable are sound support as well as screen and
 keyboard backlight. The provided kernel config is also somewhat optimized
@@ -12,7 +12,7 @@ for the Pixel 2.
 ## Usage
 
 There are two ways the patches can be applied: use the prepatched tree
-or build your own (e.g. if you need a different version than 4.1-rc8).
+or build your own (e.g. if you need a different version than 4.1).
 
 The easy way is to simply compile and install the pre-patched kernel found in
 `build/linux`. A set of Arch Linux packages is also included for convenience
@@ -37,20 +37,24 @@ $ sudo make install
 
 ### Post-install steps
 
-Once installed reboot and load the kernel. To enable sound, run `alsaucm` as
-follows:
+Once installed reboot and load the kernel. To enable sound run the `sound.sh`
+script:
 ```
-$ cd linux-4.1-pixel
-$ ALSA_CONFIG_UCM=scripts/ucm/ alsaucm -c bdw-rt5677 set _verb HiFi
+$ cd scripts/setup
+$ ./sound.sh
 ```
-To enable the microphone follow the steps in the first FAQ entry.
+> NOTE: this scripts makes a number of assumptions on your system (e.g.
+> `alsaucm` and `amixer` are both installed and the file
+> /etc/pulse/default.pa contains a line to load the modules using udev).
+
+If the setup script fails please see the #1 FAQ "Enabling sound step-by-step".
 
 ### Building your own patch
 
 To build your own patched tree use the `build.sh` scripts located in the
 `scripts` folder. The script accepts an optional argument which corresponds 
 to the git tag of the kernel tree to build the patch against. The default
-value is `4.1-rc8`.
+value is `4.1`.
 
 This script clones the two trees, diffs the necessary files and applies the
 patch containing the custom changes (`monkey.patch`) to the result. This
@@ -58,25 +62,54 @@ process results in a patched tree located in `scripts/linux-head`.
 
 ## FAQ
 
-### 1. Microphone Support
+### 1  Enabling sound step-by-step
 
-While ALSA detects the microphone device just fine, PulseAudio doesn't. The
-fix is simple though and consists of adding the following line in the file
-`/etc/pulseaudio/default.pa`:
+If you're reading this either the `sound.sh` script failed or better you want to
+understand what it does :)
+
+The first thing to do is to enable the "HiFi" verb with ALSAUCM. Make sure
+alsaucm is installed. It's usually part of the "alsa-utils" package. Assuming
+`alsaucm` is present, run the following:
+```
+$ cd scripts/setup
+$ ALSA_CONFIG_UCM=ucm/ alsaucm -c bdw-rt5677 set _verb HiFi
+```
+
+Next the microphone driver must be loaded statically by PulseAudio, add the
+line:
 ```
 load-module module-alsa-source device=hw:1,1
 ```
-This line must be added *before* the line that reads:
+to `/etc/pulseaudio/default.pa` *before* the line
 ```
 load-module module-udev-detect
 ```
 
-### 2. Resume fails after STR (Suspend-To-Ram)
+The last thing to check is the volume level for the mic in ALSA. If the mic
+doesn't seem to pick up any sound run the following command:
+```
+$ amixer -c1 set Mic 0DB
+```
+This resets the mic volume to 0DB instead of -90DB (mute). Obviously `amixer`
+must be installed.
+
+### 2. How do I control the screen brightness?
+
+The script `script/setup/brightness` can be used to control the brightness level.
+```
+$ script/setup/brightness --help
+Increase or decrease screen brighness
+Usage: brightness --increase | --decrease
+```
+Bind the F6 key to `brightness --decrease` and the F7 key to `brightness --increase` for
+an almost native experience...
+
+### 3. Resume fails after STR (Suspend-To-Ram)
 
 The TPM module must be loaded for resume to work after suspend. The config
 included in this repository enables it by default.
 
-### 3. Hibernate/Swap doesn't work
+### 4. Hibernate/Swap doesn't work
 
 The kernel config included in this repository disables swap as the Pixel 2
 is generous on memory but not so much on disk space. Hibernate requires
@@ -84,7 +117,7 @@ swap. If you need support for swap simply edit the config using e.g.
 `make nconfig` in the `build/linux` directory, go to `General setup` and
 enable `Support for paging of anonymous memory (swap)`.
 
-### 4. LVM / Encrypted partition doesn't boot
+### 5. LVM / Encrypted partition doesn't boot
 
 The kernel config in this repo doesn't enable LVM support which is required
 if the encryption is using cryptsetup a.k.a. DMCrypt.
