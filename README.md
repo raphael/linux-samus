@@ -20,20 +20,30 @@ in `build/archlinux` with an install script under `scripts/archlinux`.
 
 ### Arch Linux
 ```
-cd scripts/archlinux
-./install.sh
+$ cd scripts/archlinux
+$ ./install.sh
 ```
 ### Other distributions
 ```
-cd build/linux
-make nconfig
-make -j4
-sudo make modules_install
-sudo make install
+$ cd build/linux
+$ make nconfig
+$ make -j4
+$ sudo make modules_install
+$ sudo make install
 ```
 > *NOTE* The steps above are just the standard kernel build steps and may
 > differ depending on your setup. In particular the default kernel makefile
 > assumes LILO is being used.
+
+### Post-install steps
+
+Once installed reboot and load the kernel. To enable sound, run `alsaucm` as
+follows:
+```
+$ cd linux-4.1-pixel
+$ ALSA_CONFIG_UCM=scripts/ucm/ alsaucm -c bdw-rt5677 set _verb HiFi
+```
+To enable the microphone follow the steps in the first FAQ entry.
 
 ### Building your own patch
 
