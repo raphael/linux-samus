@@ -8,7 +8,7 @@ echo
 
 export LINUX=linux-head
 export CHROMEOS=chromiumos-chromeos-3.14
-export PATCHED=v4.1-rc8
+export PATCHED=v4.1
 if [ $# -gt 0 ]; then
   export PATCHED=$1
 fi
@@ -60,5 +60,6 @@ echo You may compile and install it with e.g.:
 echo
 echo cd linux-head
 echo sh -c \'make -j4\'
+echo sh -c \'sudo make modules_install\'
 echo sh -c \'sudo make install\'
 
