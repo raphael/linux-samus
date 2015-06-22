@@ -31,7 +31,7 @@ $ make -j4
 $ sudo make modules_install
 $ sudo make install
 ```
-> *NOTE* The steps above are just the standard kernel build steps and may
+> *NOTE* the steps above are just the standard kernel build steps and may
 > differ depending on your setup. In particular the default kernel makefile
 > assumes LILO is being used.
 
@@ -43,7 +43,7 @@ script:
 $ cd scripts/setup
 $ ./sound.sh
 ```
-> NOTE: this scripts makes a number of assumptions on your system (e.g.
+> *NOTE* this scripts makes a number of assumptions on your system (e.g.
 > `alsaucm` and `amixer` are both installed and the file
 > /etc/pulse/default.pa contains a line to load the modules using udev).
 
@@ -62,7 +62,7 @@ process results in a patched tree located in `scripts/linux-head`.
 
 ## FAQ
 
-### 1  Enabling sound step-by-step
+### 1. Enabling sound step-by-step
 
 If you're reading this either the `sound.sh` script failed or better you want to
 understand what it does :)
