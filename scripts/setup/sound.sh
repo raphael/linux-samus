@@ -9,7 +9,7 @@ if [ ! $? -eq 0 ]; then
 fi
 
 # 2. Set microphone device
-egrep -q '^load-module module-alsa-source device=hw:1,1' /etc/pulse/default.pa
+egrep -q '^[ 	]*load-module module-alsa-source device=hw:1,1' /etc/pulse/default.pa
 alreadyset=$?
 if [ ! $alreadyset -eq 0 ]; then
   echo "Updating PulseAudio config with microphone hardware info"
