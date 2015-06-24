@@ -15,6 +15,7 @@ if [ ! $alreadyset -eq 0 ]; then
   echo "Updating PulseAudio config with microphone hardware info"
   sudo cp /etc/pulse/default.pa /etc/pulse/default.pa.orig
   sudo sed -i '/load-module module-udev-detect/ i load-module module-alsa-source device=hw:1,1' /etc/pulse/default.pa
+  sudo sed -i '/load-module module-udev-detect/ i load-module module-alsa-source device=hw:1,2' /etc/pulse/default.pa
   if [ ! $? -eq 0 ]; then
     echo "!!Failed to patch /etc/pulse/default.pa, proceeding anyway."
   else
@@ -28,7 +29,10 @@ if [ ! $alreadyset -eq 0 ]; then
   fi
 fi
 
-# 3. Set alsa mic level
+# 3. Copy vda firmware
+sudo cp ../../firmware/* /usr/lib/firmware
+
+# 4. Set alsa mic level
 echo "Unmuting mic"
 amixer -c1 set Mic 0DB
 if [ ! $? -eq 0 ]; then
