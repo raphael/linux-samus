@@ -13,7 +13,7 @@ mv *.xz ../../build/archlinux
 rm -rf src
 rm -rf pkg
 rm -rf *.log
-rm -rf *.log.1
+rm -rf *.log.*
 rm -f linux.install.pkg
 
 # 4. Profit
