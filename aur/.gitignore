@@ -1,0 +1,4 @@
+*.xz
+pkg/
+src/
+linux.install.pkg
