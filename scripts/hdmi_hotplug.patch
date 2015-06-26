@@ -1,0 +1,171 @@
+diff -ruN linux-4.0.5/drivers/gpu/drm/drm_probe_helper.c linux-4.0.5.hotplug/drivers/gpu/drm/drm_probe_helper.c
+--- linux-4.0.5/drivers/gpu/drm/drm_probe_helper.c	2015-06-06 09:21:22.000000000 -0600
++++ linux-4.0.5.hotplug/drivers/gpu/drm/drm_probe_helper.c	2015-06-13 22:35:39.759455090 -0600
+@@ -295,6 +295,32 @@
+ }
+ EXPORT_SYMBOL(drm_kms_helper_hotplug_event);
+ 
++/**
++ * drm_kms_helper_hdmi_hotplug_event - fire off KMS hotplug events
++ * @dev: drm_device whose connector state changed
++ *
++ * This function fires off the uevent for userspace and also calls the
++ * output_poll_changed function, which is most commonly used to inform the fbdev
++ * emulation code and allow it to update the fbcon output configuration.
++ *
++ * Drivers should call this from their hotplug handling code when a change is
++ * detected. Note that this function does not do any output detection of its
++ * own, like drm_helper_hpd_irq_event() does - this is assumed to be done by the
++ * driver already.
++ *
++ * This function must be called from process context with no mode
++ * setting locks held.
++ */
++void drm_kms_helper_hdmi_hotplug_event(struct drm_device *dev)
++{
++	/* send a uevent + call fbdev */
++	drm_sysfs_hdmi_hotplug_event(dev);
++	if (dev->mode_config.funcs->output_poll_changed)
++		dev->mode_config.funcs->output_poll_changed(dev);
++}
++EXPORT_SYMBOL(drm_kms_helper_hdmi_hotplug_event);
++
++
+ #define DRM_OUTPUT_POLL_PERIOD (10*HZ)
+ static void output_poll_execute(struct work_struct *work)
+ {
+diff -ruN linux-4.0.5/drivers/gpu/drm/drm_sysfs.c linux-4.0.5.hotplug/drivers/gpu/drm/drm_sysfs.c
+--- linux-4.0.5/drivers/gpu/drm/drm_sysfs.c	2015-06-06 09:21:22.000000000 -0600
++++ linux-4.0.5.hotplug/drivers/gpu/drm/drm_sysfs.c	2015-06-13 22:30:18.634016865 -0600
+@@ -490,6 +490,26 @@
+ }
+ EXPORT_SYMBOL(drm_sysfs_hotplug_event);
+ 
++/**
++ * drm_sysfs_hdmi_hotplug_event - generate a DRM uevent
++ * @dev: DRM device
++ *
++ * Send a uevent for the DRM device specified by @dev.  Currently we only
++ * set HOTPLUG=1 and HDMI=1 in the uevent environment, but this could be expanded to
++ * deal with other types of events.
++ */
++void drm_sysfs_hdmi_hotplug_event(struct drm_device *dev)
++{
++	char *event_string = "HOTPLUG=1";
++	char *hdmi_event_string = "HDMI=1";
++	char *envp[] = { event_string, hdmi_event_string, NULL };
++
++	DRM_DEBUG("generating hdmi hotplug event\n");
++
++	kobject_uevent_env(&dev->primary->kdev->kobj, KOBJ_CHANGE, envp);
++}
++EXPORT_SYMBOL(drm_sysfs_hdmi_hotplug_event);
++
+ static void drm_sysfs_release(struct device *dev)
+ {
+ 	kfree(dev);
+diff -ruN linux-4.0.5/drivers/gpu/drm/i915/i915_drv.c linux-4.0.5.hotplug/drivers/gpu/drm/i915/i915_drv.c
+--- linux-4.0.5/drivers/gpu/drm/i915/i915_drv.c	2015-06-06 09:21:22.000000000 -0600
++++ linux-4.0.5.hotplug/drivers/gpu/drm/i915/i915_drv.c	2015-06-11 11:17:13.066535399 -0600
+@@ -525,7 +525,7 @@
+ 	spin_unlock_irq(&dev_priv->irq_lock);
+ 
+ 	cancel_work_sync(&dev_priv->dig_port_work);
+-	cancel_work_sync(&dev_priv->hotplug_work);
++	cancel_delayed_work_sync(&dev_priv->hotplug_work);
+ 	cancel_delayed_work_sync(&dev_priv->hotplug_reenable_work);
+ }
+ 
+diff -ruN linux-4.0.5/drivers/gpu/drm/i915/i915_drv.h linux-4.0.5.hotplug/drivers/gpu/drm/i915/i915_drv.h
+--- linux-4.0.5/drivers/gpu/drm/i915/i915_drv.h	2015-06-06 09:21:22.000000000 -0600
++++ linux-4.0.5.hotplug/drivers/gpu/drm/i915/i915_drv.h	2015-06-11 11:17:57.820448575 -0600
+@@ -1702,7 +1702,7 @@
+ 	u32 pm_rps_events;
+ 	u32 pipestat_irq_mask[I915_MAX_PIPES];
+ 
+-	struct work_struct hotplug_work;
++	struct delayed_work hotplug_work;
+ 	struct {
+ 		unsigned long hpd_last_jiffies;
+ 		int hpd_cnt;
+diff -ruN linux-4.0.5/drivers/gpu/drm/i915/i915_irq.c linux-4.0.5.hotplug/drivers/gpu/drm/i915/i915_irq.c
+--- linux-4.0.5/drivers/gpu/drm/i915/i915_irq.c	2015-06-06 09:21:22.000000000 -0600
++++ linux-4.0.5.hotplug/drivers/gpu/drm/i915/i915_irq.c	2015-06-13 22:34:12.418260951 -0600
+@@ -873,6 +873,8 @@
+ 	return true;
+ }
+ 
++#define HOTPLUG_DELAY_MS	400
++
+ static void i915_digport_work_func(struct work_struct *work)
+ {
+ 	struct drm_i915_private *dev_priv =
+@@ -917,7 +919,8 @@
+ 		spin_lock_irq(&dev_priv->irq_lock);
+ 		dev_priv->hpd_event_bits |= old_bits;
+ 		spin_unlock_irq(&dev_priv->irq_lock);
+-		schedule_work(&dev_priv->hotplug_work);
++                mod_delayed_work(system_wq, &dev_priv->hotplug_work,
++				 msecs_to_jiffies(HOTPLUG_DELAY_MS));
+ 	}
+ }
+ 
+@@ -929,7 +932,7 @@
+ static void i915_hotplug_work_func(struct work_struct *work)
+ {
+ 	struct drm_i915_private *dev_priv =
+-		container_of(work, struct drm_i915_private, hotplug_work);
++		container_of(work, struct drm_i915_private, hotplug_work.work);
+ 	struct drm_device *dev = dev_priv->dev;
+ 	struct drm_mode_config *mode_config = &dev->mode_config;
+ 	struct intel_connector *intel_connector;
+@@ -993,7 +996,7 @@
+ 	mutex_unlock(&mode_config->mutex);
+ 
+ 	if (changed)
+-		drm_kms_helper_hotplug_event(dev);
++		drm_kms_helper_hdmi_hotplug_event(dev);
+ }
+ 
+ static void ironlake_rps_change_irq_handler(struct drm_device *dev)
+@@ -1630,7 +1633,8 @@
+ 	if (queue_dig)
+ 		queue_work(dev_priv->dp_wq, &dev_priv->dig_port_work);
+ 	if (queue_hp)
+-		schedule_work(&dev_priv->hotplug_work);
++                mod_delayed_work(system_wq, &dev_priv->hotplug_work,
++                                 msecs_to_jiffies(HOTPLUG_DELAY_MS));
+ }
+ 
+ static void gmbus_irq_handler(struct drm_device *dev)
+@@ -4350,7 +4354,7 @@
+ {
+ 	struct drm_device *dev = dev_priv->dev;
+ 
+-	INIT_WORK(&dev_priv->hotplug_work, i915_hotplug_work_func);
++	INIT_DELAYED_WORK(&dev_priv->hotplug_work, i915_hotplug_work_func);
+ 	INIT_WORK(&dev_priv->dig_port_work, i915_digport_work_func);
+ 	INIT_WORK(&dev_priv->rps.work, gen6_pm_rps_work);
+ 	INIT_WORK(&dev_priv->l3_parity.error_work, ivybridge_parity_work);
+diff -urN linux-4.0.5/include/drm/drm_crtc_helper.h linux-4.0.5.hotplug/include/drm/drm_crtc_helper.h
+--- linux-4.0.5/include/drm/drm_crtc_helper.h	2015-06-06 09:21:22.000000000 -0600
++++ linux-4.0.5.hotplug/include/drm/drm_crtc_helper.h	2015-06-16 11:13:40.918159725 -0600
+@@ -231,6 +231,7 @@
+ extern void drm_kms_helper_poll_fini(struct drm_device *dev);
+ extern bool drm_helper_hpd_irq_event(struct drm_device *dev);
+ extern void drm_kms_helper_hotplug_event(struct drm_device *dev);
++extern void drm_kms_helper_hdmi_hotplug_event(struct drm_device *dev);
+ 
+ extern void drm_kms_helper_poll_disable(struct drm_device *dev);
+ extern void drm_kms_helper_poll_enable(struct drm_device *dev);
+diff -urN linux-4.0.5/include/drm/drmP.h linux-4.0.5.hotplug/include/drm/drmP.h
+--- linux-4.0.5/include/drm/drmP.h	2015-06-06 09:21:22.000000000 -0600
++++ linux-4.0.5.hotplug/include/drm/drmP.h	2015-06-16 11:13:56.273453731 -0600
+@@ -1004,6 +1004,7 @@
+ 
+ 			       /* sysfs support (drm_sysfs.c) */
+ extern void drm_sysfs_hotplug_event(struct drm_device *dev);
++extern void drm_sysfs_hdmi_hotplug_event(struct drm_device *dev);
+ 
+ 
+ struct drm_device *drm_dev_alloc(struct drm_driver *driver,
