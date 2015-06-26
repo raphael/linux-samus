@@ -28,11 +28,18 @@ mv sound/soc/intel/bdw-rt5677.c sound/soc/intel/boards/bdw-rt5677.c
 mv sound/soc/intel/sst-debugfs.* sound/soc/intel/common
 cp ../config .config
 
-# Apply custom patch
+# Apply custom patches
 patch -p1 < ../monkey.patch
 if [ $? -ne 0 ]; then
   echo Something wrong happened...
   echo I couldn\'t patch the main tree with the custom patch which means that changes upstream require an update to this script.
+  exit 1
+fi
+
+patch -p1 < ../hdmi_hotplug.patch
+if [ $? -ne 0 ]; then
+  echo Something wrong happened...
+  echo I couldn\'t patch the main tree with the hdmi patch which means that changes upstream require an update to this script.
   exit 1
 fi
 
