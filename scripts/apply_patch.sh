@@ -1,11 +1,14 @@
 #!/bin/bash
+
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+
 export PATCH=$1
 if [ $# -lt 1 ]; then
-  export PATCH=../generated.patch
+  export PATCH=$DIR/generated.patch
 fi
 export LINUX=$2
 if [ $# -lt 2 ]; then
-  export LINUX=linux-head
+  export LINUX=$DIR/../build/linux-patched
 fi
 
 echo Patching $LINUX
@@ -16,7 +19,8 @@ rm -f $LINUX/sound/soc/intel/boards/bdw-rt5677.
 cd $LINUX
 
 # Apply created patch
-patch -p1 < ../generated.patch
+echo -- Applying generated patch --
+patch -p1 < $DIR/generated.patch
 if [ $? -ne 0 ]; then
   echo Something wrong happened...
   echo I couldn\'t patch the main tree with the created patch which means that changes upstream require an update to this script.
@@ -26,17 +30,19 @@ fi
 # Adjust
 mv sound/soc/intel/bdw-rt5677.c sound/soc/intel/boards/bdw-rt5677.c
 mv sound/soc/intel/sst-debugfs.* sound/soc/intel/common
-cp ../config .config
+ln -s $DIR/config .config
 
 # Apply custom patches
-patch -p1 < ../monkey.patch
+echo -- Applying custom patch --
+patch -p1 < $DIR/monkey.patch
 if [ $? -ne 0 ]; then
   echo Something wrong happened...
   echo I couldn\'t patch the main tree with the custom patch which means that changes upstream require an update to this script.
   exit 1
 fi
 
-patch -p1 < ../hdmi_hotplug.patch
+patch -p1 < $DIR/hdmi_hotplug.patch
+echo -- Applying HDMI hotplug patch --
 if [ $? -ne 0 ]; then
   echo Something wrong happened...
   echo I couldn\'t patch the main tree with the hdmi patch which means that changes upstream require an update to this script.

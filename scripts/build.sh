@@ -6,8 +6,10 @@ echo This takes a while and uses a lot of disk space - you\'ve been warned.
 read -p 'Are you sure? (y/n)' -n 1 -r
 echo
 
-export LINUX=linux-head
-export CHROMEOS=chromiumos-chromeos-3.14
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+
+export LINUX=`readlink -f $DIR/../build/linux-patched`
+export CHROMEOS=`readlink -f $DIR/../build/chromiumos-chromeos-3.14`
 export PATCHED=v4.1
 if [ $# -gt 0 ]; then
   export PATCHED=$1
@@ -37,13 +39,13 @@ git reset --hard $PATCHED
 if [ $? -ne 0 ]; then
   exit 1
 fi
-cd ../$CHROMEOS
+cd $CHROMEOS
 git clean -qfdx
 git checkout chromeos-3.14
 if [ $? -ne 0 ]; then
   exit 1
 fi
-cd ..
+cd $DIR
 
 echo Creating patches
 ./create_patch.sh generated.patch
@@ -58,8 +60,12 @@ fi
 echo Successfully patched Linux!!
 echo You may compile and install it with e.g.:
 echo
-echo cd linux-head
+echo cd $LINUX
 echo sh -c \'make -j4\'
 echo sh -c \'sudo make modules_install\'
 echo sh -c \'sudo make install\'
-
+echo
+echo Once installed, reboot with the new kernel and run setup/sound.sh to
+echo enable sound and microphones.
+echo Use the setup/brightness script to control screen brightness
+echo \(setup/brightness --help for usage information\)
