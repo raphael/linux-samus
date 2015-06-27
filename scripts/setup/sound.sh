@@ -30,7 +30,13 @@ if [ ! $alreadyset -eq 0 ]; then
 fi
 
 # 3. Copy vda firmware
-sudo cp ../../firmware/* /usr/lib/firmware
+if [ -d "/lib/firmware" ]; then
+  sudo cp ../../firmware/* /lib/firmware
+elif [ -d "/usr/lib/firmware" ]; then
+  sudo cp ../../firmware/* /usr/lib/firmware
+else
+  echo "Could not find firmware directory, skipping firmware install"
+fi
 
 # 4. Set alsa mic level
 echo "Unmuting mic"
