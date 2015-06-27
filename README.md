@@ -21,17 +21,24 @@ also a set of debian packages included.
 
 ### Ubuntu / Debian
 ```
-$ cd build/debian
+$ git clone https://github.com/raphael/linux-4.1-samus
+$ cd linux-4.1-samus/build/debian
 $ sudo dpkg -i *.deb
 ```
 ### Arch Linux
 ```
-$ cd scripts/archlinux
+$ git clone https://github.com/raphael/linux-4.1-samus
+$ cd linux-4.1-samus/scripts/archlinux
 $ ./install.sh
+```
+or install from the AUR4:
+```
+yaourt -S linux-samus4 --aur-url https://aur4.archlinux.org
 ```
 ### Other distributions
 ```
-$ cd build/linux
+$ git clone https://github.com/raphael/linux-4.1-samus
+$ cd linux-4.1-samus/build/linux
 $ make nconfig
 $ make -j4
 $ sudo make modules_install
@@ -46,7 +53,7 @@ $ sudo make install
 Once installed reboot and load the kernel. To enable sound run the `sound.sh`
 script:
 ```
-$ cd scripts/setup
+$ cd linux-4.1-samus/scripts/setup
 $ ./sound.sh
 ```
 > *NOTE* this scripts makes a number of assumptions on your system (e.g.

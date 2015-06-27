@@ -25,4 +25,10 @@ if [ $? -ne 0 ]; then
   echo Failed to run mksrcinfo
   exit 1
 fi
+makepkg -g >> PKGBUILD
+if [ $? -ne 0 ]; then
+  echo Failed to update checksums
+  exit 1
+fi
 echo $REPO updated.
+echo DON\'T FORGET TO REMOVE THE OLD MD5SUM FROM $REPO/PKGBUILD
