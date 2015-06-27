@@ -977,11 +977,9 @@ static int hsw_pcm_dev_probe(struct platform_device *pdev)
 		goto err_comp;
 
 #ifdef CONFIG_DEBUG_FS
-#ifdef CONFIG_PM_RUNTIME
 	priv_data->hsw = sst_pdata->dsp;
 	sst_debugfs_get_root(&root);
 	sst_hsw_dbg_enable(priv_data->hsw, &root);
-#endif
 #endif
 
 	return 0;
@@ -1005,7 +1003,6 @@ static int hsw_pcm_dev_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM
-#ifdef CONFIG_PM_RUNTIME
 
 static int hsw_pcm_runtime_idle(struct device *dev)
 {
@@ -1153,14 +1150,6 @@ static int hsw_pcm_prepare(struct device *dev)
 
 	return 0;
 }
-
-#else
-#define hsw_pcm_runtime_idle		NULL
-#define hsw_pcm_runtime_suspend		NULL
-#define hsw_pcm_runtime_resume		NULL
-#define hsw_pcm_complete	NULL
-#define hsw_pcm_prepare		NULL
-#endif
 
 static const struct dev_pm_ops hsw_pcm_pm = {
 	.runtime_idle = hsw_pcm_runtime_idle,

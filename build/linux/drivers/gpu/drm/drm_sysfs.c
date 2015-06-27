@@ -535,6 +535,26 @@ void drm_sysfs_hotplug_event(struct drm_device *dev)
 }
 EXPORT_SYMBOL(drm_sysfs_hotplug_event);
 
+/**
+ * drm_sysfs_hdmi_hotplug_event - generate a DRM uevent
+ * @dev: DRM device
+ *
+ * Send a uevent for the DRM device specified by @dev.  Currently we only
+ * set HOTPLUG=1 and HDMI=1 in the uevent environment, but this could be expanded to
+ * deal with other types of events.
+ */
+void drm_sysfs_hdmi_hotplug_event(struct drm_device *dev)
+{
+	char *event_string = "HOTPLUG=1";
+	char *hdmi_event_string = "HDMI=1";
+	char *envp[] = { event_string, hdmi_event_string, NULL };
+
+	DRM_DEBUG("generating hdmi hotplug event\n");
+
+	kobject_uevent_env(&dev->primary->kdev->kobj, KOBJ_CHANGE, envp);
+}
+EXPORT_SYMBOL(drm_sysfs_hdmi_hotplug_event);
+
 static void drm_sysfs_release(struct device *dev)
 {
 	kfree(dev);

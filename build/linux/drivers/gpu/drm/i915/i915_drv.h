@@ -1624,7 +1624,7 @@ struct drm_i915_private {
 	u32 pm_rps_events;
 	u32 pipestat_irq_mask[I915_MAX_PIPES];
 
-	struct work_struct hotplug_work;
+	struct delayed_work hotplug_work;
 	struct {
 		unsigned long hpd_last_jiffies;
 		int hpd_cnt;

@@ -295,6 +295,32 @@ void drm_kms_helper_hotplug_event(struct drm_device *dev)
 }
 EXPORT_SYMBOL(drm_kms_helper_hotplug_event);
 
+/**
+ * drm_kms_helper_hdmi_hotplug_event - fire off KMS hotplug events
+ * @dev: drm_device whose connector state changed
+ *
+ * This function fires off the uevent for userspace and also calls the
+ * output_poll_changed function, which is most commonly used to inform the fbdev
+ * emulation code and allow it to update the fbcon output configuration.
+ *
+ * Drivers should call this from their hotplug handling code when a change is
+ * detected. Note that this function does not do any output detection of its
+ * own, like drm_helper_hpd_irq_event() does - this is assumed to be done by the
+ * driver already.
+ *
+ * This function must be called from process context with no mode
+ * setting locks held.
+ */
+void drm_kms_helper_hdmi_hotplug_event(struct drm_device *dev)
+{
+	/* send a uevent + call fbdev */
+	drm_sysfs_hdmi_hotplug_event(dev);
+	if (dev->mode_config.funcs->output_poll_changed)
+		dev->mode_config.funcs->output_poll_changed(dev);
+}
+EXPORT_SYMBOL(drm_kms_helper_hdmi_hotplug_event);
+
+
 #define DRM_OUTPUT_POLL_PERIOD (10*HZ)
 static void output_poll_execute(struct work_struct *work)
 {

@@ -1758,7 +1758,6 @@ void sst_hsw_runtime_module_free(struct sst_module_runtime *runtime)
 	sst_module_runtime_free(runtime);
 }
 
-#ifdef CONFIG_PM_RUNTIME
 static int sst_hsw_dx_state_dump(struct sst_hsw *hsw)
 {
 	struct sst_dsp *sst = hsw->dsp;
@@ -2203,11 +2202,9 @@ int sst_hsw_dbg_enable(struct sst_hsw *hsw,
 			&hsw->log_stream, &fw_log_config_fops))
 		pr_warn("ASoC: Failed to create fw_log_config debugfs file\n");
 
-#ifdef CONFIG_PM_RUNTIME
 	if (!debugfs_create_file("suspend_stats", 0444, fwdir,
 			&hsw->log_stream, &suspend_stats_fops))
 		pr_warn("ASoC: Failed to create suspend_stats file\n");
-#endif
 #endif
 	return 0;
 }
@@ -2367,7 +2364,6 @@ int sst_hsw_dsp_runtime_resume(struct sst_hsw *hsw)
 
 	return ret;
 }
-#endif
 
 static int msg_empty_list_init(struct sst_hsw *hsw)
 {

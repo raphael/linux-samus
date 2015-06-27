@@ -539,7 +539,7 @@ void intel_hpd_cancel_work(struct drm_i915_private *dev_priv)
 	spin_unlock_irq(&dev_priv->irq_lock);
 
 	cancel_work_sync(&dev_priv->dig_port_work);
-	cancel_work_sync(&dev_priv->hotplug_work);
+	cancel_delayed_work_sync(&dev_priv->hotplug_work);
 	cancel_delayed_work_sync(&dev_priv->hotplug_reenable_work);
 }
 
