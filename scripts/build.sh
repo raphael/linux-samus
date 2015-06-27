@@ -1,71 +1,32 @@
 #!/bin/bash
 
-echo This script will clone two complete copies of the kernel source code.
-echo The first copy from the official \'Linus\' tree and the second from the chromium tree.
-echo This takes a while and uses a lot of disk space - you\'ve been warned.
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+LINUX=`readlink -f $DIR/../build/linux-patched`
+
+echo This script builds the patch then compiles the kernel and builds the ArchLinux and Debian
+echo packages. Note that creating the patch requires resetting the `linux-patched` folder thereby
+echo discarding all the build artefacts. Therefore this script is *not* idempotent, each invokation
+echo will cause the entire kernel to get regenerated / recompiled.
 read -p 'Are you sure? (y/n)' -n 1 -r
 echo
 
-DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-
-export LINUX=`readlink -f $DIR/../build/linux-patched`
-export CHROMEOS=`readlink -f $DIR/../build/chromiumos-chromeos-3.14`
-export PATCHED=v4.1
-if [ $# -gt 0 ]; then
-  export PATCHED=$1
-fi
-
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-  if [ ! -d $LINUX ]; then
-    git clone https://github.com/torvalds/linux.git $LINUX
-  fi
-  if [ ! -d $CHROMEOS ]; then
-    git clone https://chromium.googlesource.com/chromiumos/third_party/kernel $CHROMEOS
-  fi
-fi
-if [ ! -d $LINUX ]; then
-  echo $LINUX does not exist, cannot proceed.
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  echo exiting...
   exit 1
 fi
-if [ ! -d $CHROMEOS ]; then
-  echo $CHROMEOS does not exist, cannot proceed.
-  exit 1
-fi
-
-echo Resetting repos
-cd $LINUX
-git clean -qfdx
-git reset --hard $PATCHED
+$DIR/patch.sh
 if [ $? -ne 0 ]; then
   exit 1
 fi
-cd $CHROMEOS
-git clean -qfdx
-git checkout chromeos-3.14
+cd $DIR/archlinux
+./build.sh
 if [ $? -ne 0 ]; then
   exit 1
 fi
-cd $DIR
-
-echo Creating patches
-./create_patch.sh generated.patch
-if [ $? -ne 0 ]; then
-  exit 1
-fi
-./apply_patch.sh
+cd $DIR/debian
+./build.sh
 if [ $? -ne 0 ]; then
   exit 1
 fi
 echo
-echo Successfully patched Linux!!
-echo You may compile and install it with e.g.:
-echo
-echo cd $LINUX
-echo sh -c \'make -j4\'
-echo sh -c \'sudo make modules_install\'
-echo sh -c \'sudo make install\'
-echo
-echo Once installed, reboot with the new kernel and run setup/sound.sh to
-echo enable sound and microphones.
-echo Use the setup/brightness script to control screen brightness
-echo \(setup/brightness --help for usage information\).
+echo All done!

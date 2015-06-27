@@ -57,7 +57,7 @@ If the setup script fails please see the #1 FAQ "Enabling sound step-by-step".
 
 ### Building your own patch
 
-To build your own patched tree use the `build.sh` scripts located in the
+To build your own patched tree use the `patch.sh` scripts located in the
 `scripts` folder. The script accepts an optional argument which corresponds 
 to the git tag of the kernel tree to build the patch against. The default
 value is `4.1`.
