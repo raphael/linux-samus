@@ -1018,6 +1018,7 @@ extern void drm_pci_free(struct drm_device *dev, struct drm_dma_handle * dmah);
 
 			       /* sysfs support (drm_sysfs.c) */
 extern void drm_sysfs_hotplug_event(struct drm_device *dev);
+extern void drm_sysfs_hdmi_hotplug_event(struct drm_device *dev);
 
 
 struct drm_device *drm_dev_alloc(struct drm_driver *driver,

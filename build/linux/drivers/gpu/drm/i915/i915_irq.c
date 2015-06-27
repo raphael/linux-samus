@@ -823,6 +823,8 @@ static bool intel_hpd_irq_event(struct drm_device *dev,
 	return true;
 }
 
+#define HOTPLUG_DELAY_MS	400
+
 static void i915_digport_work_func(struct work_struct *work)
 {
 	struct drm_i915_private *dev_priv =
@@ -867,7 +869,8 @@ static void i915_digport_work_func(struct work_struct *work)
 		spin_lock_irq(&dev_priv->irq_lock);
 		dev_priv->hpd_event_bits |= old_bits;
 		spin_unlock_irq(&dev_priv->irq_lock);
-		schedule_work(&dev_priv->hotplug_work);
+                mod_delayed_work(system_wq, &dev_priv->hotplug_work,
+				 msecs_to_jiffies(HOTPLUG_DELAY_MS));
 	}
 }
 
@@ -879,7 +882,7 @@ static void i915_digport_work_func(struct work_struct *work)
 static void i915_hotplug_work_func(struct work_struct *work)
 {
 	struct drm_i915_private *dev_priv =
-		container_of(work, struct drm_i915_private, hotplug_work);
+		container_of(work, struct drm_i915_private, hotplug_work.work);
 	struct drm_device *dev = dev_priv->dev;
 	struct drm_mode_config *mode_config = &dev->mode_config;
 	struct intel_connector *intel_connector;
@@ -943,7 +946,7 @@ static void i915_hotplug_work_func(struct work_struct *work)
 	mutex_unlock(&mode_config->mutex);
 
 	if (changed)
-		drm_kms_helper_hotplug_event(dev);
+		drm_kms_helper_hdmi_hotplug_event(dev);
 }
 
 static void ironlake_rps_change_irq_handler(struct drm_device *dev)
@@ -1521,7 +1524,8 @@ static inline void intel_hpd_irq_handler(struct drm_device *dev,
 	if (queue_dig)
 		queue_work(dev_priv->dp_wq, &dev_priv->dig_port_work);
 	if (queue_hp)
-		schedule_work(&dev_priv->hotplug_work);
+                mod_delayed_work(system_wq, &dev_priv->hotplug_work,
+                                 msecs_to_jiffies(HOTPLUG_DELAY_MS));
 }
 
 static void gmbus_irq_handler(struct drm_device *dev)
@@ -4230,7 +4234,7 @@ void intel_irq_init(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *dev = dev_priv->dev;
 
-	INIT_WORK(&dev_priv->hotplug_work, i915_hotplug_work_func);
+	INIT_DELAYED_WORK(&dev_priv->hotplug_work, i915_hotplug_work_func);
 	INIT_WORK(&dev_priv->dig_port_work, i915_digport_work_func);
 	INIT_WORK(&dev_priv->rps.work, gen6_pm_rps_work);
 	INIT_WORK(&dev_priv->l3_parity.error_work, ivybridge_parity_work);

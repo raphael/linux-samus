@@ -79,15 +79,44 @@ diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-ipc.c chromiumos-chrome
  
  /* Global Message - Generic */
  #define IPC_GLB_TYPE_SHIFT	24
-@@ -2129,7 +2129,7 @@
+@@ -1758,7 +1758,6 @@
+ 	sst_module_runtime_free(runtime);
+ }
+ 
+-#ifdef CONFIG_PM_RUNTIME
+ static int sst_hsw_dx_state_dump(struct sst_hsw *hsw)
+ {
+ 	struct sst_dsp *sst = hsw->dsp;
+@@ -2129,7 +2128,7 @@
  	int i;
  	struct snd_dma_buffer *dma_buf[2];
  	static struct dentry *fwdir;
-+
 -	
++
  	dma_buf[0] = devm_kzalloc(hsw->dsp->dev, sizeof(*dma_buf[0]), GFP_KERNEL);
  	dma_buf[1] = devm_kzalloc(hsw->dsp->dev, sizeof(*dma_buf[1]), GFP_KERNEL);
  	memset(log_stream->config, 0xFF, sizeof(log_stream->config));
+@@ -2203,12 +2202,10 @@
+ 			&hsw->log_stream, &fw_log_config_fops))
+ 		pr_warn("ASoC: Failed to create fw_log_config debugfs file\n");
+ 
+-#ifdef CONFIG_PM_RUNTIME
+ 	if (!debugfs_create_file("suspend_stats", 0444, fwdir,
+ 			&hsw->log_stream, &suspend_stats_fops))
+ 		pr_warn("ASoC: Failed to create suspend_stats file\n");
+ #endif
+-#endif
+ 	return 0;
+ }
+ EXPORT_SYMBOL(sst_hsw_dbg_enable);
+@@ -2367,7 +2364,6 @@
+ 
+ 	return ret;
+ }
+-#endif
+ 
+ static int msg_empty_list_init(struct sst_hsw *hsw)
+ {
 diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-pcm.c chromiumos-chromeos-3.14/sound/soc/intel/sst-haswell-pcm.c
 --- linux-head/sound/soc/intel/haswell/sst-haswell-pcm.c	2015-06-18 18:55:53.169999321 -0700
 +++ chromiumos-chromeos-3.14/sound/soc/intel/sst-haswell-pcm.c	2015-06-15 23:15:50.903314664 -0700
@@ -104,27 +133,26 @@ diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-pcm.c chromiumos-chrome
  
  #define HSW_PCM_COUNT		6
  #define HSW_VOLUME_MAX		0x7FFFFFFF	/* 0dB */
-@@ -977,10 +977,12 @@
- 		goto err_comp;
+@@ -1003,7 +1003,6 @@
+ }
  
- #ifdef CONFIG_DEBUG_FS
-+#ifdef CONFIG_PM_RUNTIME
- 	priv_data->hsw = sst_pdata->dsp;
- 	sst_debugfs_get_root(&root);
- 	sst_hsw_dbg_enable(priv_data->hsw, &root);
- #endif
-+#endif
+ #ifdef CONFIG_PM
+-#ifdef CONFIG_PM_RUNTIME
  
+ static int hsw_pcm_runtime_idle(struct device *dev)
+ {
+@@ -1152,14 +1151,6 @@
  	return 0;
+ }
  
-@@ -1158,8 +1160,8 @@
- #define hsw_pcm_runtime_idle		NULL
- #define hsw_pcm_runtime_suspend		NULL
- #define hsw_pcm_runtime_resume		NULL
-+#define hsw_pcm_complete	NULL
-+#define hsw_pcm_prepare		NULL
+-#else
+-#define hsw_pcm_runtime_idle		NULL
+-#define hsw_pcm_runtime_suspend		NULL
+-#define hsw_pcm_runtime_resume		NULL
 -#define hsw_pcm_runtime_complete	NULL
 -#define hsw_pcm_runtime_prepare		NULL
- #endif
- 
+-#endif
+-
  static const struct dev_pm_ops hsw_pcm_pm = {
+ 	.runtime_idle = hsw_pcm_runtime_idle,
+ 	.runtime_suspend = hsw_pcm_runtime_suspend,
