@@ -3,7 +3,7 @@
 This repository contains scripts that create a linux kernel patch from the
 ChromiumOS 3.14 tree (that's the version used to create the Pixel 2 kernel)
 and a small set of custom changes necessary to make the code compatible
-with the 4.1 tree. The current version is `4.1`.
+with the 4.1 tree.
 
 The main features the patches enable are sound support as well as screen and
 keyboard backlight. The provided kernel config is also somewhat optimized
@@ -16,8 +16,14 @@ or build your own (e.g. if you need a different version than 4.1).
 
 The easy way is to simply compile and install the pre-patched kernel found in
 `build/linux`. A set of Arch Linux packages is also included for convenience
-in `build/archlinux` with an install script under `scripts/archlinux`.
+in `build/archlinux` with an install script under `scripts/archlinux`. There's
+also a set of debian packages included.
 
+### Ubuntu / Debian
+```
+$ cd scripts/debian
+$ sudo dpkg -i *.deb
+```
 ### Arch Linux
 ```
 $ cd scripts/archlinux
@@ -56,9 +62,10 @@ To build your own patched tree use the `build.sh` scripts located in the
 to the git tag of the kernel tree to build the patch against. The default
 value is `4.1`.
 
-This script clones the two trees, diffs the necessary files and applies the
-patch containing the custom changes (`monkey.patch`) to the result. This
-process results in a patched tree located in `scripts/linux-head`.
+This script clones the two trees, diffs the necessary files and create a
+patch. It then applies this generated patch and the other included patches
+to the original tree. This process results in a patched tree located in
+`build/linux-patched`.
 
 ## FAQ
 

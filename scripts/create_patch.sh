@@ -1,11 +1,14 @@
 #!/bin/bash
 
-export LINUX=linux-head
-export CHROMEOS=chromiumos-chromeos-3.14
-export TARGET=$1
+LINUX=linux-patched
+CHROMEOS=chromiumos-chromeos-3.14
+TARGET=$1
 if [ $# -eq 0 ]; then
-  export TARGET=generated.patch
+  TARGET=generated.patch
 fi
+
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+TARGET=$DIR/$TARGET
 
 echo This script creates a patch file from the current content of the $LINUX and $CHROMEOS repos.
 echo Creating patches
@@ -51,6 +54,7 @@ files[38]="sound/soc/soc-io.c"
 files[39]="sound/soc/soc-jack.c"
 files[40]="sound/soc/soc-pcm.c"
 
+cd $DIR/../build
 rm -rf tmp_kernel_patches
 mkdir tmp_kernel_patches
 for f in "${files[@]}"; do
@@ -62,7 +66,7 @@ done
 
 # Create one big patch
 cat tmp_kernel_patches/*.patch > $TARGET
-cat haswell-Makefile.patch >> $TARGET
+cat $DIR/haswell-Makefile.patch >> $TARGET
 
 # Cleanup
 rm -rf tmp_kernel_patches

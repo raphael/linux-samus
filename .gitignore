@@ -1,5 +1,5 @@
-scripts/linux-head/
-scripts/chromiumos-chromeos-3.14/
+build/linux-patched/
+build/chromiumos-chromeos-3.14/
 scripts/generated.patch
 
 # Linux .gitignore
