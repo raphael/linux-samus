@@ -56,7 +56,7 @@ fi
 if [ $? -ne 0 ]; then
   exit 1
 fi
-
+echo
 echo Successfully patched Linux!!
 echo You may compile and install it with e.g.:
 echo
@@ -68,4 +68,4 @@ echo
 echo Once installed, reboot with the new kernel and run setup/sound.sh to
 echo enable sound and microphones.
 echo Use the setup/brightness script to control screen brightness
-echo \(setup/brightness --help for usage information\)
+echo \(setup/brightness --help for usage information\).

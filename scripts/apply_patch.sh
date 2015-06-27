@@ -2,13 +2,13 @@
 
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
-export PATCH=$1
+PATCH=$1
 if [ $# -lt 1 ]; then
-  export PATCH=$DIR/generated.patch
+  PATCH=$DIR/generated.patch
 fi
-export LINUX=$2
+LINUX=$2
 if [ $# -lt 2 ]; then
-  export LINUX=$DIR/../build/linux-patched
+  LINUX=`readlink -f $DIR/../build/linux-patched`
 fi
 
 echo Patching $LINUX
@@ -41,13 +41,13 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-patch -p1 < $DIR/hdmi_hotplug.patch
 echo -- Applying HDMI hotplug patch --
+patch -p1 < $DIR/hdmi_hotplug.patch
 if [ $? -ne 0 ]; then
   echo Something wrong happened...
   echo I couldn\'t patch the main tree with the hdmi patch which means that changes upstream require an update to this script.
   exit 1
 fi
-
+echo
 echo $LINUX now contains the patched source and a default config
 
