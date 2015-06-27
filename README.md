@@ -21,7 +21,7 @@ also a set of debian packages included.
 
 ### Ubuntu / Debian
 ```
-$ cd scripts/debian
+$ cd build/debian
 $ sudo dpkg -i *.deb
 ```
 ### Arch Linux
