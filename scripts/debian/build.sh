@@ -1,8 +1,8 @@
 #!/bin/bash
 
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-LINUX=`readlink -f $DIR/../build/linux-patched`
-DEBIAN=`readling -f $LINUX/../debian`
+LINUX=`readlink -f $DIR/../../build/linux-patched`
+DEBIAN=`readlink -f $LINUX/../debian`
 
 if [ ! -d $LINUX ]; then
   echo "The patched tree must be generated first, couldn't find it at $LINUX"
@@ -11,6 +11,7 @@ if [ ! -d $LINUX ]; then
 fi
 
 cd $LINUX
+echo `pwd`
 make deb-pkg
 if [ $? -ne 0 ]; then
   echo "** Build failed, aborting"
