@@ -3,18 +3,18 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 LINUX=`readlink -f $DIR/../build/linux-patched`
 
-echo This script builds the patch then compiles the kernel and builds the ArchLinux and Debian
-echo packages. Note that creating the patch requires resetting the `linux-patched` folder thereby
-echo discarding all the build artefacts. Therefore this script is *not* idempotent, each invokation
-echo will cause the entire kernel to get regenerated / recompiled.
-read -p 'Are you sure? (y/n)' -n 1 -r
-echo
-
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-  echo exiting...
-  exit 1
+if [ $1 == "--help" ]; then
+  echo "Build linux 4.1 Samus"
+  echo "This script generates a patched Linux 4.1 kernel tree containing the code necessary to"
+  echo "enable sound, screen and keyboard brightness on the chromebook Pixel 2."
+  echo "The script also generates Debian and ArchLinux packages."
+  echo "Usage: build.sh [--nopatch]"
+  echo "--nopatch skips creation of patched tree allowing for incremental builds"
+  exit 0
 fi
-$DIR/patch.sh
+if [ "$1" -ne "--nopatch" ]; then
+  $DIR/patch.sh
+fi
 if [ $? -ne 0 ]; then
   exit 1
 fi
