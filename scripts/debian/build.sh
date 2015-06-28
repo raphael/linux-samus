@@ -1,7 +1,7 @@
 #!/bin/bash
 
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-LINUX=`readlink -f $DIR/../../build/linux-patched`
+LINUX=`readlink -f $DIR/../../build/linux`
 DEBIAN=`readlink -f $LINUX/../debian`
 
 if [ ! -d $LINUX ]; then
