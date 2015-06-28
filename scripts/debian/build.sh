@@ -1,7 +1,7 @@
 #!/bin/bash
 
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-LINUX=`readlink -f $DIR/../../build/linux`
+LINUX=`readlink -f $DIR/../../build/linux-patched`
 DEBIAN=`readlink -f $LINUX/../debian`
 
 if [ ! -d $LINUX ]; then
@@ -12,6 +12,7 @@ fi
 
 cd $LINUX
 echo `pwd`
+export KDEB_CHANGELOG_DIST=vivid
 make deb-pkg
 if [ $? -ne 0 ]; then
   echo "** Build failed, aborting"
