@@ -8,15 +8,26 @@ if [ ! $? -eq 0 ]; then
   exit 1
 fi
 
+# 2. Set card order
+sudo cp modprobe.d/alsa-bdwrt5677.conf /etc/modprobe.d
+
 # 2. Set microphone device
 egrep -q '^[ 	]*load-module module-alsa-source device=hw:1,1' /etc/pulse/default.pa
+if [ $? -eq 0 ]; then
+	sudo sed -i '/^[ 	]*load-module module-alsa-source device=hw:1,1/d' /etc/pulse/default.pa
+fi
 egrep -q '^[ 	]*load-module module-alsa-source device=hw:1,2' /etc/pulse/default.pa
+if [ $? -eq 0 ]; then
+	sudo sed -i '/^[ 	]*load-module module-alsa-source device=hw:1,2/d' /etc/pulse/default.pa
+fi
+egrep -q '^[ 	]*load-module module-alsa-source device=hw:0,1' /etc/pulse/default.pa
+egrep -q '^[ 	]*load-module module-alsa-source device=hw:0,2' /etc/pulse/default.pa
 alreadyset=$?
 if [ ! $alreadyset -eq 0 ]; then
   echo "Updating PulseAudio config with microphone hardware info"
   sudo cp /etc/pulse/default.pa /etc/pulse/default.pa.orig
-  sudo sed -i '/load-module module-udev-detect/ i load-module module-alsa-source device=hw:1,1' /etc/pulse/default.pa
-  sudo sed -i '/load-module module-udev-detect/ i load-module module-alsa-source device=hw:1,2' /etc/pulse/default.pa
+  sudo sed -i '/load-module module-udev-detect/ i load-module module-alsa-source device=hw:0,1' /etc/pulse/default.pa
+  sudo sed -i '/load-module module-udev-detect/ i load-module module-alsa-source device=hw:0,2' /etc/pulse/default.pa
   if [ ! $? -eq 0 ]; then
     echo "!!Failed to patch /etc/pulse/default.pa, proceeding anyway."
   else
@@ -41,7 +52,7 @@ fi
 
 # 4. Set alsa mic level
 echo "Unmuting mic"
-amixer -c1 set Mic 0DB
+amixer -c0 set Mic "60%"
 if [ ! $? -eq 0 ]; then
   echo "!!Failed to unmute mic, check that 'amixer' is installed"
   exit 1
