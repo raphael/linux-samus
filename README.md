@@ -9,15 +9,10 @@ The main features the patches enable are sound support as well as screen and
 keyboard backlight. The provided kernel config is also somewhat optimized
 for the Pixel 2.
 
-## Usage
+## Installation
 
 There are two ways the patches can be applied: use the prepatched tree
 or build your own (e.g. if you need a different version than 4.1).
-
-The easy way is to simply compile and install the pre-patched kernel found in
-`build/linux`. A set of Arch Linux packages is also included for convenience
-in `build/archlinux` with an install script under `scripts/archlinux`. There's
-also a set of debian packages included.
 
 ### Ubuntu / Debian
 ```
@@ -26,16 +21,19 @@ $ cd linux-4.1-samus/build/debian
 $ sudo dpkg -i *.deb
 ```
 ### Arch Linux
+Install from the AUR4:
+```
+yaourt -S linux-samus4 --aur-url https://aur4.archlinux.org
+```
+or from repo:
 ```
 $ git clone https://github.com/raphael/linux-4.1-samus
 $ cd linux-4.1-samus/scripts/archlinux
 $ ./install.sh
 ```
-or install from the AUR4:
-```
-yaourt -S linux-samus4 --aur-url https://aur4.archlinux.org
-```
 ### Other distributions
+The entire kernel patched tree is located under `build/linux`, compile and install using the usual
+instructions for installing kernels. For example:
 ```
 $ git clone https://github.com/raphael/linux-4.1-samus
 $ cd linux-4.1-samus/build/linux
@@ -45,13 +43,15 @@ $ sudo make modules_install
 $ sudo make install
 ```
 > *NOTE* the steps above are just the standard kernel build steps and may
-> differ depending on your setup. In particular the default kernel makefile
-> assumes LILO is being used.
+> differ depending on your distro/setup. In particular the default kernel makefile
+> assumes LILO is being used. Follow the instructions specific to your
+> distribution for installing kernels from source.
 
 ### Post-install steps
 
-Once installed reboot and load the kernel. To enable sound run the `sound.sh`
-script:
+Once installed reboot and load the kernel.
+
+To enable sound run the `sound.sh` script:
 ```
 $ cd linux-4.1-samus/scripts/setup
 $ ./sound.sh
@@ -59,8 +59,22 @@ $ ./sound.sh
 > *NOTE* this scripts makes a number of assumptions on your system (e.g.
 > `alsaucm` and `amixer` are both installed and the file
 > /etc/pulse/default.pa contains a line to load the modules using udev).
-
 If the setup script fails please see the #1 FAQ "Enabling sound step-by-step".
+
+To enable X11 acceleration run the `xaccel.sh` script:
+```
+$ cd linux-4.1-samus/scrupts/setup
+$ ./xaccel.sh
+```
+
+The script `script/setup/brightness` can be used to control the brightness level.
+```
+$ script/setup/brightness --help
+Increase or decrease screen brighness
+Usage: brightness --increase | --decrease
+```
+Bind the F6 key to `brightness --decrease` and the F7 key to `brightness --increase` for
+an almost native experience...
 
 ### Building your own patch
 
@@ -88,42 +102,30 @@ alsaucm is installed. It's usually part of the "alsa-utils" package. Assuming
 $ cd scripts/setup
 $ ALSA_CONFIG_UCM=ucm/ alsaucm -c bdw-rt5677 set _verb HiFi
 ```
-
 Next the microphone driver must be loaded statically by PulseAudio, add the
-line:
+lines:
 ```
 load-module module-alsa-source device=hw:1,1
+load-module module-alsa-source device=hw:1,2
 ```
 to `/etc/pulseaudio/default.pa` *before* the line
 ```
 load-module module-udev-detect
 ```
-
 The last thing to check is the volume level for the mic in ALSA. If the mic
 doesn't seem to pick up any sound run the following command:
 ```
-$ amixer -c1 set Mic 0DB
+$ amixer -c1 set Mic "60%"
 ```
-This resets the mic volume to 0DB instead of -90DB (mute). Obviously `amixer`
-must be installed.
 
-### 2. How do I control the screen brightness?
-
-The script `script/setup/brightness` can be used to control the brightness level.
-```
-$ script/setup/brightness --help
-Increase or decrease screen brighness
-Usage: brightness --increase | --decrease
-```
-Bind the F6 key to `brightness --decrease` and the F7 key to `brightness --increase` for
-an almost native experience...
-
-### 3. Resume fails after STR (Suspend-To-Ram)
+### 2. Resume fails after STR (Suspend-To-Ram)
 
 The TPM module must be loaded for resume to work after suspend. The config
-included in this repository enables it by default.
+included in this repository and the pre-built packages enable it by default.
+Note that there's no need to pass in the tpm kernel option like there was
+with the 3.x kernels.
 
-### 4. Hibernate/Swap doesn't work
+### 3. Hibernate/Swap doesn't work
 
 The kernel config included in this repository disables swap as the Pixel 2
 is generous on memory but not so much on disk space. Hibernate requires
@@ -131,12 +133,12 @@ swap. If you need support for swap simply edit the config using e.g.
 `make nconfig` in the `build/linux` directory, go to `General setup` and
 enable `Support for paging of anonymous memory (swap)`.
 
-### 5. LVM / Encrypted partition doesn't boot
+### 4. LVM / Encrypted partition doesn't boot
 
 The kernel config in this repo doesn't enable LVM support which is required
 if the encryption is using cryptsetup a.k.a. DMCrypt.
-If you need support enable the corresponding options in Drivers -->
-Multiple devices driver support (RAID and LVM) --> Device mapper support.
+If you need support enable the corresponding options in `Drivers -->
+Multiple devices driver support (RAID and LVM) --> Device mapper support`.
 
 ## Contributions
 
