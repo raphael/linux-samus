@@ -47,7 +47,7 @@ $ sudo make install
 > assumes LILO is being used. Follow the instructions specific to your
 > distribution for installing kernels from source.
 
-### Post-install steps
+## Post-install steps
 
 Once installed reboot and load the kernel.
 
