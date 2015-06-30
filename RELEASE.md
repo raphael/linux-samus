@@ -5,12 +5,10 @@ To build a new release:
 3. Bump versions in scripts/archlinux/PKGBUILD and aur/PKGBUILD
 4. Tag with version e.g. "v4.1-3"
 5. Create release in Github using tag
-6. Build ArchLinux package: cd scripts/archlinux;./build.sh
+6. Build packages: cd scripts;./build.sh
 7. Install new package, reboot and test
-8. Build Debian package: cd scripts/debian;./build.sh
-9. Build source: rm -rf build/linux;cp -r build/linux-patched build/linux; cd build/linux; make clean
-10. Commit / push all packages
-11. Change aur/PKGBUILD source to point to new release
-12. Build AUR package: cd aur;./update.sh;vi linux-samus4/PKGBUILD
-13. Push AUR package, install it and test
+8. Build source: rm -rf build/linux;cp -r build/linux-patched build/linux; cd build/linux; make clean
+9. Commit / push all packages using "release 4.1-x" message
+10. Build AUR package: cd aur;./update.sh;vi linux-samus4/PKGBUILD
+11. Push AUR package, install it and test
 

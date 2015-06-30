@@ -133,13 +133,6 @@ swap. If you need support for swap simply edit the config using e.g.
 `make nconfig` in the `build/linux` directory, go to `General setup` and
 enable `Support for paging of anonymous memory (swap)`.
 
-### 4. LVM / Encrypted partition doesn't boot
-
-The kernel config in this repo doesn't enable LVM support which is required
-if the encryption is using cryptsetup a.k.a. DMCrypt.
-If you need support enable the corresponding options in `Drivers -->
-Multiple devices driver support (RAID and LVM) --> Device mapper support`.
-
 ## Contributions
 
 This repo exists so that we can all benefit from each other's work.
