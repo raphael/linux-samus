@@ -1,3 +1,7 @@
+v4.1-4 / 2015-06-29
+-------------------
+Add support for device-mapper thin provisioning module (i.e. docker support)
+
 v4.1-3 / 2015-06-28
 -------------------
 Fix issues with camera
