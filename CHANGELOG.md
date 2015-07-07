@@ -1,3 +1,7 @@
+v4.1-5 / 2015-07-06
+-------------------
+Add support for PPP (VPN)
+
 v4.1-4 / 2015-06-29
 -------------------
 Add support for device-mapper thin provisioning module (i.e. docker support)
