@@ -1,18 +1,25 @@
-# Linux 4.1 samus (Chromebook Pixel 2015)
+# Linux 4.1 for Chromebook Pixel 2015
 
-This repository contains scripts that create a linux kernel patch from the
-ChromiumOS 3.14 tree (that's the version used to create the Pixel 2 kernel)
-and a small set of custom changes necessary to make the code compatible
-with the 4.1 tree.
+This repository contains packages for Debian and Arch Linux that installs
+the Linux kernel 4.1 with a set of patches that enable sound support as
+well as keyboard and screen brightness control. The Linux kernel 4.1
+already has built-in support for the touchpad making the Pixel 2 fully
+supported with this kernel tree.
 
-The main features the patches enable are sound support as well as screen and
-keyboard backlight. The provided kernel config is also somewhat optimized
-for the Pixel 2.
+The repository also contains the complete source for the patched kernel
+tree so that it can be built and installed on other Linux distributions.
+
+The set of scripts used to create the patched linux kernel source is also
+included. These scripts diff the ChromiumOS 3.14 tree (that's the version
+used to create the Pixel 2 ChromeOS kernel) with the 4.1 tree and apply
+a small set of custom changes necessary to make the code compatible.
+
+The provided kernel config is also somewhat optimized for the Pixel 2.
 
 ## Installation
 
-There are two ways the patches can be applied: use the prepatched tree
-or build your own (e.g. if you need a different version than 4.1).
+The easiest way to get going is to install the packages if you are running
+Ubuntu, Debian or ArchLinux.
 
 ### Ubuntu / Debian
 ```
@@ -59,7 +66,7 @@ $ ./sound.sh
 > *NOTE* this scripts makes a number of assumptions on your system (e.g.
 > `alsaucm` and `amixer` are both installed and the file
 > /etc/pulse/default.pa contains a line to load the modules using udev).
-If the setup script fails please see the #1 FAQ "Enabling sound step-by-step".
+If the setup script fails please see below "Enabling sound step-by-step".
 
 To enable X11 acceleration run the `xaccel.sh` script:
 ```
@@ -88,14 +95,42 @@ patch. It then applies this generated patch and the other included patches
 to the original tree. This process results in a patched tree located in
 `build/linux-patched`.
 
-## FAQ
-
 ### 1. Enabling sound step-by-step
 
 If you're reading this either the `sound.sh` script failed or better you want to
 understand what it does :)
 
-The first thing to do is to enable the "HiFi" verb with ALSAUCM. Make sure
+The first thing to do is to copy over the firmwares from the `firmware` directory
+to wherever your distribution installs firmwares (usually `/lib/firmware` or 
+`/usr/lib/firmware`).
+
+Next it's a good idea to make sure that the internal card driver always uses slot
+0 in Alsa so that any PulseAudio configuration done later can reliably address the
+card. This is done by adding a `.conf' file in `/etc/modprobe.d` containing the
+following line:
+```
+options snd slots=snd_soc_sst_bdw_rt5677_mach,snd-hda-intel
+```
+At that point you may want to reboot  Once rebooted check the output of `aplay -l`,
+you should see something like:
+```
+**** List of PLAYBACK Hardware Devices ****
+card 0: bdwrt5677 [bdw-rt5677], device 0: System Playback (*) []
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 1: HDMI [HDA Intel HDMI], device 3: HDMI 0 [HDMI 0]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 1: HDMI [HDA Intel HDMI], device 7: HDMI 1 [HDMI 1]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 1: HDMI [HDA Intel HDMI], device 8: HDMI 2 [HDMI 2]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+```
+If that's not what you are getting then check for errors in `dmesg`.
+
+Once the driver loads correctly enable the "HiFi" verb with ALSAUCM. Make sure
 alsaucm is installed. It's usually part of the "alsa-utils" package. Assuming
 `alsaucm` is present, run the following:
 ```
@@ -105,34 +140,34 @@ $ ALSA_CONFIG_UCM=ucm/ alsaucm -c bdw-rt5677 set _verb HiFi
 Next the microphone driver must be loaded statically by PulseAudio, add the
 lines:
 ```
-load-module module-alsa-source device=hw:1,1
-load-module module-alsa-source device=hw:1,2
+load-module module-alsa-source device=hw:0,1
+load-module module-alsa-source device=hw:0,2
 ```
 to `/etc/pulseaudio/default.pa` *before* the line
 ```
 load-module module-udev-detect
 ```
-The last thing to check is the volume level for the mic in ALSA. If the mic
-doesn't seem to pick up any sound run the following command:
+Restart PulseAudio with:
 ```
-$ amixer -c1 set Mic "60%"
+pulseaudio -k
+pulseaudio -D
 ```
-
-### 2. Resume fails after STR (Suspend-To-Ram)
-
-The TPM module must be loaded for resume to work after suspend. The config
-included in this repository and the pre-built packages enable it by default.
-Note that there's no need to pass in the tpm kernel option like there was
-with the 3.x kernels.
-
-### 3. Hibernate/Swap doesn't work
-
-The kernel config included in this repository disables swap as the Pixel 2
-is generous on memory but not so much on disk space. Hibernate requires
-swap. If you need support for swap simply edit the config using e.g.
-`make nconfig` in the `build/linux` directory, go to `General setup` and
-enable `Support for paging of anonymous memory (swap)`.
-
+If PulseAudio fails to restart running it in the foreground may produce helpful
+output:
+```
+pulseaudio
+```
+Assuming PulseAudio restarted successfully the last thing to check is the volume level for the mic
+in ALSA. If the mic doesn't seem to pick up any sound run the following command:
+```
+$ amixer -c0 set Mic "60%"
+```
+Some users have also reported needing to configure PulseAudio to load the output
+driver statically, this can be done by adding the following line in 
+`/etc/pulseaudio/default.pa`:
+```
+load-module module-alsa-sink device=hw:0,0
+```
 ## Contributions
 
 This repo exists so that we can all benefit from each other's work.
