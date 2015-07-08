@@ -95,7 +95,7 @@ patch. It then applies this generated patch and the other included patches
 to the original tree. This process results in a patched tree located in
 `build/linux-patched`.
 
-### 1. Enabling sound step-by-step
+### Enabling sound step-by-step
 
 If you're reading this either the `sound.sh` script failed or better you want to
 understand what it does :)
