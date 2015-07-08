@@ -1,6 +1,15 @@
 #!/bin/bash
 
-# 1. Set verb
+# 1. Copy firmware
+if [ -d "/lib/firmware" ]; then
+  sudo cp ../../firmware/* /lib/firmware
+elif [ -d "/usr/lib/firmware" ]; then
+  sudo cp ../../firmware/* /usr/lib/firmware
+else
+  echo "Could not find firmware directory, skipping firmware install"
+fi
+
+# 2. Set verb
 echo "Setting sound card UCM verb"
 ALSA_CONFIG_UCM=ucm/ alsaucm -c bdw-rt5677 set _verb HiFi
 if [ ! $? -eq 0 ]; then
@@ -8,10 +17,10 @@ if [ ! $? -eq 0 ]; then
   exit 1
 fi
 
-# 2. Set card order
+# 3. Set card order
 sudo cp modprobe.d/alsa-bdwrt5677.conf /etc/modprobe.d
 
-# 2. Set microphone device
+# 4. Set microphone device
 egrep -q '^[ 	]*load-module module-alsa-source device=hw:1,1' /etc/pulse/default.pa
 if [ $? -eq 0 ]; then
 	sudo sed -i '/^[ 	]*load-module module-alsa-source device=hw:1,1/d' /etc/pulse/default.pa
@@ -41,16 +50,7 @@ if [ ! $alreadyset -eq 0 ]; then
   fi
 fi
 
-# 3. Copy vda firmware
-if [ -d "/lib/firmware" ]; then
-  sudo cp ../../firmware/* /lib/firmware
-elif [ -d "/usr/lib/firmware" ]; then
-  sudo cp ../../firmware/* /usr/lib/firmware
-else
-  echo "Could not find firmware directory, skipping firmware install"
-fi
-
-# 4. Set alsa mic level
+# 5. Set alsa mic level
 echo "Unmuting mic"
 amixer -c0 set Mic "60%"
 if [ ! $? -eq 0 ]; then
@@ -58,5 +58,5 @@ if [ ! $? -eq 0 ]; then
   exit 1
 fi
 
-# 4. Profit
+# 6. Profit
 echo "Sound setup completed successfully."
