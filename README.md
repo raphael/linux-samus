@@ -106,7 +106,7 @@ to wherever your distribution installs firmwares (usually `/lib/firmware` or
 
 Next it's a good idea to make sure that the internal card driver always uses slot
 0 in Alsa so that any PulseAudio configuration done later can reliably address the
-card. This is done by adding a `.conf' file in `/etc/modprobe.d` containing the
+card. This is done by adding a `.conf` file in `/etc/modprobe.d` containing the
 following line:
 ```
 options snd slots=snd_soc_sst_bdw_rt5677_mach,snd-hda-intel
