@@ -9,16 +9,16 @@ else
   echo "Could not find firmware directory, skipping firmware install"
 fi
 
-# 2. Set verb
+# 2. Set card order
+sudo cp modprobe.d/alsa-bdwrt5677.conf /etc/modprobe.d
+
+# 3. Set verb
 echo "Setting sound card UCM verb"
 ALSA_CONFIG_UCM=ucm/ alsaucm -c bdw-rt5677 set _verb HiFi
 if [ ! $? -eq 0 ]; then
   echo "!!Failed to set UCM verb, make sure 'alsaucm' is installed"
   exit 1
 fi
-
-# 3. Set card order
-sudo cp modprobe.d/alsa-bdwrt5677.conf /etc/modprobe.d
 
 # 4. Set microphone device
 egrep -q '^[ 	]*load-module module-alsa-source device=hw:1,1' /etc/pulse/default.pa
