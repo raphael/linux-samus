@@ -10,4 +10,5 @@ To build a new release:
 8. Create release in Github using tag
 9. Build AUR package: cd aur;./update.sh;vi linux-samus4/PKGBUILD
 10. Push AUR package, install it and test
+11. Update aur/PKGBUILD with new SHAs, push to master
 
