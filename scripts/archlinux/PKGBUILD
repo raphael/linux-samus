@@ -17,11 +17,15 @@ validpgpkeys=()
 _kernelname=${pkgbase#linux}
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
-# $srcdir is: /home/raphael/src/kernel-pkg/src
+# $srcdir is: ./src
 prepare() {
-  if [ ! -e ${srcdir}/${_srcname} ]
-  then
-    ln -s ${DIR}/../../build/${_srcname} ${srcdir}/${_srcname}
+  if [ ! -e ${srcdir}/${_srcname} ]; then
+    patched_source="${DIR}/../../build/${_srcname}"
+    if [ ! -e $patched_source ]; then
+      echo Missing linux-patched directory, please run `readlink -f ${DIR}/../patch.sh` first
+      exit 1
+    fi
+    ln -s $patched_source ${srcdir}/${_srcname}
   fi
   cp ${DIR}/linux.preset ${srcdir}
 }
