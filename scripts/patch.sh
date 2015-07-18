@@ -34,6 +34,7 @@ fi
 echo Resetting repos
 cd $LINUX
 git clean -qfdx
+git fetch
 git reset --hard $PATCHED
 if [ $? -ne 0 ]; then
   exit 1
