@@ -3,9 +3,23 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 LINUX=`readlink -f $DIR/../build/linux-patched`
 CHROMEOS=`readlink -f $DIR/../build/chromiumos-chromeos-3.14`
-PATCHED=v4.1
+ORIGIN=origin
+BRANCH=v4.1
+
 if [ $# -gt 0 ]; then
-  PATCHED=$1
+  ORIGIN=$1
+  if [ "$1" == "linux" ]; then
+    ORIGIN=origin
+  fi
+fi
+
+if [ $# -gt 1 ]; then
+  if [ "$2" == "--help" ]; then
+    echo "usage: $0 [ORIGIN] [BRANCH]"
+    echo "where ORIGIN is linux or linux-stable"
+    exit 0
+  fi
+  BRANCH=$2
 fi
 
 echo This script will clone two complete copies of the kernel source code.
@@ -33,9 +47,14 @@ fi
 
 echo Resetting repos
 cd $LINUX
+git checkout master
+git reset --hard origin/master
 git clean -qfdx
-git fetch
-git reset --hard $PATCHED
+git branch -D $BRANCH
+git fetch $ORIGIN
+git branch --set-upstream $BRANCH $ORIGIN/$BRANCH
+git checkout $BRANCH
+git pull $ORIGIN $BRANCH
 if [ $? -ne 0 ]; then
   exit 1
 fi

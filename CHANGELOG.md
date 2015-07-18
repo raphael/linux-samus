@@ -1,3 +1,7 @@
+v4.1-7 / 2015-07-17
+-------------------
+Upgrade to Linux v4.1.2
+
 v4.1-6 / 2015-07-07
 -------------------
 Enable support for many drivers and file systems
