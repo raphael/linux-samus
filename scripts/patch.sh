@@ -47,11 +47,10 @@ fi
 
 echo Resetting repos
 cd $LINUX
-git checkout master
-git reset --hard origin/master
-git clean -qfdx
-git branch -D $BRANCH
 git fetch $ORIGIN
+git clean -qfdx
+git checkout master
+git branch -D $BRANCH
 git branch --set-upstream $BRANCH $ORIGIN/$BRANCH
 git checkout $BRANCH
 git pull $ORIGIN $BRANCH
