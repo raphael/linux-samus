@@ -1,0 +1,26 @@
+#!/bin/bash
+
+step=10
+file=/sys/class/leds/chromeos::kbd_backlight/brightness
+
+case "$1" in
+    -i|--increase) ((val = +10));;
+    -d|--decrease) ((val = -10));;
+esac
+
+if !((val)); then
+  echo "Increase of decrease keyboard brightness"
+  echo "Usage: ${0##*/} --increase | --decrease"
+  exit
+fi
+
+read -r cur < "$file"
+((val = cur + val))
+
+if ((val <   0)); then ((val =   0));fi
+if ((val > 100)); then ((val = 100));fi
+
+printf '%d' "$val" > "$file"
+
+printf 'Before: %3d\n' "$cur"
+printf 'After : %3d\n' "$val"
