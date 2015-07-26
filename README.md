@@ -81,7 +81,16 @@ Increase or decrease screen brighness
 Usage: brightness --increase | --decrease
 ```
 Bind the F6 key to `brightness --decrease` and the F7 key to `brightness --increase` for
-an almost native experience...
+an almost native experience... (assuming the scripts are in your path).
+
+Similarly the script `script/setup/keyboard_led` can be used to control the keyboard backlight,
+bind the ALT-F6 key to `keyboard_led --decrease` and ALT-F7 to `keyboard_led --increase`.
+
+Both these scripts require write access to files living under `/sys` which get mounted
+read-only for non-root users on boot by default. If your system uses `systemd` (e.g. ArchLinux)
+then the file `script/setup/enable-brightness.service` contains the definition for a systemd
+service that makes the files above writable to non-root user. Run
+`systemctl enable enable-brightness.service` for the service to run on boot.
 
 ### Building your own patch
 
