@@ -5,8 +5,14 @@ LINUX=`readlink -f $DIR/../build/linux-patched`
 CHROMEOS=`readlink -f $DIR/../build/chromiumos-chromeos-3.14`
 ORIGIN=origin
 BRANCH=v4.1
+TAG=v4.1.4
 
 if [ $# -gt 0 ]; then
+  if [ "$1" == "--help" ]; then
+    echo "usage: $0 [ORIGIN] [BRANCH] [TAG]"
+    echo "where ORIGIN is linux or linux-stable"
+    exit 0
+  fi
   ORIGIN=$1
   if [ "$1" == "linux" ]; then
     ORIGIN=origin
@@ -15,11 +21,20 @@ fi
 
 if [ $# -gt 1 ]; then
   if [ "$2" == "--help" ]; then
-    echo "usage: $0 [ORIGIN] [BRANCH]"
+    echo "usage: $0 [ORIGIN] [BRANCH] [TAG]"
     echo "where ORIGIN is linux or linux-stable"
     exit 0
   fi
   BRANCH=$2
+fi
+
+if [ $# -gt 2 ]; then
+  if [ "$3" == "--help" ]; then
+    echo "usage: $0 [ORIGIN] [BRANCH] [TAG]"
+    echo "where ORIGIN is linux or linux-stable"
+    exit 0
+  fi
+  TAG=$3
 fi
 
 echo This script will clone two complete copies of the kernel source code.
@@ -58,6 +73,7 @@ git pull $ORIGIN $BRANCH
 if [ $? -ne 0 ]; then
   exit 1
 fi
+git checkout $TAG
 cd $CHROMEOS
 git clean -qfdx
 git checkout chromeos-3.14
