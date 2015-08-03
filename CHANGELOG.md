@@ -1,3 +1,7 @@
+v4.1-10 / 2015-08-02
+--------------------
+Full docker support (fixes #24)
+
 v4.1-9 / 2015-08-02
 -------------------
 Compile in support for USB 1.1, 2.0 and 3.0 (instead of modules)
