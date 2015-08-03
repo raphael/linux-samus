@@ -1,3 +1,8 @@
+v4.1-11 / 2015-08-03
+--------------------
+Make AppArmor default security module
+Add parallel port modules to make cups happy on Ubuntu 15.04
+
 v4.1-10 / 2015-08-02
 --------------------
 Full docker support (fixes #24)
