@@ -1,3 +1,7 @@
+v4.1-9 / 2015-08-02
+-------------------
+Compile in support for USB 1.1, 2.0 and 3.0 (instead of modules)
+
 v4.1-8 / 2015-07-23
 -------------------
 Upgrade to Linux v4.1.3
