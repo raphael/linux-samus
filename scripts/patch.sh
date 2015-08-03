@@ -48,10 +48,11 @@ fi
 echo Resetting repos
 cd $LINUX
 git fetch $ORIGIN
+git checkout .
 git clean -qfdx
 git checkout master
 git branch -D $BRANCH
-git branch --set-upstream $BRANCH $ORIGIN/$BRANCH
+git branch $BRANCH --track $ORIGIN/$BRANCH
 git checkout $BRANCH
 git pull $ORIGIN $BRANCH
 if [ $? -ne 0 ]; then

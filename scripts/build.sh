@@ -13,7 +13,7 @@ if [[ $1 == "--help" ]]; then
   exit 0
 fi
 if [[ "$1" != "--nopatch" ]]; then
-  $DIR/patch.sh
+  $DIR/patch.sh $*
 fi
 if [ $? -ne 0 ]; then
   exit 1
