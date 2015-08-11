@@ -50,13 +50,10 @@ if [ ! $alreadyset -eq 0 ]; then
   fi
 fi
 
-# 5. Set alsa mic level
-echo "Unmuting mic"
-amixer -c0 set Mic "60%"
-if [ ! $? -eq 0 ]; then
-  echo "!!Failed to unmute mic, check that 'amixer' is installed"
-  exit 1
-fi
+# 5. Restore asound.state
+echo "Restoring asla config"
+sudo alsactl restore --file alsa/asound.state
+sudo alsactl store
 
 # 6. Profit
 echo "Sound setup completed successfully."
