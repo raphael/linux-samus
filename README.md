@@ -19,21 +19,21 @@ The provided kernel config is also somewhat optimized for the Pixel 2.
 ## Installation
 
 The easiest way to get going is to install the packages if you are running
-Ubuntu, Debian or ArchLinux.
+Ubuntu, Debian or Arch Linux.
 
 ### Ubuntu / Debian
-```
+``` bash
 $ git clone https://github.com/raphael/linux-4.1-samus
 $ cd linux-4.1-samus/build/debian
 $ sudo dpkg -i *.deb
 ```
 ### Arch Linux
-Install from the AUR4:
+Install from the AUR:
 ```
-yaourt -S linux-samus4 --aur-url https://aur4.archlinux.org
+yaourt -S linux-samus4
 ```
 or from repo:
-```
+``` bash
 $ git clone https://github.com/raphael/linux-4.1-samus
 $ cd linux-4.1-samus/scripts/archlinux
 $ ./install.sh
@@ -41,7 +41,7 @@ $ ./install.sh
 ### Other distributions
 The entire kernel patched tree is located under `build/linux`, compile and install using the usual
 instructions for installing kernels. For example:
-```
+``` bash
 $ git clone https://github.com/raphael/linux-4.1-samus
 $ cd linux-4.1-samus/build/linux
 $ make nconfig
@@ -59,7 +59,7 @@ $ sudo make install
 Once installed reboot and load the kernel.
 
 To enable sound run the `sound.sh` script:
-```
+``` bash
 $ cd linux-4.1-samus/scripts/setup
 $ ./sound.sh
 ```
@@ -69,8 +69,8 @@ $ ./sound.sh
 If the setup script fails please see below "Enabling sound step-by-step".
 
 To enable X11 acceleration run the `xaccel.sh` script:
-```
-$ cd linux-4.1-samus/scrupts/setup
+``` bash
+$ cd linux-4.1-samus/scripts/setup
 $ ./xaccel.sh
 ```
 
@@ -120,7 +120,7 @@ following line:
 ```
 options snd slots=snd_soc_sst_bdw_rt5677_mach,snd-hda-intel
 ```
-At that point you may want to reboot  Once rebooted check the output of `aplay -l`,
+At that point you may want to reboot.  Once rebooted check the output of `aplay -l`,
 you should see something like:
 ```
 **** List of PLAYBACK Hardware Devices ****
@@ -142,7 +142,7 @@ If that's not what you are getting then check for errors in `dmesg`.
 Once the driver loads correctly enable the "HiFi" verb with ALSAUCM. Make sure
 alsaucm is installed. It's usually part of the "alsa-utils" package. Assuming
 `alsaucm` is present, run the following:
-```
+``` bash
 $ cd scripts/setup
 $ ALSA_CONFIG_UCM=ucm/ alsaucm -c bdw-rt5677 set _verb HiFi
 ```
@@ -158,13 +158,12 @@ load-module module-udev-detect
 ```
 Restart PulseAudio with:
 ```
-pulseaudio -k
-pulseaudio -D
+$ pulseaudio -k && pulseaudio -D
 ```
 If PulseAudio fails to restart running it in the foreground may produce helpful
 output:
 ```
-pulseaudio
+$ pulseaudio
 ```
 Assuming PulseAudio restarted successfully the last thing to check is the volume level for the mic
 in ALSA. If the mic doesn't seem to pick up any sound run the following command:
