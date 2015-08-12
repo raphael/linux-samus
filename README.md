@@ -154,7 +154,7 @@ lines:
 load-module module-alsa-source device=hw:0,1
 load-module module-alsa-source device=hw:0,2
 ```
-to `/etc/pulseaudio/default.pa` *before* the line
+to `/etc/pulse/default.pa` *before* the line
 ```
 load-module module-udev-detect
 ```
@@ -167,14 +167,14 @@ output:
 ```
 $ pulseaudio
 ```
-Assuming PulseAudio restarted successfully the last thing to check is the volume level for the mic
-in ALSA. If the mic doesn't seem to pick up any sound run the following command:
+Assuming PulseAudio restarted successfully the last thing to do is to restore the alsa state:
 ```
-$ amixer -c0 set Mic "60%"
+$ cd scripts/setup
+$ sudo alsactl restore --file alsa/asound.state
 ```
 Some users have also reported needing to configure PulseAudio to load the output
 driver statically, this can be done by adding the following line in 
-`/etc/pulseaudio/default.pa`:
+`/etc/pulse/default.pa`:
 ```
 load-module module-alsa-sink device=hw:0,0
 ```
