@@ -16,6 +16,8 @@ a small set of custom changes necessary to make the code compatible.
 
 The provided kernel config is also somewhat optimized for the Pixel 2.
 
+*Current kernel version: 4.1.5*
+
 ## Installation
 
 The easiest way to get going is to install the packages if you are running
