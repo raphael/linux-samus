@@ -1,3 +1,7 @@
+v4.1-12 / 2015-08-11
+--------------------
+Upgrade to Linux v4.1.5
+
 v4.1-11 / 2015-08-03
 --------------------
 Make AppArmor default security module
