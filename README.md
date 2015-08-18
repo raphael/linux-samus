@@ -178,6 +178,12 @@ driver statically, this can be done by adding the following line in
 ```
 load-module module-alsa-sink device=hw:0,0
 ```
+## FAQ
+
+### 1. External Monitor Goes Blank
+
+See issue [#32](https://github.com/raphael/linux-4.1-samus/issues/32). TL;DR there's a bug with the intel driver that will be fixed in kernel 4.2 that can cause this issue. The current workaround consists of disabling IPS by adding the following command line to the kernel: `i915.enable_ips=0`.
+
 ## Contributions
 
 This repo exists so that we can all benefit from each other's work.
