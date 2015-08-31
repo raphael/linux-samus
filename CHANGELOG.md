@@ -1,3 +1,7 @@
+v4.1-14 / 2015-08-30
+--------------------
+Enable all keyboards and HID modules.
+
 v4.1-13 / 2015-08-26
 --------------------
 Upgrade to Linux v4.1.6
