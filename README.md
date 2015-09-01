@@ -25,8 +25,8 @@ Ubuntu, Debian or Arch Linux.
 
 ### Ubuntu / Debian
 ``` bash
-$ git clone https://github.com/raphael/linux-4.1-samus
-$ cd linux-4.1-samus/build/debian
+$ git clone https://github.com/raphael/linux-samus
+$ cd linux-samus/build/debian
 $ sudo dpkg -i *.deb
 ```
 ### Arch Linux
@@ -36,16 +36,16 @@ yaourt -S linux-samus4
 ```
 or from repo:
 ``` bash
-$ git clone https://github.com/raphael/linux-4.1-samus
-$ cd linux-4.1-samus/scripts/archlinux
+$ git clone https://github.com/raphael/linux-samus
+$ cd linux-samus/scripts/archlinux
 $ ./install.sh
 ```
 ### Other distributions
 The entire kernel patched tree is located under `build/linux`, compile and install using the usual
 instructions for installing kernels. For example:
 ``` bash
-$ git clone https://github.com/raphael/linux-4.1-samus
-$ cd linux-4.1-samus/build/linux
+$ git clone https://github.com/raphael/linux-samus
+$ cd linux-samus/build/linux
 $ make nconfig
 $ make -j4
 $ sudo make modules_install
@@ -62,7 +62,7 @@ Once installed reboot and load the kernel.
 
 To enable sound run the `sound.sh` script:
 ``` bash
-$ cd linux-4.1-samus/scripts/setup
+$ cd linux-samus/scripts/setup
 $ ./sound.sh
 ```
 > *NOTE* this scripts makes a number of assumptions on your system (e.g.
@@ -72,7 +72,7 @@ If the setup script fails please see below "Enabling sound step-by-step".
 
 To enable X11 acceleration run the `xaccel.sh` script:
 ``` bash
-$ cd linux-4.1-samus/scripts/setup
+$ cd linux-samus/scripts/setup
 $ ./xaccel.sh
 ```
 
@@ -182,7 +182,7 @@ load-module module-alsa-sink device=hw:0,0
 
 ### 1. External Monitor Goes Blank
 
-See issue [#32](https://github.com/raphael/linux-4.1-samus/issues/32). TL;DR there's a bug with the intel driver that will be fixed in kernel 4.2 that can cause this issue. The current workaround consists of disabling IPS by adding the following command line to the kernel: `i915.enable_ips=0`.
+See issue [#32](https://github.com/raphael/linux-samus/issues/32). TL;DR there's a bug with the intel driver that will be fixed in kernel 4.2 that can cause this issue. The current workaround consists of disabling IPS by adding the following command line to the kernel: `i915.enable_ips=0`.
 
 ## Contributions
 
