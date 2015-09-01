@@ -43,7 +43,7 @@ int snd_soc_jack_new(struct snd_soc_codec *codec, const char *id, int type,
 	INIT_LIST_HEAD(&jack->jack_zones);
 	BLOCKING_INIT_NOTIFIER_HEAD(&jack->notifier);
 
-	return snd_jack_new(codec->component.card->snd_card, id, type, &jack->jack);
+	return snd_jack_new(codec->component.card->snd_card, id, type, &jack->jack, false, false);
 }
 EXPORT_SYMBOL_GPL(snd_soc_jack_new);
 

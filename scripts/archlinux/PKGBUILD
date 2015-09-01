@@ -4,8 +4,8 @@
 
 pkgbase=linux-samus4
 _srcname=linux-patched
-pkgver=4.1
-pkgrel=13
+pkgver=4.2
+pkgrel=1
 arch=('i686' 'x86_64')
 url="http://www.kernel.org/"
 license=('GPL2')
