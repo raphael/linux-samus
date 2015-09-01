@@ -1,8 +1,8 @@
-# Linux 4.1 for Chromebook Pixel 2015
+# Linux 4.2 for Chromebook Pixel 2015
 
 This repository contains packages for Debian and Arch Linux that installs
-the Linux kernel 4.1 with a set of patches that enable sound support as
-well as keyboard and screen brightness control. The Linux kernel 4.1
+the Linux kernel 4.2 with a set of patches that enable sound support as
+well as keyboard and screen brightness control. The Linux kernel 4.2
 already has built-in support for the touchpad making the Pixel 2 fully
 supported with this kernel tree.
 
@@ -11,12 +11,12 @@ tree so that it can be built and installed on other Linux distributions.
 
 The set of scripts used to create the patched linux kernel source is also
 included. These scripts diff the ChromiumOS 3.14 tree (that's the version
-used to create the Pixel 2 ChromeOS kernel) with the 4.1 tree and apply
+used to create the Pixel 2 ChromeOS kernel) with the 4.2 tree and apply
 a small set of custom changes necessary to make the code compatible.
 
 The provided kernel config is also somewhat optimized for the Pixel 2.
 
-*Current kernel version: 4.1.6*
+*Current kernel version: 4.2.0*
 
 ## Installation
 
@@ -99,7 +99,7 @@ service that makes the files above writable to non-root user. Run
 To build your own patched tree use the `patch.sh` scripts located in the
 `scripts` folder. The script accepts an optional argument which corresponds 
 to the git tag of the kernel tree to build the patch against. The default
-value is `4.1`.
+value is `4.2`.
 
 This script clones the two trees, diffs the necessary files and create a
 patch. It then applies this generated patch and the other included patches
