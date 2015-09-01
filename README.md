@@ -1,4 +1,4 @@
-# Linux 4.2 for Chromebook Pixel 2015
+# Linux for Chromebook Pixel 2015
 
 This repository contains packages for Debian and Arch Linux that installs
 the Linux kernel 4.2 with a set of patches that enable sound support as
@@ -178,11 +178,6 @@ driver statically, this can be done by adding the following line in
 ```
 load-module module-alsa-sink device=hw:0,0
 ```
-## FAQ
-
-### 1. External Monitor Goes Blank
-
-See issue [#32](https://github.com/raphael/linux-samus/issues/32). TL;DR there's a bug with the intel driver that will be fixed in kernel 4.2 that can cause this issue. The current workaround consists of disabling IPS by adding the following command line to the kernel: `i915.enable_ips=0`.
 
 ## Contributions
 
