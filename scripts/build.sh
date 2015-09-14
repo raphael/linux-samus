@@ -10,22 +10,22 @@ if [[ $1 == "--help" ]]; then
   echo "The script also generates Debian and ArchLinux packages."
   echo "Usage: build.sh [--nopatch|repo branch tag]"
   echo "--nopatch skips creation of patched tree allowing for incremental builds"
-  echo "repo is \"linux\" or \"linux-stable\"
+  echo "repo is \"linux\" or \"linux-stable\""
   echo "branch is git branch, e.g. v4.2"
   echo "tag is git tag, e.g. v4.2.1"
   exit 0
 fi
-set repo = $1
+export repo="$1"
 if [[ "$repo" == "" ]]; then
-  set repo="linux-stable"
+  export repo="linux-stable"
 fi
-set branch = $2
+export branch="$2"
 if [[ "$branch" == "" ]]; then
-  set branch="v4.2"
+  export branch="v4.2"
 fi
-set tag = $3
+export tag="$3"
 if [[ "$tag" == "" ]]; then
-  set tag="v4.2"
+  export tag="v4.2"
 fi
 if [[ "$1" != "--nopatch" ]]; then
   $DIR/patch.sh $repo $branch $tag
