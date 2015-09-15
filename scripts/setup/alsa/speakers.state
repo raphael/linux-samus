@@ -2,7 +2,7 @@ state.HDMI {
 	control.1 {
 		iface CARD
 		name 'HDMI/DP,pcm=3 Jack'
-		value true
+		value false
 		comment {
 			access read
 			type BOOLEAN
@@ -63,7 +63,7 @@ state.HDMI {
 	control.7 {
 		iface CARD
 		name 'HDMI/DP,pcm=7 Jack'
-		value true
+		value false
 		comment {
 			access read
 			type BOOLEAN
@@ -128,7 +128,7 @@ state.HDMI {
 	control.13 {
 		iface CARD
 		name 'HDMI/DP,pcm=8 Jack'
-		value true
+		value false
 		comment {
 			access read
 			type BOOLEAN
@@ -332,7 +332,7 @@ state.bdwrt5677 {
 	control.6 {
 		iface MIXER
 		name 'OUT1 Playback Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -342,7 +342,7 @@ state.bdwrt5677 {
 	control.7 {
 		iface MIXER
 		name 'OUT2 Playback Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -352,7 +352,7 @@ state.bdwrt5677 {
 	control.8 {
 		iface MIXER
 		name 'OUT3 Playback Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -683,7 +683,7 @@ state.bdwrt5677 {
 	control.31 {
 		iface MIXER
 		name 'DSP VAD Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -703,7 +703,7 @@ state.bdwrt5677 {
 	control.33 {
 		iface MIXER
 		name 'Headphone Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -713,7 +713,7 @@ state.bdwrt5677 {
 	control.34 {
 		iface MIXER
 		name 'Headset Mic Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -799,7 +799,7 @@ state.bdwrt5677 {
 	control.41 {
 		iface MIXER
 		name 'DD2 MIXR Sto DAC Mix R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -809,7 +809,7 @@ state.bdwrt5677 {
 	control.42 {
 		iface MIXER
 		name 'DD2 MIXR Mono DAC Mix R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -819,7 +819,7 @@ state.bdwrt5677 {
 	control.43 {
 		iface MIXER
 		name 'DD2 MIXR DAC4 R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -829,7 +829,7 @@ state.bdwrt5677 {
 	control.44 {
 		iface MIXER
 		name 'DD2 MIXR DAC4 L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -839,7 +839,7 @@ state.bdwrt5677 {
 	control.45 {
 		iface MIXER
 		name 'DD2 MIXL Sto DAC Mix L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -849,7 +849,7 @@ state.bdwrt5677 {
 	control.46 {
 		iface MIXER
 		name 'DD2 MIXL Mono DAC Mix L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -859,7 +859,7 @@ state.bdwrt5677 {
 	control.47 {
 		iface MIXER
 		name 'DD2 MIXL DAC4 L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -869,7 +869,7 @@ state.bdwrt5677 {
 	control.48 {
 		iface MIXER
 		name 'DD2 MIXL DAC4 R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -879,7 +879,7 @@ state.bdwrt5677 {
 	control.49 {
 		iface MIXER
 		name 'DD1 MIXR Sto DAC Mix R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -889,7 +889,7 @@ state.bdwrt5677 {
 	control.50 {
 		iface MIXER
 		name 'DD1 MIXR Mono DAC Mix R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -899,7 +899,7 @@ state.bdwrt5677 {
 	control.51 {
 		iface MIXER
 		name 'DD1 MIXR DAC3 R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -909,7 +909,7 @@ state.bdwrt5677 {
 	control.52 {
 		iface MIXER
 		name 'DD1 MIXR DAC3 L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -919,7 +919,7 @@ state.bdwrt5677 {
 	control.53 {
 		iface MIXER
 		name 'DD1 MIXL Sto DAC Mix L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -929,7 +929,7 @@ state.bdwrt5677 {
 	control.54 {
 		iface MIXER
 		name 'DD1 MIXL Mono DAC Mix L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -939,7 +939,7 @@ state.bdwrt5677 {
 	control.55 {
 		iface MIXER
 		name 'DD1 MIXL DAC3 L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -949,7 +949,7 @@ state.bdwrt5677 {
 	control.56 {
 		iface MIXER
 		name 'DD1 MIXL DAC3 R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -959,7 +959,7 @@ state.bdwrt5677 {
 	control.57 {
 		iface MIXER
 		name 'Mono DAC MIXR ST R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -969,7 +969,7 @@ state.bdwrt5677 {
 	control.58 {
 		iface MIXER
 		name 'Mono DAC MIXR DAC1 R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -979,7 +979,7 @@ state.bdwrt5677 {
 	control.59 {
 		iface MIXER
 		name 'Mono DAC MIXR DAC2 R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -989,7 +989,7 @@ state.bdwrt5677 {
 	control.60 {
 		iface MIXER
 		name 'Mono DAC MIXR DAC2 L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -999,7 +999,7 @@ state.bdwrt5677 {
 	control.61 {
 		iface MIXER
 		name 'Mono DAC MIXL ST L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1009,7 +1009,7 @@ state.bdwrt5677 {
 	control.62 {
 		iface MIXER
 		name 'Mono DAC MIXL DAC1 L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1019,7 +1019,7 @@ state.bdwrt5677 {
 	control.63 {
 		iface MIXER
 		name 'Mono DAC MIXL DAC2 L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1029,7 +1029,7 @@ state.bdwrt5677 {
 	control.64 {
 		iface MIXER
 		name 'Mono DAC MIXL DAC2 R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1039,7 +1039,7 @@ state.bdwrt5677 {
 	control.65 {
 		iface MIXER
 		name 'Stereo DAC MIXR ST R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1049,7 +1049,7 @@ state.bdwrt5677 {
 	control.66 {
 		iface MIXER
 		name 'Stereo DAC MIXR DAC1 R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1059,7 +1059,7 @@ state.bdwrt5677 {
 	control.67 {
 		iface MIXER
 		name 'Stereo DAC MIXR DAC2 R Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1079,7 +1079,7 @@ state.bdwrt5677 {
 	control.69 {
 		iface MIXER
 		name 'Stereo DAC MIXL ST L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1089,7 +1089,7 @@ state.bdwrt5677 {
 	control.70 {
 		iface MIXER
 		name 'Stereo DAC MIXL DAC1 L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1099,7 +1099,7 @@ state.bdwrt5677 {
 	control.71 {
 		iface MIXER
 		name 'Stereo DAC MIXL DAC2 L Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1274,7 +1274,7 @@ state.bdwrt5677 {
 	control.83 {
 		iface MIXER
 		name 'DAC1 MIXR Stereo ADC Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1294,7 +1294,7 @@ state.bdwrt5677 {
 	control.85 {
 		iface MIXER
 		name 'DAC1 MIXL Stereo ADC Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1314,7 +1314,7 @@ state.bdwrt5677 {
 	control.87 {
 		iface MIXER
 		name 'OB7 MIX IB01 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1324,7 +1324,7 @@ state.bdwrt5677 {
 	control.88 {
 		iface MIXER
 		name 'OB7 MIX IB23 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1334,7 +1334,7 @@ state.bdwrt5677 {
 	control.89 {
 		iface MIXER
 		name 'OB7 MIX IB45 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1344,7 +1344,7 @@ state.bdwrt5677 {
 	control.90 {
 		iface MIXER
 		name 'OB7 MIX IB6 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1354,7 +1354,7 @@ state.bdwrt5677 {
 	control.91 {
 		iface MIXER
 		name 'OB7 MIX IB7 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1364,7 +1364,7 @@ state.bdwrt5677 {
 	control.92 {
 		iface MIXER
 		name 'OB7 MIX IB8 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1374,7 +1374,7 @@ state.bdwrt5677 {
 	control.93 {
 		iface MIXER
 		name 'OB7 MIX IB9 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1384,7 +1384,7 @@ state.bdwrt5677 {
 	control.94 {
 		iface MIXER
 		name 'OB6 MIX IB01 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1394,7 +1394,7 @@ state.bdwrt5677 {
 	control.95 {
 		iface MIXER
 		name 'OB6 MIX IB23 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1404,7 +1404,7 @@ state.bdwrt5677 {
 	control.96 {
 		iface MIXER
 		name 'OB6 MIX IB45 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1414,7 +1414,7 @@ state.bdwrt5677 {
 	control.97 {
 		iface MIXER
 		name 'OB6 MIX IB6 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1424,7 +1424,7 @@ state.bdwrt5677 {
 	control.98 {
 		iface MIXER
 		name 'OB6 MIX IB7 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1434,7 +1434,7 @@ state.bdwrt5677 {
 	control.99 {
 		iface MIXER
 		name 'OB6 MIX IB8 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1444,7 +1444,7 @@ state.bdwrt5677 {
 	control.100 {
 		iface MIXER
 		name 'OB6 MIX IB9 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1454,7 +1454,7 @@ state.bdwrt5677 {
 	control.101 {
 		iface MIXER
 		name 'OB5 MIX IB01 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1464,7 +1464,7 @@ state.bdwrt5677 {
 	control.102 {
 		iface MIXER
 		name 'OB5 MIX IB23 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1474,7 +1474,7 @@ state.bdwrt5677 {
 	control.103 {
 		iface MIXER
 		name 'OB5 MIX IB45 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1484,7 +1484,7 @@ state.bdwrt5677 {
 	control.104 {
 		iface MIXER
 		name 'OB5 MIX IB6 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1494,7 +1494,7 @@ state.bdwrt5677 {
 	control.105 {
 		iface MIXER
 		name 'OB5 MIX IB7 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1504,7 +1504,7 @@ state.bdwrt5677 {
 	control.106 {
 		iface MIXER
 		name 'OB5 MIX IB8 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1514,7 +1514,7 @@ state.bdwrt5677 {
 	control.107 {
 		iface MIXER
 		name 'OB5 MIX IB9 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1524,7 +1524,7 @@ state.bdwrt5677 {
 	control.108 {
 		iface MIXER
 		name 'OB4 MIX IB01 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1534,7 +1534,7 @@ state.bdwrt5677 {
 	control.109 {
 		iface MIXER
 		name 'OB4 MIX IB23 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1544,7 +1544,7 @@ state.bdwrt5677 {
 	control.110 {
 		iface MIXER
 		name 'OB4 MIX IB45 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1554,7 +1554,7 @@ state.bdwrt5677 {
 	control.111 {
 		iface MIXER
 		name 'OB4 MIX IB6 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1564,7 +1564,7 @@ state.bdwrt5677 {
 	control.112 {
 		iface MIXER
 		name 'OB4 MIX IB7 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1574,7 +1574,7 @@ state.bdwrt5677 {
 	control.113 {
 		iface MIXER
 		name 'OB4 MIX IB8 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1584,7 +1584,7 @@ state.bdwrt5677 {
 	control.114 {
 		iface MIXER
 		name 'OB4 MIX IB9 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1594,7 +1594,7 @@ state.bdwrt5677 {
 	control.115 {
 		iface MIXER
 		name 'OB23 MIX IB01 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1604,7 +1604,7 @@ state.bdwrt5677 {
 	control.116 {
 		iface MIXER
 		name 'OB23 MIX IB23 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1614,7 +1614,7 @@ state.bdwrt5677 {
 	control.117 {
 		iface MIXER
 		name 'OB23 MIX IB45 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1624,7 +1624,7 @@ state.bdwrt5677 {
 	control.118 {
 		iface MIXER
 		name 'OB23 MIX IB6 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1634,7 +1634,7 @@ state.bdwrt5677 {
 	control.119 {
 		iface MIXER
 		name 'OB23 MIX IB7 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1644,7 +1644,7 @@ state.bdwrt5677 {
 	control.120 {
 		iface MIXER
 		name 'OB23 MIX IB8 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1654,7 +1654,7 @@ state.bdwrt5677 {
 	control.121 {
 		iface MIXER
 		name 'OB23 MIX IB9 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1664,7 +1664,7 @@ state.bdwrt5677 {
 	control.122 {
 		iface MIXER
 		name 'OB01 MIX IB01 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1674,7 +1674,7 @@ state.bdwrt5677 {
 	control.123 {
 		iface MIXER
 		name 'OB01 MIX IB23 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1684,7 +1684,7 @@ state.bdwrt5677 {
 	control.124 {
 		iface MIXER
 		name 'OB01 MIX IB45 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1694,7 +1694,7 @@ state.bdwrt5677 {
 	control.125 {
 		iface MIXER
 		name 'OB01 MIX IB6 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1704,7 +1704,7 @@ state.bdwrt5677 {
 	control.126 {
 		iface MIXER
 		name 'OB01 MIX IB7 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1714,7 +1714,7 @@ state.bdwrt5677 {
 	control.127 {
 		iface MIXER
 		name 'OB01 MIX IB8 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1724,7 +1724,7 @@ state.bdwrt5677 {
 	control.128 {
 		iface MIXER
 		name 'OB01 MIX IB9 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2565,7 +2565,7 @@ state.bdwrt5677 {
 	control.183 {
 		iface MIXER
 		name 'Mono ADC MIXR ADC1 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2575,7 +2575,7 @@ state.bdwrt5677 {
 	control.184 {
 		iface MIXER
 		name 'Mono ADC MIXR ADC2 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2585,7 +2585,7 @@ state.bdwrt5677 {
 	control.185 {
 		iface MIXER
 		name 'Mono ADC MIXL ADC1 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2605,7 +2605,7 @@ state.bdwrt5677 {
 	control.187 {
 		iface MIXER
 		name 'Sto4 ADC MIXR ADC1 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2615,7 +2615,7 @@ state.bdwrt5677 {
 	control.188 {
 		iface MIXER
 		name 'Sto4 ADC MIXR ADC2 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2625,7 +2625,7 @@ state.bdwrt5677 {
 	control.189 {
 		iface MIXER
 		name 'Sto4 ADC MIXL ADC1 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2635,7 +2635,7 @@ state.bdwrt5677 {
 	control.190 {
 		iface MIXER
 		name 'Sto4 ADC MIXL ADC2 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2645,7 +2645,7 @@ state.bdwrt5677 {
 	control.191 {
 		iface MIXER
 		name 'Sto3 ADC MIXR ADC1 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2655,7 +2655,7 @@ state.bdwrt5677 {
 	control.192 {
 		iface MIXER
 		name 'Sto3 ADC MIXR ADC2 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2665,7 +2665,7 @@ state.bdwrt5677 {
 	control.193 {
 		iface MIXER
 		name 'Sto3 ADC MIXL ADC1 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2675,7 +2675,7 @@ state.bdwrt5677 {
 	control.194 {
 		iface MIXER
 		name 'Sto3 ADC MIXL ADC2 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2685,7 +2685,7 @@ state.bdwrt5677 {
 	control.195 {
 		iface MIXER
 		name 'Sto2 ADC MIXR ADC1 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2695,7 +2695,7 @@ state.bdwrt5677 {
 	control.196 {
 		iface MIXER
 		name 'Sto2 ADC MIXR ADC2 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2705,7 +2705,7 @@ state.bdwrt5677 {
 	control.197 {
 		iface MIXER
 		name 'Sto2 ADC MIXL ADC1 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2715,7 +2715,7 @@ state.bdwrt5677 {
 	control.198 {
 		iface MIXER
 		name 'Sto2 ADC MIXL ADC2 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2725,7 +2725,7 @@ state.bdwrt5677 {
 	control.199 {
 		iface MIXER
 		name 'Sto1 ADC MIXR ADC1 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2745,7 +2745,7 @@ state.bdwrt5677 {
 	control.201 {
 		iface MIXER
 		name 'Sto1 ADC MIXL ADC1 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
