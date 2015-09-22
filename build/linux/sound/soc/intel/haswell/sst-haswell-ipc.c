@@ -312,6 +312,10 @@ struct sst_hsw {
 	int cnt_state_d3;
 	int cnt_state_s0;
 	int cnt_state_s3;
+	enum sst_hsw_device_id dx_dev;
+	enum sst_hsw_device_mclk dx_mclk;
+	enum sst_hsw_device_mode dx_mode;
+	u32 dx_clock_divider;
 
 	/* boot */
 	wait_queue_head_t boot_wait;
@@ -1663,10 +1667,10 @@ int sst_hsw_device_set_config(struct sst_hsw *hsw,
 
 	trace_ipc_request("set device config", dev);
 
-	config.ssp_interface = dev;
-	config.clock_frequency = mclk;
-	config.mode = mode;
-	config.clock_divider = clock_divider;
+	hsw->dx_dev = config.ssp_interface = dev;
+	hsw->dx_mclk = config.clock_frequency = mclk;
+	hsw->dx_mode = config.mode = mode;
+	hsw->dx_clock_divider = config.clock_divider = clock_divider;
 	if (mode == SST_HSW_DEVICE_TDM_CLOCK_MASTER)
 		config.channels = 4;
 	else
@@ -2355,10 +2359,10 @@ int sst_hsw_dsp_runtime_resume(struct sst_hsw *hsw)
 		return -EIO;
 	}
 
-	/* Set ADSP SSP port settings */
-	ret = sst_hsw_device_set_config(hsw, SST_HSW_DEVICE_SSP_0,
-					SST_HSW_DEVICE_MCLK_FREQ_24_MHZ,
-					SST_HSW_DEVICE_CLOCK_MASTER, 9);
+	/* Set ADSP SSP port settings - sadly the FW does not store SSP port
+	   settings as part of the PM context. */
+	ret = sst_hsw_device_set_config(hsw, hsw->dx_dev, hsw->dx_mclk,
+					hsw->dx_mode, hsw->dx_clock_divider);
 	if (ret < 0)
 		dev_err(dev, "error: SSP re-initialization failed\n");
 
