@@ -50,10 +50,47 @@ if [ ! $alreadyset -eq 0 ]; then
   fi
 fi
 
-# 5. Restore asound.state
+# 5. Restore speakers.state for speakers
 echo "Restoring asla config"
-sudo alsactl restore --file alsa/asound.state
+sudo alsactl restore --file alsa/speakers.state
 sudo alsactl store
 
-# 6. Profit
+#6. Setup ACPI hooks for switching between speakers and headphones
+if [[ -f /etc/acpi/handler.sh ]]; then
+  egrep -q '^[  ]*jack/headphone\)$' /etc/acpi/handler.sh
+  alreadyset=$?
+  if [ ! $alreadyset -eq 0 ]; then
+    echo "Setting up ACPI hooks"
+    sudo cp /etc/acpi/handler.sh /etc/acpi/handler.sh.orig
+    sudo mkdir -p /opt/samus
+    sudo cp ./alsa/speakers.state /opt/samus
+    sudo cp ./alsa/headphones.state /opt/samus
+    line=$(sed -n '/^case \"\$1\" in/=' /etc/acpi/handler.sh);
+    line=$(echo $line | cut -d " " -f 1)
+    sudo sed -i "${line} a \\
+    jack/headphone)\\
+        case \"\$3\" in\\
+            plug)\\
+                logger \"headphone plugged\"\\
+                alsactl restore -f /opt/samus-alsa/headphones.state\\
+                alsaucm -c bdw-rt5677 set _verb HiFi set _enadev Headphone\\
+                ;;\\
+            unplug)\\
+                logger \"headphone unplugged\"\\ 
+                alsactl restore -f /opt/samus-alsa/speakers.state\\
+                alsaucm -c bdw-rt5677 set _verb HiFi set _disdev Headphone\\
+                ;;\\
+            *)\\
+                logger \"ACPI action undefined: \$3\"\\
+                ;;\\
+        esac\\
+        ;;\\
+" /etc/acpi/handler.sh
+  fi
+else
+  echo "/etc/acpi/handler.sh not found. Not setting up ACPI hooks. Headphones may not work correctly!"
+  echo "Install the acpid daemon on re-run this script."
+fi
+
+# 7. Profit
 echo "Sound setup completed successfully."
