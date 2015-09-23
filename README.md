@@ -20,25 +20,17 @@ The provided kernel config is also somewhat optimized for the Pixel 2.
 
 ## Installation
 
-The easiest way to get going is to install the packages if you are running
-Ubuntu, Debian or Arch Linux.
-
 ### Ubuntu / Debian
+Install from PPA:
 ``` bash
-$ git clone https://github.com/raphael/linux-samus
-$ cd linux-samus/build/debian
-$ sudo dpkg -i *.deb
+$ sudo add-apt-repository ppa:simon-raphael/linux-samus
+$ sudo apt-get update && upgrade
+$ sudo apt-get install linux-samus
 ```
 ### Arch Linux
 Install from the AUR:
 ```
 yaourt -S linux-samus4
-```
-or from repo:
-``` bash
-$ git clone https://github.com/raphael/linux-samus
-$ cd linux-samus/scripts/archlinux
-$ ./install.sh
 ```
 ### Other distributions
 The entire kernel patched tree is located under `build/linux`, compile and install using the usual
@@ -60,6 +52,8 @@ $ sudo make install
 
 Once installed reboot and load the kernel.
 
+### Sound
+
 To enable sound run the `sound.sh` script:
 ``` bash
 $ cd linux-samus/scripts/setup
@@ -70,11 +64,25 @@ $ ./sound.sh
 > /etc/pulse/default.pa contains a line to load the modules using udev).
 If the setup script fails please see below "Enabling sound step-by-step".
 
+### X11 Acceleration
+
 To enable X11 acceleration run the `xaccel.sh` script:
 ``` bash
 $ cd linux-samus/scripts/setup
 $ ./xaccel.sh
 ```
+
+### Touchpad
+
+The default synaptic drivers work fine however for a native experience 
+Hugh Greenbug ported the ChromeOS driver to linux. Run the following
+to install his driver and the default configuration:
+```
+$ cd linux-samus/scripts/setup
+$ ./touchpad.sh
+```
+
+### Brightness and Keyboard Backlight
 
 The script `script/setup/brightness` can be used to control the brightness level.
 ```
@@ -94,7 +102,7 @@ then the file `script/setup/enable-brightness.service` contains the definition f
 service that makes the files above writable to non-root user. Run
 `systemctl enable enable-brightness.service` for the service to run on boot.
 
-### Building your own patch
+## Building your own patch
 
 To build your own patched tree use the `patch.sh` scripts located in the
 `scripts` folder. The script accepts an optional argument which corresponds 
@@ -106,9 +114,9 @@ patch. It then applies this generated patch and the other included patches
 to the original tree. This process results in a patched tree located in
 `build/linux-patched`.
 
-### Enabling sound step-by-step
+## Enabling Sound Troubleshooting Guide
 
-If you're reading this either the `sound.sh` script failed or better you want to
+If you're reading this either the `sound.sh` script failed or you want to
 understand what it does :)
 
 The first thing to do is to copy over the firmwares from the `firmware` directory
