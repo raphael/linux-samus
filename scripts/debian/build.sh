@@ -5,6 +5,18 @@ LINUX=`readlink -f $DIR/../../build/linux-patched`
 LINUXSRC=`readlink -f $DIR/../../build/linux`
 DEBIANPATH=`readlink -f $LINUX/../debian`
 
+if [ ! -d $LINUX ]; then
+  echo "The patched tree must be generated first, couldn't find it at $LINUX"
+  echo "run ../build.sh to generate it"
+  exit 1
+fi
+
+if [ "$1" == "--help" ]; then
+  echo Usage: ./build.sh [--nocopy] [--nochange]
+  echo --nocopy: do not create $LINUX directory
+  echo --nochange: do not edit package changelog
+fi
+
 export FLAVOUR=samus
 export DEBEMAIL="simon.raphael@gmail.com"
 export DEBFULLNAME="Raphael Simon"
@@ -14,18 +26,6 @@ cd $DIR
 export DEBIAN_REVISION_MANDATORY=${KERNELRELEASE}.samus
 export CONCURRENCY_LEVEL=4
 echo Building revision $DEBIAN_REVISION_MANDATORY
-
-if [ "$1" == "--help" ]; then
-  echo Usage: ./build.sh [--nocopy] [--nochange]
-  echo --nocopy: do not create $LINUX directory
-  echo --nochange: do not edit package changelog
-fi
-
-if [ ! -d $LINUX ]; then
-  echo "The patched tree must be generated first, couldn't find it at $LINUX"
-  echo "run ../build.sh to generate it"
-  exit 1
-fi
 
 # Prepare source
 if [ ! "$1" == "--nocopy" ] && [ ! "$2" == "--nocopy" ]; then
@@ -37,9 +37,11 @@ if [ ! "$1" == "--nocopy" ] && [ ! "$2" == "--nocopy" ]; then
   make clean
   rm .config
   ln -s ../../scripts/config .config
+  git checkout debian
 fi
 
 # Create debian directory if needed
+cd $LINUXSRC
 if [ ! -d ./debian ]; then
   echo Building "debian" files
   make-kpkg debian
@@ -59,7 +61,7 @@ fi
 # Now build source package
 KEYID="`gpg --list-keys ${DEBEMAIL} | sed -n 's,^pub.*/\([^ ]*\).*,\1,p'`"
 echo Building source package
-dpkg-buildpackage -j4 -S -nc -sa -k${KEYID} -rfakeroot -I.git -I.gitignore -i'\.git.*'
+debuild -S -sa -nc
 if [ $? -ne 0 ]; then
   echo "** Debian source package build failed, aborting"
   exit 1
