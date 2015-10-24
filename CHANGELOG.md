@@ -1,3 +1,8 @@
+v4.2-7 / 2015-10-23
+--------------------
+Upgrade to Linux 4.2.4
+Enable joystick
+
 v4.2-6 / 2015-10-18
 --------------------
 Fix keyboard backlight
