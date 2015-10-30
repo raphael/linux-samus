@@ -1,7 +1,12 @@
+v4.2-8 / 2015-10-29
+--------------------
+Upgrade to Linux 4.2.5
+Enable joystick (JOYDEV)
+
 v4.2-7 / 2015-10-23
 --------------------
 Upgrade to Linux 4.2.4
-Enable joystick
+Enable joystick (JOYSTICK)
 
 v4.2-6 / 2015-10-18
 --------------------
