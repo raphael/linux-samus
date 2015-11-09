@@ -60,7 +60,7 @@ mkdir tmp_kernel_patches
 for f in "${files[@]}"; do
   export cf=`echo $f | sed -e "s/\/common//" | sed -e "s/\/boards//" | sed -e "s/\/haswell//"`
   export name=`echo $f | sed -e "s/\//_/g"`
-  echo "diff -Nau $LINUX/$f $CHROMEOS/$cf" > tmp_kernel_patches/$name.patch
+  echo "diff -Naur $LINUX/$f $CHROMEOS/$cf" > tmp_kernel_patches/$name.patch
   diff -Naur $LINUX/$f $CHROMEOS/$cf >> tmp_kernel_patches/$name.patch
 done
 

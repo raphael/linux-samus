@@ -235,18 +235,12 @@ static ssize_t dpms_show(struct device *device,
 			   char *buf)
 {
 	struct drm_connector *connector = to_drm_connector(device);
-	struct drm_device *dev = connector->dev;
-	uint64_t dpms_status;
-	int ret;
+	int dpms;
 
-	ret = drm_object_property_get_value(&connector->base,
-					    dev->mode_config.dpms_property,
-					    &dpms_status);
-	if (ret)
-		return 0;
+	dpms = READ_ONCE(connector->dpms);
 
 	return snprintf(buf, PAGE_SIZE, "%s\n",
-			drm_get_dpms_name((int)dpms_status));
+			drm_get_dpms_name(dpms));
 }
 
 static ssize_t enabled_show(struct device *device,
@@ -570,26 +564,6 @@ void drm_sysfs_hotplug_event(struct drm_device *dev)
 	kobject_uevent_env(&dev->primary->kdev->kobj, KOBJ_CHANGE, envp);
 }
 EXPORT_SYMBOL(drm_sysfs_hotplug_event);
-
-/**
- * drm_sysfs_hdmi_hotplug_event - generate a DRM uevent
- * @dev: DRM device
- *
- * Send a uevent for the DRM device specified by @dev.  Currently we only
- * set HOTPLUG=1 and HDMI=1 in the uevent environment, but this could be expanded to
- * deal with other types of events.
- */
-void drm_sysfs_hdmi_hotplug_event(struct drm_device *dev)
-{
-	char *event_string = "HOTPLUG=1";
-	char *hdmi_event_string = "HDMI=1";
-	char *envp[] = { event_string, hdmi_event_string, NULL };
-
-	DRM_DEBUG("generating hdmi hotplug event\n");
-
-	kobject_uevent_env(&dev->primary->kdev->kobj, KOBJ_CHANGE, envp);
-}
-EXPORT_SYMBOL(drm_sysfs_hdmi_hotplug_event);
 
 static void drm_sysfs_release(struct device *dev)
 {

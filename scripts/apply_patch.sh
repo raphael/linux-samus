@@ -41,13 +41,6 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo -- Applying HDMI hotplug patch --
-patch -p1 < $DIR/hdmi_hotplug.patch
-if [ $? -ne 0 ]; then
-  echo Something wrong happened...
-  echo I couldn\'t patch the main tree with the hdmi patch which means that changes upstream require an update to this script.
-  exit 1
-fi
 echo
 echo $LINUX now contains the patched source and a default config
 

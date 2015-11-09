@@ -1,12 +1,21 @@
 diff -Nau linux-head/sound/soc/codecs/rt5677.c chromiumos-chromeos-3.14/sound/soc/codecs/rt5677.c
 --- linux-head/sound/soc/codecs/rt5677.c	2015-06-18 18:56:44.686665895 -0700
 +++ chromiumos-chromeos-3.14/sound/soc/codecs/rt5677.c	2015-06-15 23:15:50.876647997 -0700
+@@ -63,7 +63,7 @@ static const struct regmap_range_cfg rt5677_ranges[] = {
+ 	},
+ };
+
+-static const struct reg_default init_list[] = {
++static const struct reg_sequence init_list[] = {
+ 	{RT5677_ASRC_12,	0x0018},
+ 	{RT5677_PR_BASE + 0x3d,	0x364d},
+ 	{RT5677_PR_BASE + 0x17,	0x4fc0},
 @@ -4820,11 +4820,8 @@
  static void rt5677_free_gpio(struct i2c_client *i2c)
  {
  	struct rt5677_priv *rt5677 = i2c_get_clientdata(i2c);
 -	int ret;
- 
+
 +	gpiochip_remove(&rt5677->gpio_chip);
 -	ret = gpiochip_remove(&rt5677->gpio_chip);
 -	if (ret != 0)
@@ -20,32 +29,41 @@ diff -Nau linux-head/sound/soc/intel/boards/bdw-rt5677.c chromiumos-chromeos-3.1
 @@ -12,10 +12,10 @@
  #include <sound/pcm_params.h>
  #include <sound/jack.h>
- 
+
 +#include "../common/sst-dsp.h"
 +#include "../haswell/sst-haswell-ipc.h"
 -#include "sst-dsp.h"
 -#include "sst-haswell-ipc.h"
- 
+
 +#include "../../codecs/rt5677.h"
 -#include "../codecs/rt5677.h"
- 
+
  /* GPIO indexes defined by ACPI */
  enum {
+@@ -191,7 +191,7 @@
+ 
+	/* Request rt5677 GPIO for headphone amp control */
+	bdw_rt5677->gpio_hp_en = devm_gpiod_get_index(codec->dev,
+-		"RT5677_GPIO_HP_AMP_SHDN_L", RT5677_GPIO_HP_AMP_SHDN_L);
++		"RT5677_GPIO_HP_AMP_SHDN_L", RT5677_GPIO_HP_AMP_SHDN_L, GPIOD_ASIS);
+	if (IS_ERR(bdw_rt5677->gpio_hp_en)) {
+		dev_err(codec->dev, "Can't find HP_AMP_SHDN_L gpio\n");
+		return PTR_ERR(bdw_rt5677->gpio_hp_en);
 diff -Nau linux-head/sound/soc/intel/boards/broadwell.c chromiumos-chromeos-3.14/sound/soc/intel/broadwell.c
 --- linux-head/sound/soc/intel/boards/broadwell.c	2015-06-18 19:08:15.913331320 -0700
 +++ chromiumos-chromeos-3.14/sound/soc/intel/broadwell.c	2015-06-15 23:15:50.903314664 -0700
 @@ -22,10 +22,10 @@
  #include <sound/jack.h>
  #include <sound/pcm_params.h>
- 
+
 +#include "../common/sst-dsp.h"
 +#include "../haswell/sst-haswell-ipc.h"
 -#include "sst-dsp.h"
 -#include "sst-haswell-ipc.h"
- 
+
 +#include "../../codecs/rt286.h"
 -#include "../codecs/rt286.h"
- 
+
  static struct snd_soc_jack broadwell_hp;
  static struct snd_soc_jack broadwell_mic;
 diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-dsp.c chromiumos-chromeos-3.14/sound/soc/intel/sst-haswell-dsp.c
@@ -54,7 +72,7 @@ diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-dsp.c chromiumos-chrome
 @@ -28,10 +28,10 @@
  #include <linux/firmware.h>
  #include <linux/pm_runtime.h>
- 
+
 +#include "../common/sst-dsp.h"
 +#include "../common/sst-dsp-priv.h"
 -#include "sst-dsp.h"
@@ -62,44 +80,35 @@ diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-dsp.c chromiumos-chrome
  #include "sst-haswell-ipc.h"
 +#include "../common/sst-debugfs.h"
 -#include "sst-debugfs.h"
- 
+
  #include <trace/events/hswadsp.h>
- 
+
 diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-ipc.c chromiumos-chromeos-3.14/sound/soc/intel/sst-haswell-ipc.c
 --- linux-head/sound/soc/intel/haswell/sst-haswell-ipc.c	2015-06-18 18:53:59.033332859 -0700
 +++ chromiumos-chromeos-3.14/sound/soc/intel/sst-haswell-ipc.c	2015-06-15 23:15:50.903314664 -0700
 @@ -37,8 +37,8 @@
- 
- 
+
+
  #include "sst-haswell-ipc.h"
 +#include "../common/sst-dsp.h"
 +#include "../common/sst-dsp-priv.h"
 -#include "sst-dsp.h"
 -#include "sst-dsp-priv.h"
- 
+
  /* Global Message - Generic */
  #define IPC_GLB_TYPE_SHIFT	24
-@@ -1758,7 +1758,6 @@
+@@ -1762,7 +1762,6 @@
  	sst_module_runtime_free(runtime);
  }
- 
+
 -#ifdef CONFIG_PM_RUNTIME
  static int sst_hsw_dx_state_dump(struct sst_hsw *hsw)
  {
  	struct sst_dsp *sst = hsw->dsp;
-@@ -2129,7 +2128,7 @@
- 	int i;
- 	struct snd_dma_buffer *dma_buf[2];
- 	static struct dentry *fwdir;
--	
-+
- 	dma_buf[0] = devm_kzalloc(hsw->dsp->dev, sizeof(*dma_buf[0]), GFP_KERNEL);
- 	dma_buf[1] = devm_kzalloc(hsw->dsp->dev, sizeof(*dma_buf[1]), GFP_KERNEL);
- 	memset(log_stream->config, 0xFF, sizeof(log_stream->config));
-@@ -2203,12 +2202,10 @@
+@@ -2207,12 +2206,10 @@
  			&hsw->log_stream, &fw_log_config_fops))
  		pr_warn("ASoC: Failed to create fw_log_config debugfs file\n");
- 
+
 -#ifdef CONFIG_PM_RUNTIME
  	if (!debugfs_create_file("suspend_stats", 0444, fwdir,
  			&hsw->log_stream, &suspend_stats_fops))
@@ -109,12 +118,12 @@ diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-ipc.c chromiumos-chrome
  	return 0;
  }
  EXPORT_SYMBOL(sst_hsw_dbg_enable);
-@@ -2367,7 +2364,6 @@
- 
+@@ -2371,7 +2368,6 @@
+
  	return ret;
  }
 -#endif
- 
+
  static int msg_empty_list_init(struct sst_hsw *hsw)
  {
 diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-pcm.c chromiumos-chromeos-3.14/sound/soc/intel/sst-haswell-pcm.c
@@ -122,7 +131,7 @@ diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-pcm.c chromiumos-chrome
 +++ chromiumos-chromeos-3.14/sound/soc/intel/sst-haswell-pcm.c	2015-06-15 23:15:50.903314664 -0700
 @@ -30,9 +30,9 @@
  #include <sound/compress_driver.h>
- 
+
  #include "sst-haswell-ipc.h"
 +#include "../common/sst-dsp-priv.h"
 +#include "../common/sst-dsp.h"
@@ -130,21 +139,21 @@ diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-pcm.c chromiumos-chrome
 -#include "sst-dsp-priv.h"
 -#include "sst-dsp.h"
 -#include "sst-debugfs.h"
- 
+
  #define HSW_PCM_COUNT		6
  #define HSW_VOLUME_MAX		0x7FFFFFFF	/* 0dB */
 @@ -1003,7 +1003,6 @@
  }
- 
+
  #ifdef CONFIG_PM
 -#ifdef CONFIG_PM_RUNTIME
- 
+
  static int hsw_pcm_runtime_idle(struct device *dev)
  {
 @@ -1152,14 +1151,6 @@
  	return 0;
  }
- 
+
 -#else
 -#define hsw_pcm_runtime_idle		NULL
 -#define hsw_pcm_runtime_suspend		NULL
@@ -159,20 +168,47 @@ diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-pcm.c chromiumos-chrome
 diff -Nau linux-head/sound/soc/soc-jack.c chromiumos-chromeos-3.14/sound/soc/soc-jack.c
 --- linux-head/sound/soc/soc-jack.c	2015-09-01 18:55:53.169999321 -0700
 +++ chromiumos-chromeos-3.14/sound/soc/soc-jack.c	2015-09-01 23:15:50.903314664 -0700
-@@ -44,5 +44,5 @@
+@@ -44,6 +44,6 @@
  	BLOCKING_INIT_NOTIFIER_HEAD(&jack->notifier);
- 
+
 -	return snd_jack_new(codec->component.card->snd_card, id, type, &jack->jack);
 +	return snd_jack_new(codec->component.card->snd_card, id, type, &jack->jack, false, false);
  }
  EXPORT_SYMBOL_GPL(snd_soc_jack_new);
  /**
+@@ -306,11 +306,14 @@
+ 			goto undo;
+ 		}
+
+-		if (gpios[i].gpiod_dev) {
+-			/* GPIO descriptor */
++		if (gpios[i].desc) {
++			/* Already have a GPIO descriptor. */
++			goto got_gpio;
++		} else if (gpios[i].gpiod_dev) {
++			/* Get a GPIO descriptor */
+ 			gpios[i].desc = gpiod_get_index(gpios[i].gpiod_dev,
+ 							gpios[i].name,
+-							gpios[i].idx);
++							gpios[i].idx, GPIOD_IN);
+ 			if (IS_ERR(gpios[i].desc)) {
+ 				ret = PTR_ERR(gpios[i].desc);
+ 				dev_err(gpios[i].gpiod_dev,
+@@ -338,7 +341,7 @@
+ 		ret = gpiod_direction_input(gpios[i].desc);
+ 		if (ret)
+ 			goto err;
+-
++got_gpio:
+ 		INIT_DELAYED_WORK(&gpios[i].work, gpio_work);
+ 		gpios[i].jack = jack;
+
 diff -Nau linux-head/include/sound/soc.h chromiumos-chromeos-3.14/include/sound/soc.h
 --- linux-head/include/sound/soc.h	2015-09-01 18:55:53.169999321 -0700
 +++ chromiumos-chromeos-3.14/include/sound/soc.h	2015-09-01 23:15:50.903314664 -0700
 @@ -1240,4 +1240,56 @@
  }
- 
+
 +/**
 + * snd_soc_codec_get_dapm() - Returns the DAPM context for the CODEC
 + * @codec: The CODEC for which to get the DAPM context
@@ -233,7 +269,7 @@ diff -Nau linux-head/include/sound/soc-dapm.h chromiumos-chromeos-3.14/include/s
 @@ -456,6 +456,9 @@
  struct snd_soc_dapm_context *snd_soc_dapm_kcontrol_dapm(
  	struct snd_kcontrol *kcontrol);
- 
+
 +int snd_soc_dapm_force_bias_level(struct snd_soc_dapm_context *dapm,
 +	enum snd_soc_bias_level level);
 +
@@ -243,10 +279,10 @@ diff -Nau linux-head/include/sound/soc-dapm.h chromiumos-chromeos-3.14/include/s
 diff -Nau linux-head/include/sound/soc-dapm.h chromiumos-chromeos-3.14/include/sound/soc-dapm.h
 --- linux-head/include/sound/soc-dapm.h	2015-09-01 18:55:53.169999321 -0700
 +++ chromiumos-chromeos-3.14/include/sound/soc-dapm.h	2015-09-01 23:15:50.903314664 -0700
-@@ -634,4 +637,35 @@
+@@ -634,4 +634,35 @@
  	int neighbour_checks;
  };
- 
+
 +/**
 + * snd_soc_dapm_init_bias_level() - Initialize DAPM bias level
 + * @dapm: The DAPM context to initialize
@@ -284,7 +320,7 @@ diff -Nau linux-head/sound/soc/soc-dapm.c chromiumos-chromeos-3.14/sound/soc/soc
 +++ chromiumos-chromeos-3.14/sound/soc/soc-dapm.c	2015-09-01 23:15:50.903314664 -0700
 @@ -429,6 +429,35 @@
  }
- 
+
  /**
 + * snd_soc_dapm_force_bias_level() - Sets the DAPM bias level
 + * @dapm: The DAPM context for which to set the level

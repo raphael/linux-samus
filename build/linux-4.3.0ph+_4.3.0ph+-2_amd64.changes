@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Mon, 09 Nov 2015 10:46:09 -0800
+Source: linux-4.3.0ph+
+Binary: linux-image-4.3.0ph+ linux-headers-4.3.0ph+ linux-firmware-image-4.3.0ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.3.0ph+-2
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-firmware-image-4.3.0ph+ - Linux kernel firmware, version 4.3.0ph+
+ linux-headers-4.3.0ph+ - Linux kernel headers for 4.3.0ph+ on ${kernel:debarch}
+ linux-image-4.3.0ph+ - Linux kernel, version 4.3.0ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.3.0ph+ (4.3.0ph+-2) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ bea43f117e80ee37dfade30144afd9d68596618a 1130 linux-4.3.0ph+_4.3.0ph+-2.dsc
+ 061a92a2b73a0b3d8d41043a88ae42d982feb0b3 136587536 linux-4.3.0ph+_4.3.0ph+.orig.tar.gz
+ 91fc9e78681e1a96efca3e0b25e8a30d28c286fc 1280 linux-4.3.0ph+_4.3.0ph+-2.debian.tar.gz
+ 8eb4bbf537f8da3a4f2fd493cb6cfde68970c170 176830 linux-firmware-image-4.3.0ph+_4.3.0ph+-2_amd64.deb
+ 2ca0871be428c3436e5d6840688fa30b12edade3 6983950 linux-headers-4.3.0ph+_4.3.0ph+-2_amd64.deb
+ d88253b37f3fa1a77d8c82c0f697baa68748edfa 816994 linux-libc-dev_4.3.0ph+-2_amd64.deb
+ a8ad92fcc1ce1a03a772dd89b0826a17247e22a4 15181384 linux-image-4.3.0ph+_4.3.0ph+-2_amd64.deb
+Checksums-Sha256:
+ f05bbeba5c9b15e8c7a859cf68ee3a4a3d58bd5ca97228e25c3524a33320ea59 1130 linux-4.3.0ph+_4.3.0ph+-2.dsc
+ 0b9976ce12376a2dd9a22de82fac5a06ac945551eaff2ef634080eddef4ef503 136587536 linux-4.3.0ph+_4.3.0ph+.orig.tar.gz
+ 75cd6864f91f40217ca6f83a1328db77f1e4b774bbb15f9e7114f282f4e87c5f 1280 linux-4.3.0ph+_4.3.0ph+-2.debian.tar.gz
+ 2fe75c27d4f20c1b8de6ffc61fad80443e19d377a4c2e2e94375f0c2fab4d27a 176830 linux-firmware-image-4.3.0ph+_4.3.0ph+-2_amd64.deb
+ b67586ce1732116c8bf1d9a755bab369d85cae2163685ea1c8829527d4e2b1a2 6983950 linux-headers-4.3.0ph+_4.3.0ph+-2_amd64.deb
+ b0be3cfb2778f7ee6beb29079254064c39092b7bb9123a7b6d085deee156b834 816994 linux-libc-dev_4.3.0ph+-2_amd64.deb
+ 97fe8cbb9515a9232f3e52bb31cdd558f8a4c05087a956383966097565560c42 15181384 linux-image-4.3.0ph+_4.3.0ph+-2_amd64.deb
+Files:
+ c833de362d8d8506ea42393db367e73a 1130 kernel optional linux-4.3.0ph+_4.3.0ph+-2.dsc
+ 5b32951691797ff3b88b6c7f737e47c6 136587536 kernel optional linux-4.3.0ph+_4.3.0ph+.orig.tar.gz
+ e32667bcab5dbd5904632cbff9b27c19 1280 kernel optional linux-4.3.0ph+_4.3.0ph+-2.debian.tar.gz
+ 34112d2bc9d8e946fbad0db0d8fac0e6 176830 kernel optional linux-firmware-image-4.3.0ph+_4.3.0ph+-2_amd64.deb
+ 4e86d427ce92028608b201c948f786e0 6983950 kernel optional linux-headers-4.3.0ph+_4.3.0ph+-2_amd64.deb
+ ce8c2af6bd6e02a1ae56033721b4b7c2 816994 devel optional linux-libc-dev_4.3.0ph+-2_amd64.deb
+ 96a99e8e56f54de84769a247e39104ae 15181384 kernel optional linux-image-4.3.0ph+_4.3.0ph+-2_amd64.deb
