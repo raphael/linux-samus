@@ -33,7 +33,7 @@
 #include <linux/suspend.h>
 #include <linux/acpi.h>
 #include <asm/intel_pmc_ipc.h>
-#include <linux/platform_data/itco_wdt.h>
+#include <linux/mfd/lpc_ich.h>
 
 /*
  * IPC registers
@@ -473,9 +473,9 @@ static struct resource tco_res[] = {
 	},
 };
 
-static struct itco_wdt_platform_data tco_info = {
+static struct lpc_ich_info tco_info = {
 	.name = "Apollo Lake SoC",
-	.version = 3,
+	.iTCO_version = 3,
 };
 
 static int ipc_create_punit_device(void)
@@ -552,7 +552,8 @@ static int ipc_create_tco_device(void)
 		goto err;
 	}
 
-	ret = platform_device_add_data(pdev, &tco_info, sizeof(tco_info));
+	ret = platform_device_add_data(pdev, &tco_info,
+				       sizeof(struct lpc_ich_info));
 	if (ret) {
 		dev_err(ipcdev.dev, "Failed to add tco platform data\n");
 		goto err;

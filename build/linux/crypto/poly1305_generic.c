@@ -13,10 +13,30 @@
 
 #include <crypto/algapi.h>
 #include <crypto/internal/hash.h>
-#include <crypto/poly1305.h>
 #include <linux/crypto.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+
+#define POLY1305_BLOCK_SIZE	16
+#define POLY1305_KEY_SIZE	32
+#define POLY1305_DIGEST_SIZE	16
+
+struct poly1305_desc_ctx {
+	/* key */
+	u32 r[5];
+	/* finalize key */
+	u32 s[4];
+	/* accumulator */
+	u32 h[5];
+	/* partial buffer */
+	u8 buf[POLY1305_BLOCK_SIZE];
+	/* bytes used in partial buffer */
+	unsigned int buflen;
+	/* r key has been set */
+	bool rset;
+	/* s key has been set */
+	bool sset;
+};
 
 static inline u64 mlt(u64 a, u64 b)
 {
@@ -38,7 +58,7 @@ static inline u32 le32_to_cpuvp(const void *p)
 	return le32_to_cpup(p);
 }
 
-int crypto_poly1305_init(struct shash_desc *desc)
+static int poly1305_init(struct shash_desc *desc)
 {
 	struct poly1305_desc_ctx *dctx = shash_desc_ctx(desc);
 
@@ -49,9 +69,8 @@ int crypto_poly1305_init(struct shash_desc *desc)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(crypto_poly1305_init);
 
-int crypto_poly1305_setkey(struct crypto_shash *tfm,
+static int poly1305_setkey(struct crypto_shash *tfm,
 			   const u8 *key, unsigned int keylen)
 {
 	/* Poly1305 requires a unique key for each tag, which implies that
@@ -60,7 +79,6 @@ int crypto_poly1305_setkey(struct crypto_shash *tfm,
 	 * the update() call. */
 	return -ENOTSUPP;
 }
-EXPORT_SYMBOL_GPL(crypto_poly1305_setkey);
 
 static void poly1305_setrkey(struct poly1305_desc_ctx *dctx, const u8 *key)
 {
@@ -80,10 +98,16 @@ static void poly1305_setskey(struct poly1305_desc_ctx *dctx, const u8 *key)
 	dctx->s[3] = le32_to_cpuvp(key + 12);
 }
 
-unsigned int crypto_poly1305_setdesckey(struct poly1305_desc_ctx *dctx,
-					const u8 *src, unsigned int srclen)
+static unsigned int poly1305_blocks(struct poly1305_desc_ctx *dctx,
+				    const u8 *src, unsigned int srclen,
+				    u32 hibit)
 {
-	if (!dctx->sset) {
+	u32 r0, r1, r2, r3, r4;
+	u32 s1, s2, s3, s4;
+	u32 h0, h1, h2, h3, h4;
+	u64 d0, d1, d2, d3, d4;
+
+	if (unlikely(!dctx->sset)) {
 		if (!dctx->rset && srclen >= POLY1305_BLOCK_SIZE) {
 			poly1305_setrkey(dctx, src);
 			src += POLY1305_BLOCK_SIZE;
@@ -96,25 +120,6 @@ unsigned int crypto_poly1305_setdesckey(struct poly1305_desc_ctx *dctx,
 			srclen -= POLY1305_BLOCK_SIZE;
 			dctx->sset = true;
 		}
-	}
-	return srclen;
-}
-EXPORT_SYMBOL_GPL(crypto_poly1305_setdesckey);
-
-static unsigned int poly1305_blocks(struct poly1305_desc_ctx *dctx,
-				    const u8 *src, unsigned int srclen,
-				    u32 hibit)
-{
-	u32 r0, r1, r2, r3, r4;
-	u32 s1, s2, s3, s4;
-	u32 h0, h1, h2, h3, h4;
-	u64 d0, d1, d2, d3, d4;
-	unsigned int datalen;
-
-	if (unlikely(!dctx->sset)) {
-		datalen = crypto_poly1305_setdesckey(dctx, src, srclen);
-		src += srclen - datalen;
-		srclen = datalen;
 	}
 
 	r0 = dctx->r[0];
@@ -176,7 +181,7 @@ static unsigned int poly1305_blocks(struct poly1305_desc_ctx *dctx,
 	return srclen;
 }
 
-int crypto_poly1305_update(struct shash_desc *desc,
+static int poly1305_update(struct shash_desc *desc,
 			   const u8 *src, unsigned int srclen)
 {
 	struct poly1305_desc_ctx *dctx = shash_desc_ctx(desc);
@@ -209,9 +214,8 @@ int crypto_poly1305_update(struct shash_desc *desc,
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(crypto_poly1305_update);
 
-int crypto_poly1305_final(struct shash_desc *desc, u8 *dst)
+static int poly1305_final(struct shash_desc *desc, u8 *dst)
 {
 	struct poly1305_desc_ctx *dctx = shash_desc_ctx(desc);
 	__le32 *mac = (__le32 *)dst;
@@ -278,14 +282,13 @@ int crypto_poly1305_final(struct shash_desc *desc, u8 *dst)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(crypto_poly1305_final);
 
 static struct shash_alg poly1305_alg = {
 	.digestsize	= POLY1305_DIGEST_SIZE,
-	.init		= crypto_poly1305_init,
-	.update		= crypto_poly1305_update,
-	.final		= crypto_poly1305_final,
-	.setkey		= crypto_poly1305_setkey,
+	.init		= poly1305_init,
+	.update		= poly1305_update,
+	.final		= poly1305_final,
+	.setkey		= poly1305_setkey,
 	.descsize	= sizeof(struct poly1305_desc_ctx),
 	.base		= {
 		.cra_name		= "poly1305",

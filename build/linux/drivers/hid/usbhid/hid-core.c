@@ -710,8 +710,7 @@ int usbhid_open(struct hid_device *hid)
 		 * Wait 50 msec for the queue to empty before allowing events
 		 * to go through hid.
 		 */
-		if (res == 0 && !(hid->quirks & HID_QUIRK_ALWAYS_POLL))
-			msleep(50);
+		msleep(50);
 		clear_bit(HID_RESUME_RUNNING, &usbhid->iofl);
 	}
 done:

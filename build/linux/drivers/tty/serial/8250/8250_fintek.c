@@ -17,19 +17,18 @@
 #include <linux/serial_core.h>
 #include  "8250.h"
 
-#define ADDR_PORT 0
-#define DATA_PORT 1
+#define ADDR_PORT 0x4E
+#define DATA_PORT 0x4F
+#define ENTRY_KEY 0x77
 #define EXIT_KEY 0xAA
 #define CHIP_ID1  0x20
+#define CHIP_ID1_VAL 0x02
 #define CHIP_ID2  0x21
-#define CHIP_ID_0 0x1602
-#define CHIP_ID_1 0x0501
+#define CHIP_ID2_VAL 0x16
 #define VENDOR_ID1 0x23
 #define VENDOR_ID1_VAL 0x19
 #define VENDOR_ID2 0x24
 #define VENDOR_ID2_VAL 0x34
-#define IO_ADDR1 0x61
-#define IO_ADDR2 0x60
 #define LDN 0x7
 
 #define RS485  0xF0
@@ -40,49 +39,51 @@
 
 #define DRIVER_NAME "8250_fintek"
 
-struct fintek_8250 {
-	u16 base_port;
-	u8 index;
-	u8 key;
-	long line;
-};
+static int fintek_8250_enter_key(void){
 
-static int fintek_8250_enter_key(u16 base_port, u8 key)
-{
-
-	if (!request_muxed_region(base_port, 2, DRIVER_NAME))
+	if (!request_muxed_region(ADDR_PORT, 2, DRIVER_NAME))
 		return -EBUSY;
 
-	outb(key, base_port + ADDR_PORT);
-	outb(key, base_port + ADDR_PORT);
+	outb(ENTRY_KEY, ADDR_PORT);
+	outb(ENTRY_KEY, ADDR_PORT);
 	return 0;
 }
 
-static void fintek_8250_exit_key(u16 base_port)
-{
+static void fintek_8250_exit_key(void){
 
-	outb(EXIT_KEY, base_port + ADDR_PORT);
-	release_region(base_port + ADDR_PORT, 2);
+	outb(EXIT_KEY, ADDR_PORT);
+	release_region(ADDR_PORT, 2);
 }
 
-static int fintek_8250_check_id(u16 base_port)
+static int fintek_8250_get_index(resource_size_t base_addr)
 {
-	u16 chip;
+	resource_size_t base[] = {0x3f8, 0x2f8, 0x3e8, 0x2e8};
+	int i;
 
-	outb(VENDOR_ID1, base_port + ADDR_PORT);
-	if (inb(base_port + DATA_PORT) != VENDOR_ID1_VAL)
+	for (i = 0; i < ARRAY_SIZE(base); i++)
+		if (base_addr == base[i])
+			return i;
+
+	return -ENODEV;
+}
+
+static int fintek_8250_check_id(void)
+{
+
+	outb(CHIP_ID1, ADDR_PORT);
+	if (inb(DATA_PORT) != CHIP_ID1_VAL)
 		return -ENODEV;
 
-	outb(VENDOR_ID2, base_port + ADDR_PORT);
-	if (inb(base_port + DATA_PORT) != VENDOR_ID2_VAL)
+	outb(CHIP_ID2, ADDR_PORT);
+	if (inb(DATA_PORT) != CHIP_ID2_VAL)
 		return -ENODEV;
 
-	outb(CHIP_ID1, base_port + ADDR_PORT);
-	chip = inb(base_port + DATA_PORT);
-	outb(CHIP_ID2, base_port + ADDR_PORT);
-	chip |= inb(base_port + DATA_PORT) << 8;
+	outb(VENDOR_ID1, ADDR_PORT);
+	if (inb(DATA_PORT) != VENDOR_ID1_VAL)
+		return -ENODEV;
 
-	if (chip != CHIP_ID_0 && chip != CHIP_ID_1)
+	outb(VENDOR_ID2, ADDR_PORT);
+	if (inb(DATA_PORT) != VENDOR_ID2_VAL)
 		return -ENODEV;
 
 	return 0;
@@ -92,9 +93,9 @@ static int fintek_8250_rs485_config(struct uart_port *port,
 			      struct serial_rs485 *rs485)
 {
 	uint8_t config = 0;
-	struct fintek_8250 *pdata = port->private_data;
+	int index = fintek_8250_get_index(port->iobase);
 
-	if (!pdata)
+	if (index < 0)
 		return -EINVAL;
 
 	if (rs485->flags & SER_RS485_ENABLED)
@@ -124,84 +125,44 @@ static int fintek_8250_rs485_config(struct uart_port *port,
 	if (rs485->flags & SER_RS485_RTS_ON_SEND)
 		config |= RTS_INVERT;
 
-	if (fintek_8250_enter_key(pdata->base_port, pdata->key))
+	if (fintek_8250_enter_key())
 		return -EBUSY;
 
-	outb(LDN, pdata->base_port + ADDR_PORT);
-	outb(pdata->index, pdata->base_port + DATA_PORT);
-	outb(RS485, pdata->base_port + ADDR_PORT);
-	outb(config, pdata->base_port + DATA_PORT);
-	fintek_8250_exit_key(pdata->base_port);
+	outb(LDN, ADDR_PORT);
+	outb(index, DATA_PORT);
+	outb(RS485, ADDR_PORT);
+	outb(config, DATA_PORT);
+	fintek_8250_exit_key();
 
 	port->rs485 = *rs485;
 
 	return 0;
 }
 
-static int fintek_8250_base_port(u16 io_address, u8 *key, u8 *index)
-{
-	static const u16 addr[] = {0x4e, 0x2e};
-	static const u8 keys[] = {0x77, 0xa0, 0x87, 0x67};
-	int i, j, k;
-
-	for (i = 0; i < ARRAY_SIZE(addr); i++) {
-		for (j = 0; j < ARRAY_SIZE(keys); j++) {
-
-			if (fintek_8250_enter_key(addr[i], keys[j]))
-				continue;
-			if (fintek_8250_check_id(addr[i])) {
-				fintek_8250_exit_key(addr[i]);
-				continue;
-			}
-
-			for (k = 0; k < 4; k++) {
-				u16 aux;
-
-				outb(LDN, addr[i] + ADDR_PORT);
-				outb(k, addr[i] + DATA_PORT);
-
-				outb(IO_ADDR1, addr[i] + ADDR_PORT);
-				aux = inb(addr[i] + DATA_PORT);
-				outb(IO_ADDR2, addr[i] + ADDR_PORT);
-				aux |= inb(addr[i] + DATA_PORT) << 8;
-				if (aux != io_address)
-					continue;
-
-				fintek_8250_exit_key(addr[i]);
-				*key = keys[j];
-				*index = k;
-				return addr[i];
-			}
-			fintek_8250_exit_key(addr[i]);
-		}
-	}
-
-	return -ENODEV;
-}
-
 static int
 fintek_8250_probe(struct pnp_dev *dev, const struct pnp_device_id *dev_id)
 {
+	int line;
 	struct uart_8250_port uart;
-	struct fintek_8250 *pdata;
-	int base_port;
-	u8 key;
-	u8 index;
+	int ret;
 
 	if (!pnp_port_valid(dev, 0))
 		return -ENODEV;
 
-	base_port = fintek_8250_base_port(pnp_port_start(dev, 0), &key, &index);
-	if (base_port < 0)
+	if (fintek_8250_get_index(pnp_port_start(dev, 0)) < 0)
 		return -ENODEV;
 
+	/* Enable configuration registers*/
+	if (fintek_8250_enter_key())
+		return -EBUSY;
+
+	/*Check ID*/
+	ret = fintek_8250_check_id();
+	fintek_8250_exit_key();
+	if (ret)
+		return ret;
+
 	memset(&uart, 0, sizeof(uart));
-
-	pdata = devm_kzalloc(&dev->dev, sizeof(*pdata), GFP_KERNEL);
-	if (!pdata)
-		return -ENOMEM;
-	uart.port.private_data = pdata;
-
 	if (!pnp_irq_valid(dev, 0))
 		return -ENODEV;
 	uart.port.irq = pnp_irq(dev, 0);
@@ -215,43 +176,40 @@ fintek_8250_probe(struct pnp_dev *dev, const struct pnp_device_id *dev_id)
 	uart.port.uartclk = 1843200;
 	uart.port.dev = &dev->dev;
 
-	pdata->key = key;
-	pdata->base_port = base_port;
-	pdata->index = index;
-	pdata->line = serial8250_register_8250_port(&uart);
-	if (pdata->line < 0)
+	line = serial8250_register_8250_port(&uart);
+	if (line < 0)
 		return -ENODEV;
 
-	pnp_set_drvdata(dev, pdata);
+	pnp_set_drvdata(dev, (void *)((long)line + 1));
 	return 0;
 }
 
 static void fintek_8250_remove(struct pnp_dev *dev)
 {
-	struct fintek_8250 *pdata = pnp_get_drvdata(dev);
+	long line = (long)pnp_get_drvdata(dev);
 
-	if (pdata)
-		serial8250_unregister_port(pdata->line);
+	if (line)
+		serial8250_unregister_port(line - 1);
 }
 
 #ifdef CONFIG_PM
 static int fintek_8250_suspend(struct pnp_dev *dev, pm_message_t state)
 {
-	struct fintek_8250 *pdata = pnp_get_drvdata(dev);
+	long line = (long)pnp_get_drvdata(dev);
 
-	if (!pdata)
+	if (!line)
 		return -ENODEV;
-	serial8250_suspend_port(pdata->line);
+	serial8250_suspend_port(line - 1);
 	return 0;
 }
 
 static int fintek_8250_resume(struct pnp_dev *dev)
 {
-	struct fintek_8250 *pdata = pnp_get_drvdata(dev);
+	long line = (long)pnp_get_drvdata(dev);
 
-	if (!pdata)
+	if (!line)
 		return -ENODEV;
-	serial8250_resume_port(pdata->line);
+	serial8250_resume_port(line - 1);
 	return 0;
 }
 #else

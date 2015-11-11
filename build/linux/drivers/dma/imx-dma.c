@@ -1083,12 +1083,8 @@ static int __init imxdma_probe(struct platform_device *pdev)
 	if (IS_ERR(imxdma->dma_ahb))
 		return PTR_ERR(imxdma->dma_ahb);
 
-	ret = clk_prepare_enable(imxdma->dma_ipg);
-	if (ret)
-		return ret;
-	ret = clk_prepare_enable(imxdma->dma_ahb);
-	if (ret)
-		goto disable_dma_ipg_clk;
+	clk_prepare_enable(imxdma->dma_ipg);
+	clk_prepare_enable(imxdma->dma_ahb);
 
 	/* reset DMA module */
 	imx_dmav1_writel(imxdma, DCR_DRST, DMA_DCR);
@@ -1098,20 +1094,20 @@ static int __init imxdma_probe(struct platform_device *pdev)
 				       dma_irq_handler, 0, "DMA", imxdma);
 		if (ret) {
 			dev_warn(imxdma->dev, "Can't register IRQ for DMA\n");
-			goto disable_dma_ahb_clk;
+			goto err;
 		}
 
 		irq_err = platform_get_irq(pdev, 1);
 		if (irq_err < 0) {
 			ret = irq_err;
-			goto disable_dma_ahb_clk;
+			goto err;
 		}
 
 		ret = devm_request_irq(&pdev->dev, irq_err,
 				       imxdma_err_handler, 0, "DMA", imxdma);
 		if (ret) {
 			dev_warn(imxdma->dev, "Can't register ERRIRQ for DMA\n");
-			goto disable_dma_ahb_clk;
+			goto err;
 		}
 	}
 
@@ -1148,7 +1144,7 @@ static int __init imxdma_probe(struct platform_device *pdev)
 				dev_warn(imxdma->dev, "Can't register IRQ %d "
 					 "for DMA channel %d\n",
 					 irq + i, i);
-				goto disable_dma_ahb_clk;
+				goto err;
 			}
 			init_timer(&imxdmac->watchdog);
 			imxdmac->watchdog.function = &imxdma_watchdog;
@@ -1187,14 +1183,14 @@ static int __init imxdma_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, imxdma);
 
-	imxdma->dma_device.copy_align = DMAENGINE_ALIGN_4_BYTES;
+	imxdma->dma_device.copy_align = 2; /* 2^2 = 4 bytes alignment */
 	imxdma->dma_device.dev->dma_parms = &imxdma->dma_parms;
 	dma_set_max_seg_size(imxdma->dma_device.dev, 0xffffff);
 
 	ret = dma_async_device_register(&imxdma->dma_device);
 	if (ret) {
 		dev_err(&pdev->dev, "unable to register\n");
-		goto disable_dma_ahb_clk;
+		goto err;
 	}
 
 	if (pdev->dev.of_node) {
@@ -1210,10 +1206,9 @@ static int __init imxdma_probe(struct platform_device *pdev)
 
 err_of_dma_controller:
 	dma_async_device_unregister(&imxdma->dma_device);
-disable_dma_ahb_clk:
-	clk_disable_unprepare(imxdma->dma_ahb);
-disable_dma_ipg_clk:
+err:
 	clk_disable_unprepare(imxdma->dma_ipg);
+	clk_disable_unprepare(imxdma->dma_ahb);
 	return ret;
 }
 

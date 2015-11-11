@@ -157,14 +157,10 @@ static int validate_ctr_auth(const struct hw_perf_event *hwc)
 
 	cpuhw = &get_cpu_var(cpu_hw_events);
 
-	/* Check authorization for cpu counter sets.
-	 * If the particular CPU counter set is not authorized,
-	 * return with -ENOENT in order to fall back to other
-	 * PMUs that might suffice the event request.
-	 */
+	/* check authorization for cpu counter sets */
 	ctrs_state = cpumf_state_ctl[hwc->config_base];
 	if (!(ctrs_state & cpuhw->info.auth_ctl))
-		err = -ENOENT;
+		err = -EPERM;
 
 	put_cpu_var(cpu_hw_events);
 	return err;
@@ -540,7 +536,7 @@ static int cpumf_pmu_add(struct perf_event *event, int flags)
 	 */
 	if (!(cpuhw->flags & PERF_EVENT_TXN))
 		if (validate_ctr_auth(&event->hw))
-			return -ENOENT;
+			return -EPERM;
 
 	ctr_set_enable(&cpuhw->state, event->hw.config_base);
 	event->hw.state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
@@ -615,7 +611,7 @@ static int cpumf_pmu_commit_txn(struct pmu *pmu)
 	state = cpuhw->state & ~((1 << CPUMF_LCCTL_ENABLE_SHIFT) - 1);
 	state >>= CPUMF_LCCTL_ENABLE_SHIFT;
 	if ((state & cpuhw->info.auth_ctl) != state)
-		return -ENOENT;
+		return -EPERM;
 
 	cpuhw->flags &= ~PERF_EVENT_TXN;
 	perf_pmu_enable(pmu);

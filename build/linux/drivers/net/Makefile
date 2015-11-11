@@ -25,7 +25,6 @@ obj-$(CONFIG_VIRTIO_NET) += virtio_net.o
 obj-$(CONFIG_VXLAN) += vxlan.o
 obj-$(CONFIG_GENEVE) += geneve.o
 obj-$(CONFIG_NLMON) += nlmon.o
-obj-$(CONFIG_NET_VRF) += vrf.o
 
 #
 # Networking Drivers
@@ -68,5 +67,3 @@ obj-$(CONFIG_USB_NET_DRIVERS) += usb/
 
 obj-$(CONFIG_HYPERV_NET) += hyperv/
 obj-$(CONFIG_NTB_NETDEV) += ntb_netdev.o
-
-obj-$(CONFIG_FUJITSU_ES) += fjes/

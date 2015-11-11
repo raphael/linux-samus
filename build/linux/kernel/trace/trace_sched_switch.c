@@ -26,7 +26,7 @@ probe_sched_switch(void *ignore, struct task_struct *prev, struct task_struct *n
 }
 
 static void
-probe_sched_wakeup(void *ignore, struct task_struct *wakee)
+probe_sched_wakeup(void *ignore, struct task_struct *wakee, int success)
 {
 	if (unlikely(!sched_ref))
 		return;

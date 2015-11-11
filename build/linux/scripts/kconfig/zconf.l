@@ -66,16 +66,9 @@ static void alloc_string(const char *str, int size)
 	memcpy(text, str, size);
 	text[size] = 0;
 }
-
-static void warn_ignored_character(char chr)
-{
-	fprintf(stderr,
-	        "%s:%d:warning: ignoring unsupported character '%c'\n",
-	        zconf_curname(), zconf_lineno(), chr);
-}
 %}
 
-n	[A-Za-z0-9_-]
+n	[A-Za-z0-9_]
 
 %%
 	int str = 0;
@@ -113,7 +106,7 @@ n	[A-Za-z0-9_-]
 		zconflval.string = text;
 		return T_WORD;
 	}
-	.	warn_ignored_character(*yytext);
+	.
 	\n	{
 		BEGIN(INITIAL);
 		current_file->lineno++;
@@ -139,7 +132,8 @@ n	[A-Za-z0-9_-]
 		BEGIN(STRING);
 	}
 	\n	BEGIN(INITIAL); current_file->lineno++; return T_EOL;
-	({n}|[/.])+	{
+	---	/* ignore */
+	({n}|[-/.])+	{
 		const struct kconf_id *id = kconf_id_lookup(yytext, yyleng);
 		if (id && id->flags & TF_PARAM) {
 			zconflval.id = id;
@@ -152,7 +146,11 @@ n	[A-Za-z0-9_-]
 	#.*	/* comment */
 	\\\n	current_file->lineno++;
 	[[:blank:]]+
-	.	warn_ignored_character(*yytext);
+	.	{
+		fprintf(stderr,
+		        "%s:%d:warning: ignoring unsupported character '%c'\n",
+		        zconf_curname(), zconf_lineno(), *yytext);
+	}
 	<<EOF>> {
 		BEGIN(INITIAL);
 	}

@@ -136,8 +136,7 @@ static inline bool is_of_node(struct fwnode_handle *fwnode)
 
 static inline struct device_node *to_of_node(struct fwnode_handle *fwnode)
 {
-	return is_of_node(fwnode) ?
-		container_of(fwnode, struct device_node, fwnode) : NULL;
+	return fwnode ? container_of(fwnode, struct device_node, fwnode) : NULL;
 }
 
 static inline bool of_have_populated_dt(void)

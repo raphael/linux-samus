@@ -1384,7 +1384,7 @@ static int qlcnic_83xx_copy_fw_file(struct qlcnic_adapter *adapter)
 	size_t size;
 	u64 addr;
 
-	temp = vzalloc(fw->size);
+	temp = kzalloc(fw->size, GFP_KERNEL);
 	if (!temp) {
 		release_firmware(fw);
 		fw_info->fw = NULL;
@@ -1430,7 +1430,7 @@ static int qlcnic_83xx_copy_fw_file(struct qlcnic_adapter *adapter)
 exit:
 	release_firmware(fw);
 	fw_info->fw = NULL;
-	vfree(temp);
+	kfree(temp);
 
 	return ret;
 }

@@ -26,6 +26,8 @@
 static LIST_HEAD(mbox_cons);
 static DEFINE_MUTEX(con_mutex);
 
+static void poll_txdone(unsigned long data);
+
 static int add_to_rbuf(struct mbox_chan *chan, void *mssg)
 {
 	int idx;
@@ -86,9 +88,7 @@ exit:
 	spin_unlock_irqrestore(&chan->lock, flags);
 
 	if (!err && (chan->txdone_method & TXDONE_BY_POLL))
-		/* kick start the timer immediately to avoid delays */
-		hrtimer_start(&chan->mbox->poll_hrt, ktime_set(0, 0),
-			      HRTIMER_MODE_REL);
+		poll_txdone((unsigned long)chan->mbox);
 }
 
 static void tx_tick(struct mbox_chan *chan, int r)
@@ -112,10 +112,9 @@ static void tx_tick(struct mbox_chan *chan, int r)
 		complete(&chan->tx_complete);
 }
 
-static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
+static void poll_txdone(unsigned long data)
 {
-	struct mbox_controller *mbox =
-		container_of(hrtimer, struct mbox_controller, poll_hrt);
+	struct mbox_controller *mbox = (struct mbox_controller *)data;
 	bool txdone, resched = false;
 	int i;
 
@@ -131,11 +130,9 @@ static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
 		}
 	}
 
-	if (resched) {
-		hrtimer_forward_now(hrtimer, ms_to_ktime(mbox->txpoll_period));
-		return HRTIMER_RESTART;
-	}
-	return HRTIMER_NORESTART;
+	if (resched)
+		mod_timer(&mbox->poll, jiffies +
+				msecs_to_jiffies(mbox->txpoll_period));
 }
 
 /**
@@ -454,9 +451,9 @@ int mbox_controller_register(struct mbox_controller *mbox)
 		txdone = TXDONE_BY_ACK;
 
 	if (txdone == TXDONE_BY_POLL) {
-		hrtimer_init(&mbox->poll_hrt, CLOCK_MONOTONIC,
-			     HRTIMER_MODE_REL);
-		mbox->poll_hrt.function = txdone_hrtimer;
+		mbox->poll.function = &poll_txdone;
+		mbox->poll.data = (unsigned long)mbox;
+		init_timer(&mbox->poll);
 	}
 
 	for (i = 0; i < mbox->num_chans; i++) {
@@ -498,7 +495,7 @@ void mbox_controller_unregister(struct mbox_controller *mbox)
 		mbox_free_channel(&mbox->chans[i]);
 
 	if (mbox->txdone_poll)
-		hrtimer_cancel(&mbox->poll_hrt);
+		del_timer_sync(&mbox->poll);
 
 	mutex_unlock(&con_mutex);
 }

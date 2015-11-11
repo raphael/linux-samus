@@ -119,7 +119,6 @@ int snd_hdac_device_register(struct hdac_device *codec);
 void snd_hdac_device_unregister(struct hdac_device *codec);
 
 int snd_hdac_refresh_widgets(struct hdac_device *codec);
-int snd_hdac_refresh_widget_sysfs(struct hdac_device *codec);
 
 unsigned int snd_hdac_make_cmd(struct hdac_device *codec, hda_nid_t nid,
 			       unsigned int verb, unsigned int parm);
@@ -165,15 +164,15 @@ static inline int snd_hdac_read_parm(struct hdac_device *codec, hda_nid_t nid,
 }
 
 #ifdef CONFIG_PM
-int snd_hdac_power_up(struct hdac_device *codec);
-int snd_hdac_power_down(struct hdac_device *codec);
-int snd_hdac_power_up_pm(struct hdac_device *codec);
-int snd_hdac_power_down_pm(struct hdac_device *codec);
+void snd_hdac_power_up(struct hdac_device *codec);
+void snd_hdac_power_down(struct hdac_device *codec);
+void snd_hdac_power_up_pm(struct hdac_device *codec);
+void snd_hdac_power_down_pm(struct hdac_device *codec);
 #else
-static inline int snd_hdac_power_up(struct hdac_device *codec) { return 0; }
-static inline int snd_hdac_power_down(struct hdac_device *codec) { return 0; }
-static inline int snd_hdac_power_up_pm(struct hdac_device *codec) { return 0; }
-static inline int snd_hdac_power_down_pm(struct hdac_device *codec) { return 0; }
+static inline void snd_hdac_power_up(struct hdac_device *codec) {}
+static inline void snd_hdac_power_down(struct hdac_device *codec) {}
+static inline void snd_hdac_power_up_pm(struct hdac_device *codec) {}
+static inline void snd_hdac_power_down_pm(struct hdac_device *codec) {}
 #endif
 
 /*
@@ -438,8 +437,6 @@ void snd_hdac_stream_init(struct hdac_bus *bus, struct hdac_stream *azx_dev,
 struct hdac_stream *snd_hdac_stream_assign(struct hdac_bus *bus,
 					   struct snd_pcm_substream *substream);
 void snd_hdac_stream_release(struct hdac_stream *azx_dev);
-struct hdac_stream *snd_hdac_get_stream(struct hdac_bus *bus,
-					int dir, int stream_tag);
 
 int snd_hdac_stream_setup(struct hdac_stream *azx_dev);
 void snd_hdac_stream_cleanup(struct hdac_stream *azx_dev);

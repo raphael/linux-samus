@@ -276,7 +276,7 @@ static int elan_i2c_get_sm_version(struct i2c_client *client,
 	return 0;
 }
 
-static int elan_i2c_get_product_id(struct i2c_client *client, u16 *id)
+static int elan_i2c_get_product_id(struct i2c_client *client, u8 *id)
 {
 	int error;
 	u8 val[3];
@@ -287,7 +287,7 @@ static int elan_i2c_get_product_id(struct i2c_client *client, u16 *id)
 		return error;
 	}
 
-	*id = le16_to_cpup((__le16 *)val);
+	*id = val[0];
 	return 0;
 }
 

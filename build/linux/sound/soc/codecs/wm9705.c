@@ -22,9 +22,6 @@
 
 #include "wm9705.h"
 
-#define WM9705_VENDOR_ID 0x574d4c05
-#define WM9705_VENDOR_ID_MASK 0xffffffff
-
 /*
  * WM9705 register cache
  */
@@ -296,6 +293,21 @@ static struct snd_soc_dai_driver wm9705_dai[] = {
 	}
 };
 
+static int wm9705_reset(struct snd_soc_codec *codec)
+{
+	struct snd_ac97 *ac97 = snd_soc_codec_get_drvdata(codec);
+
+	if (soc_ac97_ops->reset) {
+		soc_ac97_ops->reset(ac97);
+		if (ac97_read(codec, 0) == wm9705_reg[0])
+			return 0; /* Success */
+	}
+
+	dev_err(codec->dev, "Failed to reset: AC97 link error\n");
+
+	return -EIO;
+}
+
 #ifdef CONFIG_PM
 static int wm9705_soc_suspend(struct snd_soc_codec *codec)
 {
@@ -312,8 +324,7 @@ static int wm9705_soc_resume(struct snd_soc_codec *codec)
 	int i, ret;
 	u16 *cache = codec->reg_cache;
 
-	ret = snd_ac97_reset(ac97, true, WM9705_VENDOR_ID,
-		WM9705_VENDOR_ID_MASK);
+	ret = wm9705_reset(codec);
 	if (ret < 0)
 		return ret;
 
@@ -331,17 +342,30 @@ static int wm9705_soc_resume(struct snd_soc_codec *codec)
 static int wm9705_soc_probe(struct snd_soc_codec *codec)
 {
 	struct snd_ac97 *ac97;
+	int ret = 0;
 
-	ac97 = snd_soc_new_ac97_codec(codec, WM9705_VENDOR_ID,
-		WM9705_VENDOR_ID_MASK);
+	ac97 = snd_soc_alloc_ac97_codec(codec);
 	if (IS_ERR(ac97)) {
+		ret = PTR_ERR(ac97);
 		dev_err(codec->dev, "Failed to register AC97 codec\n");
-		return PTR_ERR(ac97);
+		return ret;
 	}
+
+	ret = wm9705_reset(codec);
+	if (ret)
+		goto err_put_device;
+
+	ret = device_add(&ac97->dev);
+	if (ret)
+		goto err_put_device;
 
 	snd_soc_codec_set_drvdata(codec, ac97);
 
 	return 0;
+
+err_put_device:
+	put_device(&ac97->dev);
+	return ret;
 }
 
 static int wm9705_soc_remove(struct snd_soc_codec *codec)

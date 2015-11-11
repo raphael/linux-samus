@@ -331,12 +331,14 @@ static void brd_make_request(struct request_queue *q, struct bio *bio)
 	struct bio_vec bvec;
 	sector_t sector;
 	struct bvec_iter iter;
+	int err = -EIO;
 
 	sector = bio->bi_iter.bi_sector;
 	if (bio_end_sector(bio) > get_capacity(bdev->bd_disk))
-		goto io_error;
+		goto out;
 
 	if (unlikely(bio->bi_rw & REQ_DISCARD)) {
+		err = 0;
 		discard_from_brd(brd, sector, bio->bi_iter.bi_size);
 		goto out;
 	}
@@ -347,20 +349,15 @@ static void brd_make_request(struct request_queue *q, struct bio *bio)
 
 	bio_for_each_segment(bvec, bio, iter) {
 		unsigned int len = bvec.bv_len;
-		int err;
-
 		err = brd_do_bvec(brd, bvec.bv_page, len,
 					bvec.bv_offset, rw, sector);
 		if (err)
-			goto io_error;
+			break;
 		sector += len >> SECTOR_SHIFT;
 	}
 
 out:
-	bio_endio(bio);
-	return;
-io_error:
-	bio_io_error(bio);
+	bio_endio(bio, err);
 }
 
 static int brd_rw_page(struct block_device *bdev, sector_t sector,
@@ -374,7 +371,7 @@ static int brd_rw_page(struct block_device *bdev, sector_t sector,
 
 #ifdef CONFIG_BLK_DEV_RAM_DAX
 static long brd_direct_access(struct block_device *bdev, sector_t sector,
-			void __pmem **kaddr, unsigned long *pfn)
+			void **kaddr, unsigned long *pfn, long size)
 {
 	struct brd_device *brd = bdev->bd_disk->private_data;
 	struct page *page;
@@ -384,9 +381,13 @@ static long brd_direct_access(struct block_device *bdev, sector_t sector,
 	page = brd_insert_page(brd, sector);
 	if (!page)
 		return -ENOSPC;
-	*kaddr = (void __pmem *)page_address(page);
+	*kaddr = page_address(page);
 	*pfn = page_to_pfn(page);
 
+	/*
+	 * TODO: If size > PAGE_SIZE, we could look to see if the next page in
+	 * the file happens to be mapped to the next page of physical RAM.
+	 */
 	return PAGE_SIZE;
 }
 #else
@@ -499,7 +500,7 @@ static struct brd_device *brd_alloc(int i)
 	blk_queue_physical_block_size(brd->brd_queue, PAGE_SIZE);
 
 	brd->brd_queue->limits.discard_granularity = PAGE_SIZE;
-	blk_queue_max_discard_sectors(brd->brd_queue, UINT_MAX);
+	brd->brd_queue->limits.max_discard_sectors = UINT_MAX;
 	brd->brd_queue->limits.discard_zeroes_data = 1;
 	queue_flag_set_unlocked(QUEUE_FLAG_DISCARD, brd->brd_queue);
 

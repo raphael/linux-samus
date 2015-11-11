@@ -2544,8 +2544,7 @@ static int s5p_jpeg_probe(struct platform_device *pdev)
 	ret = video_register_device(jpeg->vfd_encoder, VFL_TYPE_GRABBER, -1);
 	if (ret) {
 		v4l2_err(&jpeg->v4l2_dev, "Failed to register video device\n");
-		video_device_release(jpeg->vfd_encoder);
-		goto vb2_allocator_rollback;
+		goto enc_vdev_alloc_rollback;
 	}
 
 	video_set_drvdata(jpeg->vfd_encoder, jpeg);
@@ -2573,8 +2572,7 @@ static int s5p_jpeg_probe(struct platform_device *pdev)
 	ret = video_register_device(jpeg->vfd_decoder, VFL_TYPE_GRABBER, -1);
 	if (ret) {
 		v4l2_err(&jpeg->v4l2_dev, "Failed to register video device\n");
-		video_device_release(jpeg->vfd_decoder);
-		goto enc_vdev_register_rollback;
+		goto dec_vdev_alloc_rollback;
 	}
 
 	video_set_drvdata(jpeg->vfd_decoder, jpeg);
@@ -2591,8 +2589,14 @@ static int s5p_jpeg_probe(struct platform_device *pdev)
 
 	return 0;
 
+dec_vdev_alloc_rollback:
+	video_device_release(jpeg->vfd_decoder);
+
 enc_vdev_register_rollback:
 	video_unregister_device(jpeg->vfd_encoder);
+
+enc_vdev_alloc_rollback:
+	video_device_release(jpeg->vfd_encoder);
 
 vb2_allocator_rollback:
 	vb2_dma_contig_cleanup_ctx(jpeg->alloc_ctx);
@@ -2618,7 +2622,9 @@ static int s5p_jpeg_remove(struct platform_device *pdev)
 	pm_runtime_disable(jpeg->dev);
 
 	video_unregister_device(jpeg->vfd_decoder);
+	video_device_release(jpeg->vfd_decoder);
 	video_unregister_device(jpeg->vfd_encoder);
+	video_device_release(jpeg->vfd_encoder);
 	vb2_dma_contig_cleanup_ctx(jpeg->alloc_ctx);
 	v4l2_m2m_release(jpeg->m2m_dev);
 	v4l2_device_unregister(&jpeg->v4l2_dev);

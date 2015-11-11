@@ -22,8 +22,6 @@
 #include <linux/pm_runtime.h>
 
 #include <dt-bindings/spmi/spmi.h>
-#define CREATE_TRACE_POINTS
-#include <trace/events/spmi.h>
 
 static DEFINE_IDA(ctrl_ida);
 
@@ -98,42 +96,28 @@ EXPORT_SYMBOL_GPL(spmi_device_remove);
 static inline int
 spmi_cmd(struct spmi_controller *ctrl, u8 opcode, u8 sid)
 {
-	int ret;
-
 	if (!ctrl || !ctrl->cmd || ctrl->dev.type != &spmi_ctrl_type)
 		return -EINVAL;
 
-	ret = ctrl->cmd(ctrl, opcode, sid);
-	trace_spmi_cmd(opcode, sid, ret);
-	return ret;
+	return ctrl->cmd(ctrl, opcode, sid);
 }
 
 static inline int spmi_read_cmd(struct spmi_controller *ctrl, u8 opcode,
 				u8 sid, u16 addr, u8 *buf, size_t len)
 {
-	int ret;
-
 	if (!ctrl || !ctrl->read_cmd || ctrl->dev.type != &spmi_ctrl_type)
 		return -EINVAL;
 
-	trace_spmi_read_begin(opcode, sid, addr);
-	ret = ctrl->read_cmd(ctrl, opcode, sid, addr, buf, len);
-	trace_spmi_read_end(opcode, sid, addr, ret, len, buf);
-	return ret;
+	return ctrl->read_cmd(ctrl, opcode, sid, addr, buf, len);
 }
 
 static inline int spmi_write_cmd(struct spmi_controller *ctrl, u8 opcode,
 				 u8 sid, u16 addr, const u8 *buf, size_t len)
 {
-	int ret;
-
 	if (!ctrl || !ctrl->write_cmd || ctrl->dev.type != &spmi_ctrl_type)
 		return -EINVAL;
 
-	trace_spmi_write_begin(opcode, sid, addr, len, buf);
-	ret = ctrl->write_cmd(ctrl, opcode, sid, addr, buf, len);
-	trace_spmi_write_end(opcode, sid, addr, ret);
-	return ret;
+	return ctrl->write_cmd(ctrl, opcode, sid, addr, buf, len);
 }
 
 /**

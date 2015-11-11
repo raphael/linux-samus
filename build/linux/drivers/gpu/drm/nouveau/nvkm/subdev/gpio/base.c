@@ -23,33 +23,28 @@
  */
 #include "priv.h"
 
+#include <core/device.h>
 #include <core/notify.h>
 
 static int
 nvkm_gpio_drive(struct nvkm_gpio *gpio, int idx, int line, int dir, int out)
 {
-	return gpio->func->drive(gpio, line, dir, out);
+	const struct nvkm_gpio_impl *impl = (void *)nv_object(gpio)->oclass;
+	return impl->drive ? impl->drive(gpio, line, dir, out) : -ENODEV;
 }
 
 static int
 nvkm_gpio_sense(struct nvkm_gpio *gpio, int idx, int line)
 {
-	return gpio->func->sense(gpio, line);
+	const struct nvkm_gpio_impl *impl = (void *)nv_object(gpio)->oclass;
+	return impl->sense ? impl->sense(gpio, line) : -ENODEV;
 }
 
-void
-nvkm_gpio_reset(struct nvkm_gpio *gpio, u8 func)
-{
-	if (gpio->func->reset)
-		gpio->func->reset(gpio, func);
-}
-
-int
+static int
 nvkm_gpio_find(struct nvkm_gpio *gpio, int idx, u8 tag, u8 line,
 	       struct dcb_gpio_func *func)
 {
-	struct nvkm_device *device = gpio->subdev.device;
-	struct nvkm_bios *bios = device->bios;
+	struct nvkm_bios *bios = nvkm_bios(gpio);
 	u8  ver, len;
 	u16 data;
 
@@ -61,11 +56,11 @@ nvkm_gpio_find(struct nvkm_gpio *gpio, int idx, u8 tag, u8 line,
 		return 0;
 
 	/* Apple iMac G4 NV18 */
-	if (device->quirk && device->quirk->tv_gpio) {
+	if (nv_device_match(nv_object(gpio), 0x0189, 0x10de, 0x0010)) {
 		if (tag == DCB_GPIO_TVDAC0) {
 			*func = (struct dcb_gpio_func) {
 				.func = DCB_GPIO_TVDAC0,
-				.line = device->quirk->tv_gpio,
+				.line = 4,
 				.log[0] = 0,
 				.log[1] = 1,
 			};
@@ -76,7 +71,7 @@ nvkm_gpio_find(struct nvkm_gpio *gpio, int idx, u8 tag, u8 line,
 	return -ENOENT;
 }
 
-int
+static int
 nvkm_gpio_set(struct nvkm_gpio *gpio, int idx, u8 tag, u8 line, int state)
 {
 	struct dcb_gpio_func func;
@@ -92,7 +87,7 @@ nvkm_gpio_set(struct nvkm_gpio *gpio, int idx, u8 tag, u8 line, int state)
 	return ret;
 }
 
-int
+static int
 nvkm_gpio_get(struct nvkm_gpio *gpio, int idx, u8 tag, u8 line)
 {
 	struct dcb_gpio_func func;
@@ -112,14 +107,16 @@ static void
 nvkm_gpio_intr_fini(struct nvkm_event *event, int type, int index)
 {
 	struct nvkm_gpio *gpio = container_of(event, typeof(*gpio), event);
-	gpio->func->intr_mask(gpio, type, 1 << index, 0);
+	const struct nvkm_gpio_impl *impl = (void *)nv_object(gpio)->oclass;
+	impl->intr_mask(gpio, type, 1 << index, 0);
 }
 
 static void
 nvkm_gpio_intr_init(struct nvkm_event *event, int type, int index)
 {
 	struct nvkm_gpio *gpio = container_of(event, typeof(*gpio), event);
-	gpio->func->intr_mask(gpio, type, 1 << index, 1 << index);
+	const struct nvkm_gpio_impl *impl = (void *)nv_object(gpio)->oclass;
+	impl->intr_mask(gpio, type, 1 << index, 1 << index);
 }
 
 static int
@@ -136,22 +133,16 @@ nvkm_gpio_intr_ctor(struct nvkm_object *object, void *data, u32 size,
 	return -EINVAL;
 }
 
-static const struct nvkm_event_func
-nvkm_gpio_intr_func = {
-	.ctor = nvkm_gpio_intr_ctor,
-	.init = nvkm_gpio_intr_init,
-	.fini = nvkm_gpio_intr_fini,
-};
-
 static void
 nvkm_gpio_intr(struct nvkm_subdev *subdev)
 {
 	struct nvkm_gpio *gpio = nvkm_gpio(subdev);
+	const struct nvkm_gpio_impl *impl = (void *)nv_object(gpio)->oclass;
 	u32 hi, lo, i;
 
-	gpio->func->intr_stat(gpio, &hi, &lo);
+	impl->intr_stat(gpio, &hi, &lo);
 
-	for (i = 0; (hi | lo) && i < gpio->func->lines; i++) {
+	for (i = 0; (hi | lo) && i < impl->lines; i++) {
 		struct nvkm_gpio_ntfy_rep rep = {
 			.mask = (NVKM_GPIO_HI * !!(hi & (1 << i))) |
 				(NVKM_GPIO_LO * !!(lo & (1 << i))),
@@ -160,15 +151,24 @@ nvkm_gpio_intr(struct nvkm_subdev *subdev)
 	}
 }
 
-static int
-nvkm_gpio_fini(struct nvkm_subdev *subdev, bool suspend)
-{
-	struct nvkm_gpio *gpio = nvkm_gpio(subdev);
-	u32 mask = (1 << gpio->func->lines) - 1;
+static const struct nvkm_event_func
+nvkm_gpio_intr_func = {
+	.ctor = nvkm_gpio_intr_ctor,
+	.init = nvkm_gpio_intr_init,
+	.fini = nvkm_gpio_intr_fini,
+};
 
-	gpio->func->intr_mask(gpio, NVKM_GPIO_TOGGLED, mask, 0);
-	gpio->func->intr_stat(gpio, &mask, &mask);
-	return 0;
+int
+_nvkm_gpio_fini(struct nvkm_object *object, bool suspend)
+{
+	const struct nvkm_gpio_impl *impl = (void *)object->oclass;
+	struct nvkm_gpio *gpio = nvkm_gpio(object);
+	u32 mask = (1 << impl->lines) - 1;
+
+	impl->intr_mask(gpio, NVKM_GPIO_TOGGLED, mask, 0);
+	impl->intr_stat(gpio, &mask, &mask);
+
+	return nvkm_subdev_fini(&gpio->base, suspend);
 }
 
 static struct dmi_system_id gpio_reset_ids[] = {
@@ -182,43 +182,70 @@ static struct dmi_system_id gpio_reset_ids[] = {
 	{ }
 };
 
-static int
-nvkm_gpio_init(struct nvkm_subdev *subdev)
+int
+_nvkm_gpio_init(struct nvkm_object *object)
 {
-	struct nvkm_gpio *gpio = nvkm_gpio(subdev);
-	if (dmi_check_system(gpio_reset_ids))
-		nvkm_gpio_reset(gpio, DCB_GPIO_UNUSED);
+	struct nvkm_gpio *gpio = nvkm_gpio(object);
+	int ret;
+
+	ret = nvkm_subdev_init(&gpio->base);
+	if (ret)
+		return ret;
+
+	if (gpio->reset && dmi_check_system(gpio_reset_ids))
+		gpio->reset(gpio, DCB_GPIO_UNUSED);
+
+	return ret;
+}
+
+void
+_nvkm_gpio_dtor(struct nvkm_object *object)
+{
+	struct nvkm_gpio *gpio = (void *)object;
+	nvkm_event_fini(&gpio->event);
+	nvkm_subdev_destroy(&gpio->base);
+}
+
+int
+nvkm_gpio_create_(struct nvkm_object *parent, struct nvkm_object *engine,
+		  struct nvkm_oclass *oclass, int length, void **pobject)
+{
+	const struct nvkm_gpio_impl *impl = (void *)oclass;
+	struct nvkm_gpio *gpio;
+	int ret;
+
+	ret = nvkm_subdev_create_(parent, engine, oclass, 0, "GPIO",
+				  "gpio", length, pobject);
+	gpio = *pobject;
+	if (ret)
+		return ret;
+
+	gpio->find = nvkm_gpio_find;
+	gpio->set  = nvkm_gpio_set;
+	gpio->get  = nvkm_gpio_get;
+	gpio->reset = impl->reset;
+
+	ret = nvkm_event_init(&nvkm_gpio_intr_func, 2, impl->lines,
+			      &gpio->event);
+	if (ret)
+		return ret;
+
+	nv_subdev(gpio)->intr = nvkm_gpio_intr;
 	return 0;
 }
 
-static void *
-nvkm_gpio_dtor(struct nvkm_subdev *subdev)
-{
-	struct nvkm_gpio *gpio = nvkm_gpio(subdev);
-	nvkm_event_fini(&gpio->event);
-	return gpio;
-}
-
-static const struct nvkm_subdev_func
-nvkm_gpio = {
-	.dtor = nvkm_gpio_dtor,
-	.init = nvkm_gpio_init,
-	.fini = nvkm_gpio_fini,
-	.intr = nvkm_gpio_intr,
-};
-
 int
-nvkm_gpio_new_(const struct nvkm_gpio_func *func, struct nvkm_device *device,
-	       int index, struct nvkm_gpio **pgpio)
+_nvkm_gpio_ctor(struct nvkm_object *parent, struct nvkm_object *engine,
+		struct nvkm_oclass *oclass, void *data, u32 size,
+		struct nvkm_object **pobject)
 {
 	struct nvkm_gpio *gpio;
+	int ret;
 
-	if (!(gpio = *pgpio = kzalloc(sizeof(*gpio), GFP_KERNEL)))
-		return -ENOMEM;
+	ret = nvkm_gpio_create(parent, engine, oclass, &gpio);
+	*pobject = nv_object(gpio);
+	if (ret)
+		return ret;
 
-	nvkm_subdev_ctor(&nvkm_gpio, device, index, 0, &gpio->subdev);
-	gpio->func = func;
-
-	return nvkm_event_init(&nvkm_gpio_intr_func, 2, func->lines,
-			       &gpio->event);
+	return 0;
 }

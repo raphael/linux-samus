@@ -26,8 +26,6 @@
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Dan Streetman <ddstreet@ieee.org>");
 MODULE_DESCRIPTION("842 H/W Compression driver for IBM PowerNV processors");
-MODULE_ALIAS_CRYPTO("842");
-MODULE_ALIAS_CRYPTO("842-nx");
 
 #define WORKMEM_ALIGN	(CRB_ALIGN)
 #define CSB_WAIT_MAX	(5000) /* ms */
@@ -346,8 +344,7 @@ static int wait_for_csb(struct nx842_workmem *wmem,
 	}
 
 	/* successful completion */
-	pr_debug_ratelimited("Processed %u bytes in %lu us\n",
-			     be32_to_cpu(csb->count),
+	pr_debug_ratelimited("Processed %u bytes in %lu us\n", csb->count,
 			     (unsigned long)ktime_us_delta(now, start));
 
 	return 0;
@@ -584,29 +581,9 @@ static struct nx842_driver nx842_powernv_driver = {
 	.decompress =	nx842_powernv_decompress,
 };
 
-static int nx842_powernv_crypto_init(struct crypto_tfm *tfm)
-{
-	return nx842_crypto_init(tfm, &nx842_powernv_driver);
-}
-
-static struct crypto_alg nx842_powernv_alg = {
-	.cra_name		= "842",
-	.cra_driver_name	= "842-nx",
-	.cra_priority		= 300,
-	.cra_flags		= CRYPTO_ALG_TYPE_COMPRESS,
-	.cra_ctxsize		= sizeof(struct nx842_crypto_ctx),
-	.cra_module		= THIS_MODULE,
-	.cra_init		= nx842_powernv_crypto_init,
-	.cra_exit		= nx842_crypto_exit,
-	.cra_u			= { .compress = {
-	.coa_compress		= nx842_crypto_compress,
-	.coa_decompress		= nx842_crypto_decompress } }
-};
-
 static __init int nx842_powernv_init(void)
 {
 	struct device_node *dn;
-	int ret;
 
 	/* verify workmem size/align restrictions */
 	BUILD_BUG_ON(WORKMEM_ALIGN % CRB_ALIGN);
@@ -617,14 +594,17 @@ static __init int nx842_powernv_init(void)
 	BUILD_BUG_ON(DDE_BUFFER_ALIGN % DDE_BUFFER_SIZE_MULT);
 	BUILD_BUG_ON(DDE_BUFFER_SIZE_MULT % DDE_BUFFER_LAST_MULT);
 
+	pr_info("loading\n");
+
 	for_each_compatible_node(dn, NULL, "ibm,power-nx")
 		nx842_powernv_probe(dn);
 
-	if (!nx842_ct)
+	if (!nx842_ct) {
+		pr_err("no coprocessors found\n");
 		return -ENODEV;
+	}
 
-	ret = crypto_register_alg(&nx842_powernv_alg);
-	if (ret) {
+	if (!nx842_platform_driver_set(&nx842_powernv_driver)) {
 		struct nx842_coproc *coproc, *n;
 
 		list_for_each_entry_safe(coproc, n, &nx842_coprocs, list) {
@@ -632,8 +612,10 @@ static __init int nx842_powernv_init(void)
 			kfree(coproc);
 		}
 
-		return ret;
+		return -EEXIST;
 	}
+
+	pr_info("loaded\n");
 
 	return 0;
 }
@@ -643,11 +625,13 @@ static void __exit nx842_powernv_exit(void)
 {
 	struct nx842_coproc *coproc, *n;
 
-	crypto_unregister_alg(&nx842_powernv_alg);
+	nx842_platform_driver_unset(&nx842_powernv_driver);
 
 	list_for_each_entry_safe(coproc, n, &nx842_coprocs, list) {
 		list_del(&coproc->list);
 		kfree(coproc);
 	}
+
+	pr_info("unloaded\n");
 }
 module_exit(nx842_powernv_exit);

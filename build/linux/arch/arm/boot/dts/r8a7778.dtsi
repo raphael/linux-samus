@@ -53,7 +53,6 @@
 		reg = <0xfde00000 0x400>;
 		interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp1_clks R8A7778_CLK_ETHER>;
-		power-domains = <&cpg_clocks>;
 		phy-mode = "rmii";
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -153,7 +152,6 @@
 		reg = <0xffc70000 0x1000>;
 		interrupts = <0 67 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_I2C0>;
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -164,7 +162,6 @@
 		reg = <0xffc71000 0x1000>;
 		interrupts = <0 78 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_I2C1>;
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -175,7 +172,6 @@
 		reg = <0xffc72000 0x1000>;
 		interrupts = <0 76 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_I2C2>;
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -186,7 +182,6 @@
 		reg = <0xffc73000 0x1000>;
 		interrupts = <0 77 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_I2C3>;
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -198,7 +193,6 @@
 			     <0 34 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_TMU0>;
 		clock-names = "fck";
-		power-domains = <&cpg_clocks>;
 
 		#renesas,channels = <3>;
 
@@ -213,7 +207,6 @@
 			     <0 38 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_TMU1>;
 		clock-names = "fck";
-		power-domains = <&cpg_clocks>;
 
 		#renesas,channels = <3>;
 
@@ -228,7 +221,6 @@
 			     <0 42 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_TMU2>;
 		clock-names = "fck";
-		power-domains = <&cpg_clocks>;
 
 		#renesas,channels = <3>;
 
@@ -296,7 +288,6 @@
 		interrupts = <0 70 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_SCIF0>;
 		clock-names = "sci_ick";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -306,7 +297,6 @@
 		interrupts = <0 71 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_SCIF1>;
 		clock-names = "sci_ick";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -316,7 +306,6 @@
 		interrupts = <0 72 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_SCIF2>;
 		clock-names = "sci_ick";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -326,7 +315,6 @@
 		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_SCIF3>;
 		clock-names = "sci_ick";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -336,7 +324,6 @@
 		interrupts = <0 74 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_SCIF4>;
 		clock-names = "sci_ick";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -346,7 +333,6 @@
 		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_SCIF5>;
 		clock-names = "sci_ick";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -355,7 +341,6 @@
 		reg = <0xffe4e000 0x100>;
 		interrupts = <0 61 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp3_clks R8A7778_CLK_MMC>;
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -364,7 +349,6 @@
 		reg = <0xffe4c000 0x100>;
 		interrupts = <0 87 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp3_clks R8A7778_CLK_SDHI0>;
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -373,7 +357,6 @@
 		reg = <0xffe4d000 0x100>;
 		interrupts = <0 88 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp3_clks R8A7778_CLK_SDHI1>;
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -382,7 +365,6 @@
 		reg = <0xffe4f000 0x100>;
 		interrupts = <0 86 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp3_clks R8A7778_CLK_SDHI2>;
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -391,7 +373,6 @@
 		reg = <0xfffc7000 0x18>;
 		interrupts = <0 63 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_HSPI>;
-		power-domains = <&cpg_clocks>;
 		#address-cells = <1>;
 		#size-cells = <0>;
 		status = "disabled";
@@ -402,7 +383,6 @@
 		reg = <0xfffc8000 0x18>;
 		interrupts = <0 84 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_HSPI>;
-		power-domains = <&cpg_clocks>;
 		#address-cells = <1>;
 		#size-cells = <0>;
 		status = "disabled";
@@ -413,7 +393,6 @@
 		reg = <0xfffc6000 0x18>;
 		interrupts = <0 85 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp0_clks R8A7778_CLK_HSPI>;
-		power-domains = <&cpg_clocks>;
 		#address-cells = <1>;
 		#size-cells = <0>;
 		status = "disabled";
@@ -440,7 +419,6 @@
 			clocks = <&extal_clk>;
 			clock-output-names = "plla", "pllb", "b",
 					     "out", "p", "s", "s1";
-			#power-domain-cells = <0>;
 		};
 
 		/* Audio clocks; frequencies are set by boards if applicable. */

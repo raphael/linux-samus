@@ -18,7 +18,6 @@
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
-#include <linux/irqchip.h>
 #include <linux/irqchip/chained_irq.h>
 #include <linux/cpu.h>
 #include <linux/io.h>
@@ -33,6 +32,8 @@
 #include <asm/exception.h>
 #include <asm/smp_plat.h>
 #include <asm/mach/irq.h>
+
+#include "irqchip.h"
 
 /* Interrupt Controller Registers Map */
 #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
@@ -200,6 +201,7 @@ static int armada_370_xp_msi_map(struct irq_domain *domain, unsigned int virq,
 {
 	irq_set_chip_and_handler(virq, &armada_370_xp_msi_irq_chip,
 				 handle_simple_irq);
+	set_irq_flags(virq, IRQF_VALID);
 
 	return 0;
 }
@@ -316,8 +318,7 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
 		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
 					handle_level_irq);
 	}
-	irq_set_probe(virq);
-	irq_clear_status_flags(virq, IRQ_NOAUTOEN);
+	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
 
 	return 0;
 }
@@ -447,9 +448,10 @@ static void armada_370_xp_handle_msi_irq(struct pt_regs *regs, bool is_chained)
 static void armada_370_xp_handle_msi_irq(struct pt_regs *r, bool b) {}
 #endif
 
-static void armada_370_xp_mpic_handle_cascade_irq(struct irq_desc *desc)
+static void armada_370_xp_mpic_handle_cascade_irq(unsigned int irq,
+						  struct irq_desc *desc)
 {
-	struct irq_chip *chip = irq_desc_get_chip(desc);
+	struct irq_chip *chip = irq_get_chip(irq);
 	unsigned long irqmap, irqn, irqsrc, cpuid;
 	unsigned int cascade_irq;
 

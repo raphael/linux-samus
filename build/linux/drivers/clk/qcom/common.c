@@ -12,7 +12,6 @@
  */
 
 #include <linux/export.h>
-#include <linux/module.h>
 #include <linux/regmap.h>
 #include <linux/platform_device.h>
 #include <linux/clk-provider.h>
@@ -46,7 +45,7 @@ EXPORT_SYMBOL_GPL(qcom_find_freq);
 
 int qcom_find_src_index(struct clk_hw *hw, const struct parent_map *map, u8 src)
 {
-	int i, num_parents = clk_hw_get_num_parents(hw);
+	int i, num_parents = __clk_get_num_parents(hw->clk);
 
 	for (i = 0; i < num_parents; i++)
 		if (src == map[i].src)
@@ -145,5 +144,3 @@ void qcom_cc_remove(struct platform_device *pdev)
 	reset_controller_unregister(platform_get_drvdata(pdev));
 }
 EXPORT_SYMBOL_GPL(qcom_cc_remove);
-
-MODULE_LICENSE("GPL v2");

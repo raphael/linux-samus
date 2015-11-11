@@ -6,7 +6,7 @@
  *   Daniel Kurtz <djkurtz@chromium.org>
  *   Benson Leung <bleung@chromium.org>
  *
- * Copyright (C) 2011-2015 Cypress Semiconductor, Inc.
+ * Copyright (C) 2011-2014 Cypress Semiconductor, Inc.
  * Copyright (C) 2011-2012 Google, Inc.
  *
  * This file is subject to the terms and conditions of the GNU General Public
@@ -21,12 +21,10 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
-#include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/pm_runtime.h>
 #include <linux/acpi.h>
-#include <linux/of.h>
 #include "cyapa.h"
 
 
@@ -41,31 +39,9 @@ const char product_id[] = "CYTRA";
 
 static int cyapa_reinitialize(struct cyapa *cyapa);
 
-bool cyapa_is_pip_bl_mode(struct cyapa *cyapa)
+static inline bool cyapa_is_bootloader_mode(struct cyapa *cyapa)
 {
-	if (cyapa->gen == CYAPA_GEN6 && cyapa->state == CYAPA_STATE_GEN6_BL)
-		return true;
-
 	if (cyapa->gen == CYAPA_GEN5 && cyapa->state == CYAPA_STATE_GEN5_BL)
-		return true;
-
-	return false;
-}
-
-bool cyapa_is_pip_app_mode(struct cyapa *cyapa)
-{
-	if (cyapa->gen == CYAPA_GEN6 && cyapa->state == CYAPA_STATE_GEN6_APP)
-		return true;
-
-	if (cyapa->gen == CYAPA_GEN5 && cyapa->state == CYAPA_STATE_GEN5_APP)
-		return true;
-
-	return false;
-}
-
-static bool cyapa_is_bootloader_mode(struct cyapa *cyapa)
-{
-	if (cyapa_is_pip_bl_mode(cyapa))
 		return true;
 
 	if (cyapa->gen == CYAPA_GEN3 &&
@@ -78,7 +54,7 @@ static bool cyapa_is_bootloader_mode(struct cyapa *cyapa)
 
 static inline bool cyapa_is_operational_mode(struct cyapa *cyapa)
 {
-	if (cyapa_is_pip_app_mode(cyapa))
+	if (cyapa->gen == CYAPA_GEN5 && cyapa->state == CYAPA_STATE_GEN5_APP)
 		return true;
 
 	if (cyapa->gen == CYAPA_GEN3 && cyapa->state == CYAPA_STATE_OP)
@@ -212,15 +188,6 @@ static int cyapa_get_state(struct cyapa *cyapa)
 			if (!error)
 				goto out_detected;
 		}
-		if (cyapa->gen == CYAPA_GEN_UNKNOWN ||
-				cyapa->gen == CYAPA_GEN6 ||
-				cyapa->gen == CYAPA_GEN5) {
-			error = cyapa_pip_state_parse(cyapa,
-					status, BL_STATUS_SIZE);
-			if (!error)
-				goto out_detected;
-		}
-		/* For old Gen5 trackpads detecting. */
 		if ((cyapa->gen == CYAPA_GEN_UNKNOWN ||
 				cyapa->gen == CYAPA_GEN5) &&
 			!smbus && even_addr) {
@@ -317,9 +284,6 @@ static int cyapa_check_is_operational(struct cyapa *cyapa)
 		return error;
 
 	switch (cyapa->gen) {
-	case CYAPA_GEN6:
-		cyapa->ops = &cyapa_gen6_ops;
-		break;
 	case CYAPA_GEN5:
 		cyapa->ops = &cyapa_gen5_ops;
 		break;
@@ -342,7 +306,7 @@ static int cyapa_check_is_operational(struct cyapa *cyapa)
 
 /*
  * Returns 0 on device detected, negative errno on no device detected.
- * And when the device is detected and operational, it will be reset to
+ * And when the device is detected and opertaional, it will be reset to
  * full power active mode automatically.
  */
 static int cyapa_detect(struct cyapa *cyapa)
@@ -369,7 +333,6 @@ static int cyapa_open(struct input_dev *input)
 {
 	struct cyapa *cyapa = input_get_drvdata(input);
 	struct i2c_client *client = cyapa->client;
-	struct device *dev = &client->dev;
 	int error;
 
 	error = mutex_lock_interruptible(&cyapa->state_sync_lock);
@@ -383,9 +346,10 @@ static int cyapa_open(struct input_dev *input)
 		 * when in operational mode.
 		 */
 		error = cyapa->ops->set_power_mode(cyapa,
-				PWR_MODE_FULL_ACTIVE, 0, false);
+				PWR_MODE_FULL_ACTIVE, 0);
 		if (error) {
-			dev_warn(dev, "set active power failed: %d\n", error);
+			dev_warn(&client->dev,
+				"set active power failed: %d\n", error);
 			goto out;
 		}
 	} else {
@@ -397,14 +361,10 @@ static int cyapa_open(struct input_dev *input)
 	}
 
 	enable_irq(client->irq);
-	if (!pm_runtime_enabled(dev)) {
-		pm_runtime_set_active(dev);
-		pm_runtime_enable(dev);
+	if (!pm_runtime_enabled(&client->dev)) {
+		pm_runtime_set_active(&client->dev);
+		pm_runtime_enable(&client->dev);
 	}
-
-	pm_runtime_get_sync(dev);
-	pm_runtime_mark_last_busy(dev);
-	pm_runtime_put_sync_autosuspend(dev);
 out:
 	mutex_unlock(&cyapa->state_sync_lock);
 	return error;
@@ -414,17 +374,16 @@ static void cyapa_close(struct input_dev *input)
 {
 	struct cyapa *cyapa = input_get_drvdata(input);
 	struct i2c_client *client = cyapa->client;
-	struct device *dev = &cyapa->client->dev;
 
 	mutex_lock(&cyapa->state_sync_lock);
 
 	disable_irq(client->irq);
-	if (pm_runtime_enabled(dev))
-		pm_runtime_disable(dev);
-	pm_runtime_set_suspended(dev);
+	if (pm_runtime_enabled(&client->dev))
+		pm_runtime_disable(&client->dev);
+	pm_runtime_set_suspended(&client->dev);
 
 	if (cyapa->operational)
-		cyapa->ops->set_power_mode(cyapa, PWR_MODE_OFF, 0, false);
+		cyapa->ops->set_power_mode(cyapa, PWR_MODE_OFF, 0);
 
 	mutex_unlock(&cyapa->state_sync_lock);
 }
@@ -484,7 +443,6 @@ static int cyapa_create_input_dev(struct cyapa *cyapa)
 	if (cyapa->gen >= CYAPA_GEN5) {
 		input_set_abs_params(input, ABS_MT_WIDTH_MAJOR, 0, 255, 0, 0);
 		input_set_abs_params(input, ABS_MT_WIDTH_MINOR, 0, 255, 0, 0);
-		input_set_abs_params(input, ABS_DISTANCE, 0, 1, 0, 0);
 	}
 
 	input_abs_set_res(input, ABS_MT_POSITION_X,
@@ -534,7 +492,7 @@ static void cyapa_enable_irq_for_cmd(struct cyapa *cyapa)
 		 */
 		if (!input || cyapa->operational)
 			cyapa->ops->set_power_mode(cyapa,
-				PWR_MODE_FULL_ACTIVE, 0, false);
+				PWR_MODE_FULL_ACTIVE, 0);
 		/* Gen3 always using polling mode for command. */
 		if (cyapa->gen >= CYAPA_GEN5)
 			enable_irq(cyapa->client->irq);
@@ -549,8 +507,7 @@ static void cyapa_disable_irq_for_cmd(struct cyapa *cyapa)
 		if (cyapa->gen >= CYAPA_GEN5)
 			disable_irq(cyapa->client->irq);
 		if (!input || cyapa->operational)
-			cyapa->ops->set_power_mode(cyapa,
-						   PWR_MODE_OFF, 0, false);
+			cyapa->ops->set_power_mode(cyapa, PWR_MODE_OFF, 0);
 	}
 }
 
@@ -606,8 +563,6 @@ static int cyapa_initialize(struct cyapa *cyapa)
 	error = cyapa_gen3_ops.initialize(cyapa);
 	if (!error)
 		error = cyapa_gen5_ops.initialize(cyapa);
-	if (!error)
-		error = cyapa_gen6_ops.initialize(cyapa);
 	if (error)
 		return error;
 
@@ -617,7 +572,7 @@ static int cyapa_initialize(struct cyapa *cyapa)
 
 	/* Power down the device until we need it. */
 	if (cyapa->operational)
-		cyapa->ops->set_power_mode(cyapa, PWR_MODE_OFF, 0, false);
+		cyapa->ops->set_power_mode(cyapa, PWR_MODE_OFF, 0);
 
 	return 0;
 }
@@ -633,8 +588,7 @@ static int cyapa_reinitialize(struct cyapa *cyapa)
 
 	/* Avoid command failures when TP was in OFF state. */
 	if (cyapa->operational)
-		cyapa->ops->set_power_mode(cyapa,
-					   PWR_MODE_FULL_ACTIVE, 0, false);
+		cyapa->ops->set_power_mode(cyapa, PWR_MODE_FULL_ACTIVE, 0);
 
 	error = cyapa_detect(cyapa);
 	if (error)
@@ -653,8 +607,7 @@ out:
 	if (!input || !input->users) {
 		/* Reset to power OFF state to save power when no user open. */
 		if (cyapa->operational)
-			cyapa->ops->set_power_mode(cyapa,
-						   PWR_MODE_OFF, 0, false);
+			cyapa->ops->set_power_mode(cyapa, PWR_MODE_OFF, 0);
 	} else if (!error && cyapa->operational) {
 		/*
 		 * Make sure only enable runtime PM when device is
@@ -662,10 +615,6 @@ out:
 		 */
 		pm_runtime_set_active(dev);
 		pm_runtime_enable(dev);
-
-		pm_runtime_get_sync(dev);
-		pm_runtime_mark_last_busy(dev);
-		pm_runtime_put_sync_autosuspend(dev);
 	}
 
 	return error;
@@ -675,44 +624,27 @@ static irqreturn_t cyapa_irq(int irq, void *dev_id)
 {
 	struct cyapa *cyapa = dev_id;
 	struct device *dev = &cyapa->client->dev;
-	int error;
 
+	pm_runtime_get_sync(dev);
 	if (device_may_wakeup(dev))
 		pm_wakeup_event(dev, 0);
 
-	/* Interrupt event can be caused by host command to trackpad device. */
+	/* Interrupt event maybe cuased by host command to trackpad device. */
 	if (cyapa->ops->irq_cmd_handler(cyapa)) {
 		/*
 		 * Interrupt event maybe from trackpad device input reporting.
 		 */
 		if (!cyapa->input) {
 			/*
-			 * Still in probing or in firmware image
-			 * updating or reading.
+			 * Still in probling or in firware image
+			 * udpating or reading.
 			 */
 			cyapa->ops->sort_empty_output_data(cyapa,
 					NULL, NULL, NULL);
 			goto out;
 		}
 
-		if (cyapa->operational) {
-			error = cyapa->ops->irq_handler(cyapa);
-
-			/*
-			 * Apply runtime power management to touch report event
-			 * except the events caused by the command responses.
-			 * Note:
-			 * It will introduce about 20~40 ms additional delay
-			 * time in receiving for first valid touch report data.
-			 * The time is used to execute device runtime resume
-			 * process.
-			 */
-			pm_runtime_get_sync(dev);
-			pm_runtime_mark_last_busy(dev);
-			pm_runtime_put_sync_autosuspend(dev);
-		}
-
-		if (!cyapa->operational || error) {
+		if (!cyapa->operational || cyapa->ops->irq_handler(cyapa)) {
 			if (!mutex_trylock(&cyapa->state_sync_lock)) {
 				cyapa->ops->sort_empty_output_data(cyapa,
 					NULL, NULL, NULL);
@@ -724,6 +656,8 @@ static irqreturn_t cyapa_irq(int irq, void *dev_id)
 	}
 
 out:
+	pm_runtime_mark_last_busy(dev);
+	pm_runtime_put_sync_autosuspend(dev);
 	return IRQ_HANDLED;
 }
 
@@ -1117,12 +1051,12 @@ static ssize_t cyapa_update_fw_store(struct device *dev,
 		dev_dbg(dev, "firmware update successfully done.\n");
 
 	/*
-	 * Re-detect trackpad device states because firmware update process
+	 * Redetect trackpad device states because firmware update process
 	 * will reset trackpad device into bootloader mode.
 	 */
 	ret = cyapa_reinitialize(cyapa);
 	if (ret) {
-		dev_err(dev, "failed to re-detect after updated: %d\n", ret);
+		dev_err(dev, "failed to redetect after updated: %d\n", ret);
 		error = error ? error : ret;
 	}
 
@@ -1186,11 +1120,9 @@ static char *cyapa_state_to_string(struct cyapa *cyapa)
 	case CYAPA_STATE_BL_ACTIVE:
 		return "bootloader active";
 	case CYAPA_STATE_GEN5_BL:
-	case CYAPA_STATE_GEN6_BL:
 		return "bootloader";
 	case CYAPA_STATE_OP:
 	case CYAPA_STATE_GEN5_APP:
-	case CYAPA_STATE_GEN6_APP:
 		return "operational";  /* Normal valid state. */
 	default:
 		return "invalid mode";
@@ -1243,13 +1175,6 @@ static void cyapa_remove_sysfs_group(void *data)
 	sysfs_remove_group(&cyapa->client->dev.kobj, &cyapa_sysfs_group);
 }
 
-static void cyapa_disable_regulator(void *data)
-{
-	struct cyapa *cyapa = data;
-
-	regulator_disable(cyapa->vcc);
-}
-
 static int cyapa_probe(struct i2c_client *client,
 		       const struct i2c_device_id *dev_id)
 {
@@ -1282,27 +1207,6 @@ static int cyapa_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, cyapa);
 	sprintf(cyapa->phys, "i2c-%d-%04x/input0", client->adapter->nr,
 		client->addr);
-
-	cyapa->vcc = devm_regulator_get(dev, "vcc");
-	if (IS_ERR(cyapa->vcc)) {
-		error = PTR_ERR(cyapa->vcc);
-		dev_err(dev, "failed to get vcc regulator: %d\n", error);
-		return error;
-	}
-
-	error = regulator_enable(cyapa->vcc);
-	if (error) {
-		dev_err(dev, "failed to enable regulator: %d\n", error);
-		return error;
-	}
-
-	error = devm_add_action(dev, cyapa_disable_regulator, cyapa);
-	if (error) {
-		cyapa_disable_regulator(cyapa);
-		dev_err(dev, "failed to add disable regulator action: %d\n",
-			error);
-		return error;
-	}
 
 	error = cyapa_initialize(cyapa);
 	if (error) {
@@ -1392,18 +1296,11 @@ static int __maybe_unused cyapa_suspend(struct device *dev)
 		power_mode = device_may_wakeup(dev) ? cyapa->suspend_power_mode
 						    : PWR_MODE_OFF;
 		error = cyapa->ops->set_power_mode(cyapa, power_mode,
-				cyapa->suspend_sleep_time, true);
+				cyapa->suspend_sleep_time);
 		if (error)
 			dev_err(dev, "suspend set power mode failed: %d\n",
 					error);
 	}
-
-	/*
-	 * Disable proximity interrupt when system idle, want true touch to
-	 * wake the system.
-	 */
-	if (cyapa->dev_pwr_mode != PWR_MODE_OFF)
-		cyapa->ops->set_proximity(cyapa, false);
 
 	if (device_may_wakeup(dev))
 		cyapa->irq_wake = (enable_irq_wake(client->irq) == 0);
@@ -1425,10 +1322,7 @@ static int __maybe_unused cyapa_resume(struct device *dev)
 		cyapa->irq_wake = false;
 	}
 
-	/*
-	 * Update device states and runtime PM states.
-	 * Re-Enable proximity interrupt after enter operational mode.
-	 */
+	/* Update device states and runtime PM states. */
 	error = cyapa_reinitialize(cyapa);
 	if (error)
 		dev_warn(dev, "failed to reinitialize TP device: %d\n", error);
@@ -1446,8 +1340,7 @@ static int __maybe_unused cyapa_runtime_suspend(struct device *dev)
 
 	error = cyapa->ops->set_power_mode(cyapa,
 			cyapa->runtime_suspend_power_mode,
-			cyapa->runtime_suspend_sleep_time,
-			false);
+			cyapa->runtime_suspend_sleep_time);
 	if (error)
 		dev_warn(dev, "runtime suspend failed: %d\n", error);
 
@@ -1459,8 +1352,7 @@ static int __maybe_unused cyapa_runtime_resume(struct device *dev)
 	struct cyapa *cyapa = dev_get_drvdata(dev);
 	int error;
 
-	error = cyapa->ops->set_power_mode(cyapa,
-					   PWR_MODE_FULL_ACTIVE, 0, false);
+	error = cyapa->ops->set_power_mode(cyapa, PWR_MODE_FULL_ACTIVE, 0);
 	if (error)
 		dev_warn(dev, "runtime resume failed: %d\n", error);
 
@@ -1482,26 +1374,17 @@ MODULE_DEVICE_TABLE(i2c, cyapa_id_table);
 static const struct acpi_device_id cyapa_acpi_id[] = {
 	{ "CYAP0000", 0 },  /* Gen3 trackpad with 0x67 I2C address. */
 	{ "CYAP0001", 0 },  /* Gen5 trackpad with 0x24 I2C address. */
-	{ "CYAP0002", 0 },  /* Gen6 trackpad with 0x24 I2C address. */
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, cyapa_acpi_id);
 #endif
 
-#ifdef CONFIG_OF
-static const struct of_device_id cyapa_of_match[] = {
-	{ .compatible = "cypress,cyapa" },
-	{ /* sentinel */ }
-};
-MODULE_DEVICE_TABLE(of, cyapa_of_match);
-#endif
-
 static struct i2c_driver cyapa_driver = {
 	.driver = {
 		.name = "cyapa",
+		.owner = THIS_MODULE,
 		.pm = &cyapa_pm_ops,
 		.acpi_match_table = ACPI_PTR(cyapa_acpi_id),
-		.of_match_table = of_match_ptr(cyapa_of_match),
 	},
 
 	.probe = cyapa_probe,

@@ -1,7 +1,6 @@
 /*
  *    Disk Array driver for HP Smart Array SAS controllers
- *    Copyright 2014-2015 PMC-Sierra, Inc.
- *    Copyright 2000,2009-2015 Hewlett-Packard Development Company, L.P.
+ *    Copyright 2000, 2014 Hewlett-Packard Development Company, L.P.
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -12,7 +11,11 @@
  *    MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, GOOD TITLE or
  *    NON INFRINGEMENT.  See the GNU General Public License for more details.
  *
- *    Questions/Comments/Bugfixes to storagedev@pmcs.com
+ *    You should have received a copy of the GNU General Public License
+ *    along with this program; if not, write to the Free Software
+ *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ *    Questions/Comments/Bugfixes to iss_storagedev@hp.com
  *
  */
 #ifndef HPSA_H
@@ -50,11 +53,6 @@ struct hpsa_scsi_dev_t {
 					 * device via "ioaccel" path.
 					 */
 	u32 ioaccel_handle;
-	u8 active_path_index;
-	u8 path_map;
-	u8 bay;
-	u8 box[8];
-	u16 phys_connector[8];
 	int offload_config;		/* I/O accel RAID offload configured */
 	int offload_enabled;		/* I/O accel RAID offload enabled */
 	int offload_to_be_enabled;
@@ -116,6 +114,7 @@ struct bmic_controller_parameters {
 	u8   automatic_drive_slamming;
 	u8   reserved1;
 	u8   nvram_flags;
+#define HBA_MODE_ENABLED_FLAG (1 << 3)
 	u8   cache_nvram_flags;
 	u8   drive_config_flags;
 	u16  reserved2;
@@ -154,6 +153,7 @@ struct ctlr_info {
 	unsigned int msi_vector;
 	int intr_mode; /* either PERF_MODE_INT or SIMPLE_MODE_INT */
 	struct access_method access;
+	char hba_mode_enabled;
 
 	/* queue and queue Info */
 	unsigned int Qdepth;

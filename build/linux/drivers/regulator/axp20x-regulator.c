@@ -405,4 +405,3 @@ module_platform_driver(axp20x_regulator_driver);
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Carlo Caione <carlo@caione.org>");
 MODULE_DESCRIPTION("Regulator Driver for AXP20X PMIC");
-MODULE_ALIAS("platform:axp20x-regulator");

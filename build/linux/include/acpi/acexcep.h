@@ -192,9 +192,8 @@ struct acpi_exception_info {
 #define AE_AML_BAD_RESOURCE_LENGTH      EXCEP_AML (0x001F)
 #define AE_AML_ILLEGAL_ADDRESS          EXCEP_AML (0x0020)
 #define AE_AML_INFINITE_LOOP            EXCEP_AML (0x0021)
-#define AE_AML_UNINITIALIZED_NODE       EXCEP_AML (0x0022)
 
-#define AE_CODE_AML_MAX                 0x0022
+#define AE_CODE_AML_MAX                 0x0021
 
 /*
  * Internal exceptions used for control
@@ -356,9 +355,7 @@ static const struct acpi_exception_info acpi_gbl_exception_names_aml[] = {
 	EXCEP_TXT("AE_AML_ILLEGAL_ADDRESS",
 		  "A memory, I/O, or PCI configuration address is invalid"),
 	EXCEP_TXT("AE_AML_INFINITE_LOOP",
-		  "An apparent infinite AML While loop, method was aborted"),
-	EXCEP_TXT("AE_AML_UNINITIALIZED_NODE",
-		  "A namespace node is uninitialized or unresolved")
+		  "An apparent infinite AML While loop, method was aborted")
 };
 
 static const struct acpi_exception_info acpi_gbl_exception_names_ctrl[] = {

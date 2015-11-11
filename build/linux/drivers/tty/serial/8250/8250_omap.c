@@ -16,7 +16,6 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
 #include <linux/delay.h>
@@ -33,11 +32,6 @@
 #define UART_ERRATA_i202_MDR1_ACCESS	(1 << 0)
 #define OMAP_UART_WER_HAS_TX_WAKEUP	(1 << 1)
 #define OMAP_DMA_TX_KICK		(1 << 2)
-/*
- * See Advisory 21 in AM437x errata SPRZ408B, updated April 2015.
- * The same errata is applicable to AM335x and DRA7x processors too.
- */
-#define UART_ERRATA_CLOCK_DISABLE	(1 << 3)
 
 #define OMAP_UART_FCR_RX_TRIG		6
 #define OMAP_UART_FCR_TX_TRIG		4
@@ -58,12 +52,6 @@
 #define OMAP_UART_MVR_MAJ_MASK		0x700
 #define OMAP_UART_MVR_MAJ_SHIFT		8
 #define OMAP_UART_MVR_MIN_MASK		0x3f
-
-/* SYSC register bitmasks */
-#define OMAP_UART_SYSC_SOFTRESET	(1 << 1)
-
-/* SYSS register bitmasks */
-#define OMAP_UART_SYSS_RESETDONE	(1 << 0)
 
 #define UART_TI752_TLR_TX	0
 #define UART_TI752_TLR_RX	4
@@ -245,15 +233,6 @@ static void omap8250_update_scr(struct uart_8250_port *up,
 	serial_out(up, UART_OMAP_SCR, priv->scr);
 }
 
-static void omap8250_update_mdr1(struct uart_8250_port *up,
-				 struct omap8250_priv *priv)
-{
-	if (priv->habit & UART_ERRATA_i202_MDR1_ACCESS)
-		omap_8250_mdr1_errataset(up, priv);
-	else
-		serial_out(up, UART_OMAP_MDR1, priv->mdr1);
-}
-
 static void omap8250_restore_regs(struct uart_8250_port *up)
 {
 	struct omap8250_priv *priv = up->port.private_data;
@@ -304,9 +283,11 @@ static void omap8250_restore_regs(struct uart_8250_port *up)
 	serial_out(up, UART_XOFF1, priv->xoff);
 
 	serial_out(up, UART_LCR, up->lcr);
-
-	omap8250_update_mdr1(up, priv);
-
+	/* need mode A for FCR */
+	if (priv->habit & UART_ERRATA_i202_MDR1_ACCESS)
+		omap_8250_mdr1_errataset(up, priv);
+	else
+		serial_out(up, UART_OMAP_MDR1, priv->mdr1);
 	up->port.ops->set_mctrl(&up->port, up->port.mctrl);
 }
 
@@ -448,9 +429,12 @@ static void omap_8250_set_termios(struct uart_port *port,
 		priv->efr |= UART_EFR_CTS;
 	} else	if (up->port.flags & UPF_SOFT_FLOW) {
 		/*
-		 * OMAP rx s/w flow control is borked; the transmitter remains
-		 * stuck off even if rx flow control is subsequently disabled
+		 * IXON Flag:
+		 * Enable XON/XOFF flow control on input.
+		 * Receiver compares XON1, XOFF1.
 		 */
+		if (termios->c_iflag & IXON)
+			priv->efr |= OMAP_UART_SW_RX;
 
 		/*
 		 * IXOFF Flag:
@@ -461,6 +445,15 @@ static void omap_8250_set_termios(struct uart_port *port,
 			up->port.status |= UPSTAT_AUTOXOFF;
 			priv->efr |= OMAP_UART_SW_TX;
 		}
+
+		/*
+		 * IXANY Flag:
+		 * Enable any character to restart output.
+		 * Operation resumes after receiving any
+		 * character after recognition of the XOFF character
+		 */
+		if (termios->c_iflag & IXANY)
+			up->mcr |= UART_MCR_XONANY;
 	}
 	omap8250_restore_regs(up);
 
@@ -538,14 +531,14 @@ static void omap_serial_fill_features_erratas(struct uart_8250_port *up,
 
 	switch (revision) {
 	case OMAP_UART_REV_46:
-		priv->habit |= UART_ERRATA_i202_MDR1_ACCESS;
+		priv->habit = UART_ERRATA_i202_MDR1_ACCESS;
 		break;
 	case OMAP_UART_REV_52:
-		priv->habit |= UART_ERRATA_i202_MDR1_ACCESS |
+		priv->habit = UART_ERRATA_i202_MDR1_ACCESS |
 				OMAP_UART_WER_HAS_TX_WAKEUP;
 		break;
 	case OMAP_UART_REV_63:
-		priv->habit |= UART_ERRATA_i202_MDR1_ACCESS |
+		priv->habit = UART_ERRATA_i202_MDR1_ACCESS |
 			OMAP_UART_WER_HAS_TX_WAKEUP;
 		break;
 	default:
@@ -1068,20 +1061,6 @@ static int omap8250_no_handle_irq(struct uart_port *port)
 	return 0;
 }
 
-static const u8 am3352_habit = OMAP_DMA_TX_KICK | UART_ERRATA_CLOCK_DISABLE;
-static const u8 am4372_habit = UART_ERRATA_CLOCK_DISABLE;
-
-static const struct of_device_id omap8250_dt_ids[] = {
-	{ .compatible = "ti,omap2-uart" },
-	{ .compatible = "ti,omap3-uart" },
-	{ .compatible = "ti,omap4-uart" },
-	{ .compatible = "ti,am3352-uart", .data = &am3352_habit, },
-	{ .compatible = "ti,am4372-uart", .data = &am4372_habit, },
-	{ .compatible = "ti,dra742-uart", .data = &am4372_habit, },
-	{},
-};
-MODULE_DEVICE_TABLE(of, omap8250_dt_ids);
-
 static int omap8250_probe(struct platform_device *pdev)
 {
 	struct resource *regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -1146,17 +1125,11 @@ static int omap8250_probe(struct platform_device *pdev)
 	up.port.unthrottle = omap_8250_unthrottle;
 
 	if (pdev->dev.of_node) {
-		const struct of_device_id *id;
-
 		ret = of_alias_get_id(pdev->dev.of_node, "serial");
 
 		of_property_read_u32(pdev->dev.of_node, "clock-frequency",
 				     &up.port.uartclk);
 		priv->wakeirq = irq_of_parse_and_map(pdev->dev.of_node, 1);
-
-		id = of_match_device(of_match_ptr(omap8250_dt_ids), &pdev->dev);
-		if (id && id->data)
-			priv->habit |= *(u8 *)id->data;
 	} else {
 		ret = pdev->id;
 	}
@@ -1296,43 +1269,14 @@ static int omap8250_lost_context(struct uart_8250_port *up)
 {
 	u32 val;
 
-	val = serial_in(up, UART_OMAP_SCR);
+	val = serial_in(up, UART_OMAP_MDR1);
 	/*
-	 * If we lose context, then SCR is set to its reset value of zero.
-	 * After set_termios() we set bit 3 of SCR (TX_EMPTY_CTL_IT) to 1,
-	 * among other bits, to never set the register back to zero again.
+	 * If we lose context, then MDR1 is set to its reset value which is
+	 * UART_OMAP_MDR1_DISABLE. After set_termios() we set it either to 13x
+	 * or 16x but never to disable again.
 	 */
-	if (!val)
+	if (val == UART_OMAP_MDR1_DISABLE)
 		return 1;
-	return 0;
-}
-
-/* TODO: in future, this should happen via API in drivers/reset/ */
-static int omap8250_soft_reset(struct device *dev)
-{
-	struct omap8250_priv *priv = dev_get_drvdata(dev);
-	struct uart_8250_port *up = serial8250_get_port(priv->line);
-	int timeout = 100;
-	int sysc;
-	int syss;
-
-	sysc = serial_in(up, UART_OMAP_SYSC);
-
-	/* softreset the UART */
-	sysc |= OMAP_UART_SYSC_SOFTRESET;
-	serial_out(up, UART_OMAP_SYSC, sysc);
-
-	/* By experiments, 1us enough for reset complete on AM335x */
-	do {
-		udelay(1);
-		syss = serial_in(up, UART_OMAP_SYSS);
-	} while (--timeout && !(syss & OMAP_UART_SYSS_RESETDONE));
-
-	if (!timeout) {
-		dev_err(dev, "timed out waiting for reset done\n");
-		return -ETIMEDOUT;
-	}
-
 	return 0;
 }
 
@@ -1353,18 +1297,7 @@ static int omap8250_runtime_suspend(struct device *dev)
 			return -EBUSY;
 	}
 
-	if (priv->habit & UART_ERRATA_CLOCK_DISABLE) {
-		int ret;
-
-		ret = omap8250_soft_reset(dev);
-		if (ret)
-			return ret;
-
-		/* Restore to UART mode after reset (for wakeup) */
-		omap8250_update_mdr1(up, priv);
-	}
-
-	if (up->dma && up->dma->rxchan)
+	if (up->dma)
 		omap_8250_rx_dma(up, UART_IIR_RX_TIMEOUT);
 
 	priv->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
@@ -1389,7 +1322,7 @@ static int omap8250_runtime_resume(struct device *dev)
 	if (loss_cntx)
 		omap8250_restore_regs(up);
 
-	if (up->dma && up->dma->rxchan)
+	if (up->dma)
 		omap_8250_rx_dma(up, 0);
 
 	priv->latency = priv->calc_latency;
@@ -1445,6 +1378,14 @@ static const struct dev_pm_ops omap8250_dev_pm_ops = {
 	.prepare        = omap8250_prepare,
 	.complete       = omap8250_complete,
 };
+
+static const struct of_device_id omap8250_dt_ids[] = {
+	{ .compatible = "ti,omap2-uart" },
+	{ .compatible = "ti,omap3-uart" },
+	{ .compatible = "ti,omap4-uart" },
+	{},
+};
+MODULE_DEVICE_TABLE(of, omap8250_dt_ids);
 
 static struct platform_driver omap8250_platform_driver = {
 	.driver = {

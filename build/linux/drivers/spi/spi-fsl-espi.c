@@ -21,7 +21,6 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/spi/spi.h>
-#include <linux/pm_runtime.h>
 #include <sysdev/fsl_soc.h>
 
 #include "spi-fsl-lib.h"
@@ -85,8 +84,6 @@ struct fsl_espi_transfer {
 #define SPCOM_CS(x)		((x) << 30)
 #define SPCOM_TRANLEN(x)	((x) << 0)
 #define	SPCOM_TRANLEN_MAX	0xFFFF	/* Max transaction length */
-
-#define AUTOSUSPEND_TIMEOUT 2000
 
 static void fsl_espi_change_mode(struct spi_device *spi)
 {
@@ -488,8 +485,6 @@ static int fsl_espi_setup(struct spi_device *spi)
 	mpc8xxx_spi = spi_master_get_devdata(spi->master);
 	reg_base = mpc8xxx_spi->reg_base;
 
-	pm_runtime_get_sync(mpc8xxx_spi->dev);
-
 	hw_mode = cs->hw_mode; /* Save original settings */
 	cs->hw_mode = mpc8xxx_spi_read_reg(
 			&reg_base->csmode[spi->chip_select]);
@@ -512,10 +507,6 @@ static int fsl_espi_setup(struct spi_device *spi)
 	mpc8xxx_spi_write_reg(&reg_base->mode, loop_mode);
 
 	retval = fsl_espi_setup_transfer(spi, NULL);
-
-	pm_runtime_mark_last_busy(mpc8xxx_spi->dev);
-	pm_runtime_put_autosuspend(mpc8xxx_spi->dev);
-
 	if (retval < 0) {
 		cs->hw_mode = hw_mode; /* Restore settings */
 		return retval;
@@ -613,13 +604,19 @@ static irqreturn_t fsl_espi_irq(s32 irq, void *context_data)
 	return ret;
 }
 
-#ifdef CONFIG_PM
-static int fsl_espi_runtime_suspend(struct device *dev)
+static void fsl_espi_remove(struct mpc8xxx_spi *mspi)
 {
-	struct spi_master *master = dev_get_drvdata(dev);
-	struct mpc8xxx_spi *mpc8xxx_spi = spi_master_get_devdata(master);
-	struct fsl_espi_reg *reg_base = mpc8xxx_spi->reg_base;
+	iounmap(mspi->reg_base);
+}
+
+static int fsl_espi_suspend(struct spi_master *master)
+{
+	struct mpc8xxx_spi *mpc8xxx_spi;
+	struct fsl_espi_reg *reg_base;
 	u32 regval;
+
+	mpc8xxx_spi = spi_master_get_devdata(master);
+	reg_base = mpc8xxx_spi->reg_base;
 
 	regval = mpc8xxx_spi_read_reg(&reg_base->mode);
 	regval &= ~SPMODE_ENABLE;
@@ -628,12 +625,14 @@ static int fsl_espi_runtime_suspend(struct device *dev)
 	return 0;
 }
 
-static int fsl_espi_runtime_resume(struct device *dev)
+static int fsl_espi_resume(struct spi_master *master)
 {
-	struct spi_master *master = dev_get_drvdata(dev);
-	struct mpc8xxx_spi *mpc8xxx_spi = spi_master_get_devdata(master);
-	struct fsl_espi_reg *reg_base = mpc8xxx_spi->reg_base;
+	struct mpc8xxx_spi *mpc8xxx_spi;
+	struct fsl_espi_reg *reg_base;
 	u32 regval;
+
+	mpc8xxx_spi = spi_master_get_devdata(master);
+	reg_base = mpc8xxx_spi->reg_base;
 
 	regval = mpc8xxx_spi_read_reg(&reg_base->mode);
 	regval |= SPMODE_ENABLE;
@@ -641,7 +640,6 @@ static int fsl_espi_runtime_resume(struct device *dev)
 
 	return 0;
 }
-#endif
 
 static struct spi_master * fsl_espi_probe(struct device *dev,
 		struct resource *mem, unsigned int irq)
@@ -669,23 +667,25 @@ static struct spi_master * fsl_espi_probe(struct device *dev,
 	master->setup = fsl_espi_setup;
 	master->cleanup = fsl_espi_cleanup;
 	master->transfer_one_message = fsl_espi_do_one_msg;
-	master->auto_runtime_pm = true;
+	master->prepare_transfer_hardware = fsl_espi_resume;
+	master->unprepare_transfer_hardware = fsl_espi_suspend;
 
 	mpc8xxx_spi = spi_master_get_devdata(master);
+	mpc8xxx_spi->spi_remove = fsl_espi_remove;
 
-	mpc8xxx_spi->reg_base = devm_ioremap_resource(dev, mem);
-	if (IS_ERR(mpc8xxx_spi->reg_base)) {
-		ret = PTR_ERR(mpc8xxx_spi->reg_base);
+	mpc8xxx_spi->reg_base = ioremap(mem->start, resource_size(mem));
+	if (!mpc8xxx_spi->reg_base) {
+		ret = -ENOMEM;
 		goto err_probe;
 	}
 
 	reg_base = mpc8xxx_spi->reg_base;
 
 	/* Register for SPI Interrupt */
-	ret = devm_request_irq(dev, mpc8xxx_spi->irq, fsl_espi_irq,
+	ret = request_irq(mpc8xxx_spi->irq, fsl_espi_irq,
 			  0, "fsl_espi", mpc8xxx_spi);
 	if (ret)
-		goto err_probe;
+		goto free_irq;
 
 	if (mpc8xxx_spi->flags & SPI_QE_CPU_MODE) {
 		mpc8xxx_spi->rx_shift = 16;
@@ -731,27 +731,18 @@ static struct spi_master * fsl_espi_probe(struct device *dev,
 
 	mpc8xxx_spi_write_reg(&reg_base->mode, regval);
 
-	pm_runtime_set_autosuspend_delay(dev, AUTOSUSPEND_TIMEOUT);
-	pm_runtime_use_autosuspend(dev);
-	pm_runtime_set_active(dev);
-	pm_runtime_enable(dev);
-	pm_runtime_get_sync(dev);
-
-	ret = devm_spi_register_master(dev, master);
+	ret = spi_register_master(master);
 	if (ret < 0)
-		goto err_pm;
+		goto unreg_master;
 
 	dev_info(dev, "at 0x%p (irq = %d)\n", reg_base, mpc8xxx_spi->irq);
 
-	pm_runtime_mark_last_busy(dev);
-	pm_runtime_put_autosuspend(dev);
-
 	return master;
 
-err_pm:
-	pm_runtime_put_noidle(dev);
-	pm_runtime_disable(dev);
-	pm_runtime_set_suspended(dev);
+unreg_master:
+	free_irq(mpc8xxx_spi->irq, mpc8xxx_spi);
+free_irq:
+	iounmap(mpc8xxx_spi->reg_base);
 err_probe:
 	spi_master_put(master);
 err:
@@ -818,9 +809,7 @@ err:
 
 static int of_fsl_espi_remove(struct platform_device *dev)
 {
-	pm_runtime_disable(&dev->dev);
-
-	return 0;
+	return mpc8xxx_spi_remove(&dev->dev);
 }
 
 #ifdef CONFIG_PM_SLEEP
@@ -835,11 +824,7 @@ static int of_fsl_espi_suspend(struct device *dev)
 		return ret;
 	}
 
-	ret = pm_runtime_force_suspend(dev);
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	return fsl_espi_suspend(master);
 }
 
 static int of_fsl_espi_resume(struct device *dev)
@@ -849,7 +834,7 @@ static int of_fsl_espi_resume(struct device *dev)
 	struct mpc8xxx_spi *mpc8xxx_spi;
 	struct fsl_espi_reg *reg_base;
 	u32 regval;
-	int i, ret;
+	int i;
 
 	mpc8xxx_spi = spi_master_get_devdata(master);
 	reg_base = mpc8xxx_spi->reg_base;
@@ -869,17 +854,11 @@ static int of_fsl_espi_resume(struct device *dev)
 
 	mpc8xxx_spi_write_reg(&reg_base->mode, regval);
 
-	ret = pm_runtime_force_resume(dev);
-	if (ret < 0)
-		return ret;
-
 	return spi_master_resume(master);
 }
 #endif /* CONFIG_PM_SLEEP */
 
 static const struct dev_pm_ops espi_pm = {
-	SET_RUNTIME_PM_OPS(fsl_espi_runtime_suspend,
-			   fsl_espi_runtime_resume, NULL)
 	SET_SYSTEM_SLEEP_PM_OPS(of_fsl_espi_suspend, of_fsl_espi_resume)
 };
 

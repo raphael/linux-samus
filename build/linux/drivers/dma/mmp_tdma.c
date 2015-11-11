@@ -100,6 +100,7 @@ enum mmp_tdma_type {
 	PXA910_SQU,
 };
 
+#define TDMA_ALIGNMENT		3
 #define TDMA_MAX_XFER_BYTES    SZ_64K
 
 struct mmp_tdma_chan {
@@ -694,7 +695,7 @@ static int mmp_tdma_probe(struct platform_device *pdev)
 	tdev->device.device_pause = mmp_tdma_pause_chan;
 	tdev->device.device_resume = mmp_tdma_resume_chan;
 	tdev->device.device_terminate_all = mmp_tdma_terminate_all;
-	tdev->device.copy_align = DMAENGINE_ALIGN_8_BYTES;
+	tdev->device.copy_align = TDMA_ALIGNMENT;
 
 	dma_set_mask(&pdev->dev, DMA_BIT_MASK(64));
 	platform_set_drvdata(pdev, tdev);

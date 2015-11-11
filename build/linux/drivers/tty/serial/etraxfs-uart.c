@@ -10,8 +10,6 @@
 #include <linux/of_address.h>
 #include <hwregs/ser_defs.h>
 
-#include "serial_mctrl_gpio.h"
-
 #define DRV_NAME "etraxfs-uart"
 #define UART_NR CONFIG_ETRAX_SERIAL_PORTS
 
@@ -30,7 +28,10 @@ struct uart_cris_port {
 
 	void __iomem *regi_ser;
 
-	struct mctrl_gpios *gpios;
+	struct gpio_desc *dtr_pin;
+	struct gpio_desc *dsr_pin;
+	struct gpio_desc *ri_pin;
+	struct gpio_desc *cd_pin;
 
 	int write_ongoing;
 };
@@ -111,10 +112,17 @@ cris_console_setup(struct console *co, char *options)
 	return 0;
 }
 
+static struct tty_driver *cris_console_device(struct console *co, int *index)
+{
+	struct uart_driver *p = co->data;
+	*index = co->index;
+	return p->tty_driver;
+}
+
 static struct console cris_console = {
 	.name = "ttyS",
 	.write = cris_console_write,
-	.device = uart_console_device,
+	.device = cris_console_device,
 	.setup = cris_console_setup,
 	.flags = CON_PRINTBUFFER,
 	.index = -1,
@@ -365,6 +373,14 @@ static void etraxfs_uart_stop_rx(struct uart_port *port)
 	REG_WR(ser, regi_ser, rw_rec_ctrl, rec_ctrl);
 }
 
+static void etraxfs_uart_enable_ms(struct uart_port *port)
+{
+}
+
+static void check_modem_status(struct uart_cris_port *up)
+{
+}
+
 static unsigned int etraxfs_uart_tx_empty(struct uart_port *port)
 {
 	struct uart_cris_port *up = (struct uart_cris_port *)port;
@@ -388,9 +404,21 @@ static unsigned int etraxfs_uart_get_mctrl(struct uart_port *port)
 	ret = 0;
 	if (crisv32_serial_get_rts(up))
 		ret |= TIOCM_RTS;
+	/* DTR is active low */
+	if (up->dtr_pin && !gpiod_get_raw_value(up->dtr_pin))
+		ret |= TIOCM_DTR;
+	/* CD is active low */
+	if (up->cd_pin && !gpiod_get_raw_value(up->cd_pin))
+		ret |= TIOCM_CD;
+	/* RI is active low */
+	if (up->ri_pin && !gpiod_get_raw_value(up->ri_pin))
+		ret |= TIOCM_RI;
+	/* DSR is active low */
+	if (up->dsr_pin && !gpiod_get_raw_value(up->dsr_pin))
+		ret |= TIOCM_DSR;
 	if (crisv32_serial_get_cts(up))
 		ret |= TIOCM_CTS;
-	return mctrl_gpio_get(up->gpios, &ret);
+	return ret;
 }
 
 static void etraxfs_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
@@ -398,7 +426,15 @@ static void etraxfs_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
 	struct uart_cris_port *up = (struct uart_cris_port *)port;
 
 	crisv32_serial_set_rts(up, mctrl & TIOCM_RTS ? 1 : 0, 0);
-	mctrl_gpio_set(up->gpios, mctrl);
+	/* DTR is active low */
+	if (up->dtr_pin)
+		gpiod_set_raw_value(up->dtr_pin, mctrl & TIOCM_DTR ? 0 : 1);
+	/* RI is active low */
+	if (up->ri_pin)
+		gpiod_set_raw_value(up->ri_pin, mctrl & TIOCM_RNG ? 0 : 1);
+	/* CD is active low */
+	if (up->cd_pin)
+		gpiod_set_raw_value(up->cd_pin, mctrl & TIOCM_CD ? 0 : 1);
 }
 
 static void etraxfs_uart_break_ctl(struct uart_port *port, int break_state)
@@ -562,6 +598,7 @@ ser_interrupt(int irq, void *dev_id)
 			receive_chars_no_dma(up);
 			handled = 1;
 		}
+		check_modem_status(up);
 
 		if (masked_intr.tr_rdy) {
 			transmit_chars_no_dma(up);
@@ -825,6 +862,7 @@ static const struct uart_ops etraxfs_uart_pops = {
 	.start_tx = etraxfs_uart_start_tx,
 	.send_xchar = etraxfs_uart_send_xchar,
 	.stop_rx = etraxfs_uart_stop_rx,
+	.enable_ms = etraxfs_uart_enable_ms,
 	.break_ctl = etraxfs_uart_break_ctl,
 	.startup = etraxfs_uart_startup,
 	.shutdown = etraxfs_uart_shutdown,
@@ -892,12 +930,11 @@ static int etraxfs_uart_probe(struct platform_device *pdev)
 
 	up->irq = irq_of_parse_and_map(np, 0);
 	up->regi_ser = of_iomap(np, 0);
+	up->dtr_pin = devm_gpiod_get_optional(&pdev->dev, "dtr");
+	up->dsr_pin = devm_gpiod_get_optional(&pdev->dev, "dsr");
+	up->ri_pin = devm_gpiod_get_optional(&pdev->dev, "ri");
+	up->cd_pin = devm_gpiod_get_optional(&pdev->dev, "cd");
 	up->port.dev = &pdev->dev;
-
-	up->gpios = mctrl_gpio_init(&pdev->dev, 0);
-	if (IS_ERR(up->gpios))
-		return PTR_ERR(up->gpios);
-
 	cris_serial_port_init(&up->port, dev_id);
 
 	etraxfs_uart_ports[dev_id] = up;

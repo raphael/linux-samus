@@ -577,10 +577,8 @@ static int ah6_input(struct xfrm_state *x, struct sk_buff *skb)
 
 	work_iph = ah_alloc_tmp(ahash, nfrags + sglists, hdr_len +
 				ahp->icv_trunc_len + seqhi_len);
-	if (!work_iph) {
-		err = -ENOMEM;
+	if (!work_iph)
 		goto out;
-	}
 
 	auth_data = ah_tmp_auth((u8 *)work_iph, hdr_len);
 	seqhi = (__be32 *)(auth_data + ahp->icv_trunc_len);

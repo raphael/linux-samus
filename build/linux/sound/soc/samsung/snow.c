@@ -56,7 +56,6 @@ static int snow_late_probe(struct snd_soc_card *card)
 
 static struct snd_soc_card snow_snd = {
 	.name = "Snow-I2S",
-	.owner = THIS_MODULE,
 	.dai_link = snow_dai,
 	.num_links = ARRAY_SIZE(snow_dai),
 

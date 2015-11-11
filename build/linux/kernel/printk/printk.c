@@ -835,7 +835,7 @@ const struct file_operations kmsg_fops = {
 	.release = devkmsg_release,
 };
 
-#ifdef CONFIG_KEXEC_CORE
+#ifdef CONFIG_KEXEC
 /*
  * This appends the listed symbols to /proc/vmcore
  *

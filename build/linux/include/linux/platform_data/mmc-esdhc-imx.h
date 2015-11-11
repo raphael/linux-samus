@@ -45,6 +45,5 @@ struct esdhc_platform_data {
 	int max_bus_width;
 	bool support_vsel;
 	unsigned int delay_line;
-	unsigned int tuning_step;       /* The delay cell steps in tuning procedure */
 };
 #endif /* __ASM_ARCH_IMX_ESDHC_H */

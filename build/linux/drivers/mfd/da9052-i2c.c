@@ -195,6 +195,7 @@ static struct i2c_driver da9052_i2c_driver = {
 	.id_table = da9052_i2c_id,
 	.driver = {
 		.name = "da9052",
+		.owner = THIS_MODULE,
 #ifdef CONFIG_OF
 		.of_match_table = dialog_dt_ids,
 #endif

@@ -1865,11 +1865,9 @@ static void rbd_osd_req_callback(struct ceph_osd_request *osd_req,
 		rbd_osd_read_callback(obj_request);
 		break;
 	case CEPH_OSD_OP_SETALLOCHINT:
-		rbd_assert(osd_req->r_ops[1].op == CEPH_OSD_OP_WRITE ||
-			   osd_req->r_ops[1].op == CEPH_OSD_OP_WRITEFULL);
+		rbd_assert(osd_req->r_ops[1].op == CEPH_OSD_OP_WRITE);
 		/* fall through */
 	case CEPH_OSD_OP_WRITE:
-	case CEPH_OSD_OP_WRITEFULL:
 		rbd_osd_write_callback(obj_request);
 		break;
 	case CEPH_OSD_OP_STAT:
@@ -2405,10 +2403,7 @@ static void rbd_img_obj_request_fill(struct rbd_obj_request *obj_request,
 				opcode = CEPH_OSD_OP_ZERO;
 		}
 	} else if (op_type == OBJ_OP_WRITE) {
-		if (!offset && length == object_size)
-			opcode = CEPH_OSD_OP_WRITEFULL;
-		else
-			opcode = CEPH_OSD_OP_WRITE;
+		opcode = CEPH_OSD_OP_WRITE;
 		osd_req_op_alloc_hint_init(osd_request, num_ops,
 					object_size, object_size);
 		num_ops++;
@@ -3481,6 +3476,52 @@ static int rbd_queue_rq(struct blk_mq_hw_ctx *hctx,
 	return BLK_MQ_RQ_QUEUE_OK;
 }
 
+/*
+ * a queue callback. Makes sure that we don't create a bio that spans across
+ * multiple osd objects. One exception would be with a single page bios,
+ * which we handle later at bio_chain_clone_range()
+ */
+static int rbd_merge_bvec(struct request_queue *q, struct bvec_merge_data *bmd,
+			  struct bio_vec *bvec)
+{
+	struct rbd_device *rbd_dev = q->queuedata;
+	sector_t sector_offset;
+	sector_t sectors_per_obj;
+	sector_t obj_sector_offset;
+	int ret;
+
+	/*
+	 * Find how far into its rbd object the partition-relative
+	 * bio start sector is to offset relative to the enclosing
+	 * device.
+	 */
+	sector_offset = get_start_sect(bmd->bi_bdev) + bmd->bi_sector;
+	sectors_per_obj = 1 << (rbd_dev->header.obj_order - SECTOR_SHIFT);
+	obj_sector_offset = sector_offset & (sectors_per_obj - 1);
+
+	/*
+	 * Compute the number of bytes from that offset to the end
+	 * of the object.  Account for what's already used by the bio.
+	 */
+	ret = (int) (sectors_per_obj - obj_sector_offset) << SECTOR_SHIFT;
+	if (ret > bmd->bi_size)
+		ret -= bmd->bi_size;
+	else
+		ret = 0;
+
+	/*
+	 * Don't send back more than was asked for.  And if the bio
+	 * was empty, let the whole thing through because:  "Note
+	 * that a block device *must* allow a single page to be
+	 * added to an empty bio."
+	 */
+	rbd_assert(bvec->bv_len <= PAGE_SIZE);
+	if (ret > (int) bvec->bv_len || !bmd->bi_size)
+		ret = (int) bvec->bv_len;
+
+	return ret;
+}
+
 static void rbd_free_disk(struct rbd_device *rbd_dev)
 {
 	struct gendisk *disk = rbd_dev->disk;
@@ -3767,7 +3808,6 @@ static int rbd_init_disk(struct rbd_device *rbd_dev)
 	/* set io sizes to object size */
 	segment_size = rbd_obj_bytes(&rbd_dev->header);
 	blk_queue_max_hw_sectors(q, segment_size / SECTOR_SIZE);
-	q->limits.max_sectors = queue_max_hw_sectors(q);
 	blk_queue_max_segments(q, segment_size / SECTOR_SIZE);
 	blk_queue_max_segment_size(q, segment_size);
 	blk_queue_io_min(q, segment_size);
@@ -3777,9 +3817,10 @@ static int rbd_init_disk(struct rbd_device *rbd_dev)
 	queue_flag_set_unlocked(QUEUE_FLAG_DISCARD, q);
 	q->limits.discard_granularity = segment_size;
 	q->limits.discard_alignment = segment_size;
-	blk_queue_max_discard_sectors(q, segment_size / SECTOR_SIZE);
+	q->limits.max_discard_sectors = segment_size / SECTOR_SIZE;
 	q->limits.discard_zeroes_data = 1;
 
+	blk_queue_merge_bvec(q, rbd_merge_bvec);
 	if (!ceph_test_opt(rbd_dev->rbd_client->client, NOCRC))
 		q->backing_dev_info.capabilities |= BDI_CAP_STABLE_WRITES;
 
@@ -4684,10 +4725,7 @@ static int rbd_dev_v2_header_info(struct rbd_device *rbd_dev)
 	}
 
 	ret = rbd_dev_v2_snap_context(rbd_dev);
-	if (ret && first_time) {
-		kfree(rbd_dev->header.object_prefix);
-		rbd_dev->header.object_prefix = NULL;
-	}
+	dout("rbd_dev_v2_snap_context returned %d\n", ret);
 
 	return ret;
 }

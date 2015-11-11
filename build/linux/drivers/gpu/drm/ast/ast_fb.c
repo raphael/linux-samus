@@ -125,7 +125,7 @@ static void ast_fillrect(struct fb_info *info,
 			 const struct fb_fillrect *rect)
 {
 	struct ast_fbdev *afbdev = info->par;
-	drm_fb_helper_sys_fillrect(info, rect);
+	sys_fillrect(info, rect);
 	ast_dirty_update(afbdev, rect->dx, rect->dy, rect->width,
 			 rect->height);
 }
@@ -134,7 +134,7 @@ static void ast_copyarea(struct fb_info *info,
 			 const struct fb_copyarea *area)
 {
 	struct ast_fbdev *afbdev = info->par;
-	drm_fb_helper_sys_copyarea(info, area);
+	sys_copyarea(info, area);
 	ast_dirty_update(afbdev, area->dx, area->dy, area->width,
 			 area->height);
 }
@@ -143,7 +143,7 @@ static void ast_imageblit(struct fb_info *info,
 			  const struct fb_image *image)
 {
 	struct ast_fbdev *afbdev = info->par;
-	drm_fb_helper_sys_imageblit(info, image);
+	sys_imageblit(info, image);
 	ast_dirty_update(afbdev, image->dx, image->dy, image->width,
 			 image->height);
 }
@@ -193,6 +193,7 @@ static int astfb_create(struct drm_fb_helper *helper,
 	struct drm_framebuffer *fb;
 	struct fb_info *info;
 	int size, ret;
+	struct device *device = &dev->pdev->dev;
 	void *sysram;
 	struct drm_gem_object *gobj = NULL;
 	struct ast_bo *bo = NULL;
@@ -216,28 +217,40 @@ static int astfb_create(struct drm_fb_helper *helper,
 	if (!sysram)
 		return -ENOMEM;
 
-	info = drm_fb_helper_alloc_fbi(helper);
-	if (IS_ERR(info)) {
-		ret = PTR_ERR(info);
-		goto err_free_vram;
+	info = framebuffer_alloc(0, device);
+	if (!info) {
+		ret = -ENOMEM;
+		goto out;
 	}
 	info->par = afbdev;
 
 	ret = ast_framebuffer_init(dev, &afbdev->afb, &mode_cmd, gobj);
 	if (ret)
-		goto err_release_fbi;
+		goto out;
 
 	afbdev->sysram = sysram;
 	afbdev->size = size;
 
 	fb = &afbdev->afb.base;
 	afbdev->helper.fb = fb;
+	afbdev->helper.fbdev = info;
 
 	strcpy(info->fix.id, "astdrmfb");
 
 	info->flags = FBINFO_DEFAULT | FBINFO_CAN_FORCE_OUTPUT;
 	info->fbops = &astfb_ops;
 
+	ret = fb_alloc_cmap(&info->cmap, 256, 0);
+	if (ret) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	info->apertures = alloc_apertures(1);
+	if (!info->apertures) {
+		ret = -ENOMEM;
+		goto out;
+	}
 	info->apertures->ranges[0].base = pci_resource_start(dev->pdev, 0);
 	info->apertures->ranges[0].size = pci_resource_len(dev->pdev, 0);
 
@@ -253,11 +266,7 @@ static int astfb_create(struct drm_fb_helper *helper,
 		      fb->width, fb->height);
 
 	return 0;
-
-err_release_fbi:
-	drm_fb_helper_release_fbi(helper);
-err_free_vram:
-	vfree(afbdev->sysram);
+out:
 	return ret;
 }
 
@@ -288,10 +297,15 @@ static const struct drm_fb_helper_funcs ast_fb_helper_funcs = {
 static void ast_fbdev_destroy(struct drm_device *dev,
 			      struct ast_fbdev *afbdev)
 {
+	struct fb_info *info;
 	struct ast_framebuffer *afb = &afbdev->afb;
-
-	drm_fb_helper_unregister_fbi(&afbdev->helper);
-	drm_fb_helper_release_fbi(&afbdev->helper);
+	if (afbdev->helper.fbdev) {
+		info = afbdev->helper.fbdev;
+		unregister_framebuffer(info);
+		if (info->cmap.len)
+			fb_dealloc_cmap(&info->cmap);
+		framebuffer_release(info);
+	}
 
 	if (afb->obj) {
 		drm_gem_object_unreference_unlocked(afb->obj);
@@ -363,5 +377,5 @@ void ast_fbdev_set_suspend(struct drm_device *dev, int state)
 	if (!ast->fbdev)
 		return;
 
-	drm_fb_helper_set_suspend(&ast->fbdev->helper, state);
+	fb_set_suspend(ast->fbdev->helper.fbdev, state);
 }

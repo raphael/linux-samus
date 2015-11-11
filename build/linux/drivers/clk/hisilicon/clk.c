@@ -24,14 +24,15 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/clkdev.h>
 #include <linux/clk-provider.h>
+#include <linux/clkdev.h>
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
 #include <linux/slab.h>
+#include <linux/clk.h>
 
 #include "clk.h"
 
@@ -44,9 +45,14 @@ struct hisi_clock_data __init *hisi_clk_init(struct device_node *np,
 	struct clk **clk_table;
 	void __iomem *base;
 
-	base = of_iomap(np, 0);
-	if (!base) {
-		pr_err("%s: failed to map clock registers\n", __func__);
+	if (np) {
+		base = of_iomap(np, 0);
+		if (!base) {
+			pr_err("failed to map Hisilicon clock registers\n");
+			goto err;
+		}
+	} else {
+		pr_err("failed to find Hisilicon clock node in DTS\n");
 		goto err;
 	}
 

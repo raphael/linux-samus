@@ -24,7 +24,6 @@
 #include <crypto/algapi.h>
 #include <linux/err.h>
 #include <linux/module.h>
-#include <linux/cpufeature.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include "crypt_s390.h"
@@ -977,7 +976,7 @@ static void __exit aes_s390_fini(void)
 	crypto_unregister_alg(&aes_alg);
 }
 
-module_cpu_feature_match(MSA, aes_s390_init);
+module_init(aes_s390_init);
 module_exit(aes_s390_fini);
 
 MODULE_ALIAS_CRYPTO("aes-all");

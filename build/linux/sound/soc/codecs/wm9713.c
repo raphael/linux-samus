@@ -29,9 +29,6 @@
 
 #include "wm9713.h"
 
-#define WM9713_VENDOR_ID 0x574d4c13
-#define WM9713_VENDOR_ID_MASK 0xffffffff
-
 struct wm9713_priv {
 	struct snd_ac97 *ac97;
 	u32 pll_in; /* PLL input frequency */
@@ -119,10 +116,11 @@ SOC_ENUM_SINGLE_VIRT(2, wm9713_micb_select), /* mic selection 19 */
 static const DECLARE_TLV_DB_SCALE(out_tlv, -4650, 150, 0);
 static const DECLARE_TLV_DB_SCALE(main_tlv, -3450, 150, 0);
 static const DECLARE_TLV_DB_SCALE(misc_tlv, -1500, 300, 0);
-static const  DECLARE_TLV_DB_RANGE(mic_tlv,
+static unsigned int mic_tlv[] = {
+	TLV_DB_RANGE_HEAD(2),
 	0, 2, TLV_DB_SCALE_ITEM(1200, 600, 0),
-	3, 3, TLV_DB_SCALE_ITEM(3000, 0, 0)
-);
+	3, 3, TLV_DB_SCALE_ITEM(3000, 0, 0),
+};
 
 static const struct snd_kcontrol_new wm9713_snd_ac97_controls[] = {
 SOC_DOUBLE_TLV("Speaker Playback Volume", AC97_MASTER, 8, 0, 31, 1, out_tlv),
@@ -1125,6 +1123,28 @@ static struct snd_soc_dai_driver wm9713_dai[] = {
 	},
 };
 
+int wm9713_reset(struct snd_soc_codec *codec, int try_warm)
+{
+	struct wm9713_priv *wm9713 = snd_soc_codec_get_drvdata(codec);
+
+	if (try_warm && soc_ac97_ops->warm_reset) {
+		soc_ac97_ops->warm_reset(wm9713->ac97);
+		if (ac97_read(codec, 0) == wm9713_reg[0])
+			return 1;
+	}
+
+	soc_ac97_ops->reset(wm9713->ac97);
+	if (soc_ac97_ops->warm_reset)
+		soc_ac97_ops->warm_reset(wm9713->ac97);
+	if (ac97_read(codec, 0) != wm9713_reg[0]) {
+		dev_err(codec->dev, "Failed to reset: AC97 link error\n");
+		return -EIO;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(wm9713_reset);
+
 static int wm9713_set_bias_level(struct snd_soc_codec *codec,
 				 enum snd_soc_bias_level level)
 {
@@ -1176,8 +1196,7 @@ static int wm9713_soc_resume(struct snd_soc_codec *codec)
 	int i, ret;
 	u16 *cache = codec->reg_cache;
 
-	ret = snd_ac97_reset(wm9713->ac97, true, WM9713_VENDOR_ID,
-		WM9713_VENDOR_ID_MASK);
+	ret = wm9713_reset(codec, 1);
 	if (ret < 0)
 		return ret;
 
@@ -1203,18 +1222,32 @@ static int wm9713_soc_resume(struct snd_soc_codec *codec)
 static int wm9713_soc_probe(struct snd_soc_codec *codec)
 {
 	struct wm9713_priv *wm9713 = snd_soc_codec_get_drvdata(codec);
-	int reg;
+	int ret = 0, reg;
 
-	wm9713->ac97 = snd_soc_new_ac97_codec(codec, WM9713_VENDOR_ID,
-		WM9713_VENDOR_ID_MASK);
+	wm9713->ac97 = snd_soc_alloc_ac97_codec(codec);
 	if (IS_ERR(wm9713->ac97))
 		return PTR_ERR(wm9713->ac97);
+
+	/* do a cold reset for the controller and then try
+	 * a warm reset followed by an optional cold reset for codec */
+	wm9713_reset(codec, 0);
+	ret = wm9713_reset(codec, 1);
+	if (ret < 0)
+		goto err_put_device;
+
+	ret = device_add(&wm9713->ac97->dev);
+	if (ret)
+		goto err_put_device;
 
 	/* unmute the adc - move to kcontrol */
 	reg = ac97_read(codec, AC97_CD) & 0x7fff;
 	ac97_write(codec, AC97_CD, reg);
 
 	return 0;
+
+err_put_device:
+	put_device(&wm9713->ac97->dev);
+	return ret;
 }
 
 static int wm9713_soc_remove(struct snd_soc_codec *codec)

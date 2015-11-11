@@ -2132,7 +2132,7 @@ int sst_hsw_dbg_enable(struct sst_hsw *hsw,
 	int i;
 	struct snd_dma_buffer *dma_buf[2];
 	static struct dentry *fwdir;
-	
+
 	dma_buf[0] = devm_kzalloc(hsw->dsp->dev, sizeof(*dma_buf[0]), GFP_KERNEL);
 	dma_buf[1] = devm_kzalloc(hsw->dsp->dev, sizeof(*dma_buf[1]), GFP_KERNEL);
 	memset(log_stream->config, 0xFF, sizeof(log_stream->config));

@@ -2329,7 +2329,6 @@ static int slic_if_init(struct adapter *adapter, unsigned long *flags)
 
 	if (!adapter->isp_initialized) {
 		unsigned long flags;
-
 		pshmem = (struct slic_shmem *)(unsigned long)
 			 adapter->phys_shmem;
 

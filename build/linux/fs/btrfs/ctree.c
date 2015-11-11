@@ -1159,10 +1159,8 @@ static noinline int __btrfs_cow_block(struct btrfs_trans_handle *trans,
 
 	if (test_bit(BTRFS_ROOT_REF_COWS, &root->state)) {
 		ret = btrfs_reloc_cow_block(trans, root, buf, cow);
-		if (ret) {
-			btrfs_abort_transaction(trans, root, ret);
+		if (ret)
 			return ret;
-		}
 	}
 
 	if (buf == root->node) {

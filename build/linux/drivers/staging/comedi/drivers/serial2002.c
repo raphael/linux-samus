@@ -32,7 +32,6 @@ Status: in development
 #include <linux/delay.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/ktime.h>
 
 #include <linux/termios.h>
 #include <asm/ioctls.h>
@@ -122,9 +121,9 @@ static int serial2002_tty_write(struct file *f, unsigned char *buf, int count)
 static void serial2002_tty_read_poll_wait(struct file *f, int timeout)
 {
 	struct poll_wqueues table;
-	ktime_t start, now;
+	struct timeval start, now;
 
-	start = ktime_get();
+	do_gettimeofday(&start);
 	poll_initwait(&table);
 	while (1) {
 		long elapsed;
@@ -135,8 +134,9 @@ static void serial2002_tty_read_poll_wait(struct file *f, int timeout)
 			    POLLHUP | POLLERR)) {
 			break;
 		}
-		now = ktime_get();
-		elapsed = ktime_us_delta(now, start);
+		do_gettimeofday(&now);
+		elapsed = 1000000 * (now.tv_sec - start.tv_sec) +
+			  now.tv_usec - start.tv_usec;
 		if (elapsed > timeout)
 			break;
 		set_current_state(TASK_INTERRUPTIBLE);

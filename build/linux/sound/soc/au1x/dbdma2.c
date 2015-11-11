@@ -344,8 +344,14 @@ static int au1xpsc_pcm_drvprobe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, dmadata);
 
-	return devm_snd_soc_register_platform(&pdev->dev,
-					      &au1xpsc_soc_platform);
+	return snd_soc_register_platform(&pdev->dev, &au1xpsc_soc_platform);
+}
+
+static int au1xpsc_pcm_drvremove(struct platform_device *pdev)
+{
+	snd_soc_unregister_platform(&pdev->dev);
+
+	return 0;
 }
 
 static struct platform_driver au1xpsc_pcm_driver = {
@@ -353,6 +359,7 @@ static struct platform_driver au1xpsc_pcm_driver = {
 		.name	= "au1xpsc-pcm",
 	},
 	.probe		= au1xpsc_pcm_drvprobe,
+	.remove		= au1xpsc_pcm_drvremove,
 };
 
 module_platform_driver(au1xpsc_pcm_driver);

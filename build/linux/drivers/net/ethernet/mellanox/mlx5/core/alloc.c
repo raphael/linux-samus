@@ -45,34 +45,15 @@
  * register it in a memory region at HCA virtual address 0.
  */
 
-static void *mlx5_dma_zalloc_coherent_node(struct mlx5_core_dev *dev,
-					   size_t size, dma_addr_t *dma_handle,
-					   int node)
-{
-	struct mlx5_priv *priv = &dev->priv;
-	int original_node;
-	void *cpu_handle;
-
-	mutex_lock(&priv->alloc_mutex);
-	original_node = dev_to_node(&dev->pdev->dev);
-	set_dev_node(&dev->pdev->dev, node);
-	cpu_handle = dma_zalloc_coherent(&dev->pdev->dev, size,
-					 dma_handle, GFP_KERNEL);
-	set_dev_node(&dev->pdev->dev, original_node);
-	mutex_unlock(&priv->alloc_mutex);
-	return cpu_handle;
-}
-
-int mlx5_buf_alloc_node(struct mlx5_core_dev *dev, int size,
-			struct mlx5_buf *buf, int node)
+int mlx5_buf_alloc(struct mlx5_core_dev *dev, int size, struct mlx5_buf *buf)
 {
 	dma_addr_t t;
 
 	buf->size = size;
 	buf->npages       = 1;
 	buf->page_shift   = (u8)get_order(size) + PAGE_SHIFT;
-	buf->direct.buf   = mlx5_dma_zalloc_coherent_node(dev, size,
-							  &t, node);
+	buf->direct.buf   = dma_zalloc_coherent(&dev->pdev->dev,
+						size, &t, GFP_KERNEL);
 	if (!buf->direct.buf)
 		return -ENOMEM;
 
@@ -85,11 +66,6 @@ int mlx5_buf_alloc_node(struct mlx5_core_dev *dev, int size,
 
 	return 0;
 }
-
-int mlx5_buf_alloc(struct mlx5_core_dev *dev, int size, struct mlx5_buf *buf)
-{
-	return mlx5_buf_alloc_node(dev, size, buf, dev->priv.numa_node);
-}
 EXPORT_SYMBOL_GPL(mlx5_buf_alloc);
 
 void mlx5_buf_free(struct mlx5_core_dev *dev, struct mlx5_buf *buf)
@@ -99,8 +75,7 @@ void mlx5_buf_free(struct mlx5_core_dev *dev, struct mlx5_buf *buf)
 }
 EXPORT_SYMBOL_GPL(mlx5_buf_free);
 
-static struct mlx5_db_pgdir *mlx5_alloc_db_pgdir(struct mlx5_core_dev *dev,
-						 int node)
+static struct mlx5_db_pgdir *mlx5_alloc_db_pgdir(struct device *dma_device)
 {
 	struct mlx5_db_pgdir *pgdir;
 
@@ -109,9 +84,8 @@ static struct mlx5_db_pgdir *mlx5_alloc_db_pgdir(struct mlx5_core_dev *dev,
 		return NULL;
 
 	bitmap_fill(pgdir->bitmap, MLX5_DB_PER_PAGE);
-
-	pgdir->db_page = mlx5_dma_zalloc_coherent_node(dev, PAGE_SIZE,
-						       &pgdir->db_dma, node);
+	pgdir->db_page = dma_alloc_coherent(dma_device, PAGE_SIZE,
+					    &pgdir->db_dma, GFP_KERNEL);
 	if (!pgdir->db_page) {
 		kfree(pgdir);
 		return NULL;
@@ -144,7 +118,7 @@ static int mlx5_alloc_db_from_pgdir(struct mlx5_db_pgdir *pgdir,
 	return 0;
 }
 
-int mlx5_db_alloc_node(struct mlx5_core_dev *dev, struct mlx5_db *db, int node)
+int mlx5_db_alloc(struct mlx5_core_dev *dev, struct mlx5_db *db)
 {
 	struct mlx5_db_pgdir *pgdir;
 	int ret = 0;
@@ -155,7 +129,7 @@ int mlx5_db_alloc_node(struct mlx5_core_dev *dev, struct mlx5_db *db, int node)
 		if (!mlx5_alloc_db_from_pgdir(pgdir, db))
 			goto out;
 
-	pgdir = mlx5_alloc_db_pgdir(dev, node);
+	pgdir = mlx5_alloc_db_pgdir(&(dev->pdev->dev));
 	if (!pgdir) {
 		ret = -ENOMEM;
 		goto out;
@@ -170,12 +144,6 @@ out:
 	mutex_unlock(&dev->priv.pgdir_mutex);
 
 	return ret;
-}
-EXPORT_SYMBOL_GPL(mlx5_db_alloc_node);
-
-int mlx5_db_alloc(struct mlx5_core_dev *dev, struct mlx5_db *db)
-{
-	return mlx5_db_alloc_node(dev, db, dev->priv.numa_node);
 }
 EXPORT_SYMBOL_GPL(mlx5_db_alloc);
 

@@ -702,7 +702,6 @@
 		clocks = <&clock CLK_JPEG>;
 		clock-names = "jpeg";
 		power-domains = <&pd_cam>;
-		iommus = <&sysmmu_jpeg>;
 	};
 
 	hdmi: hdmi@12D00000 {

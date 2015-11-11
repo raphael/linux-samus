@@ -61,7 +61,9 @@ static bool rpfilter_lookup_reverse(struct flowi4 *fl4,
 	if (FIB_RES_DEV(res) == dev)
 		dev_match = true;
 #endif
-	return dev_match || flags & XT_RPFILTER_LOOSE;
+	if (dev_match || flags & XT_RPFILTER_LOOSE)
+		return FIB_RES_NH(res).nh_scope <= RT_SCOPE_HOST;
+	return dev_match;
 }
 
 static bool rpfilter_is_local(const struct sk_buff *skb)

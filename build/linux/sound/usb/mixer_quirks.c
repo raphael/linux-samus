@@ -308,10 +308,11 @@ static int snd_audigy2nx_led_update(struct usb_mixer_interface *mixer,
 	struct snd_usb_audio *chip = mixer->chip;
 	int err;
 
-	err = snd_usb_lock_shutdown(chip);
-	if (err < 0)
-		return err;
-
+	down_read(&chip->shutdown_rwsem);
+	if (chip->shutdown) {
+		err = -ENODEV;
+		goto out;
+	}
 	if (chip->usb_id == USB_ID(0x041e, 0x3042))
 		err = snd_usb_ctl_msg(chip->dev,
 			      usb_sndctrlpipe(chip->dev, 0), 0x24,
@@ -328,7 +329,8 @@ static int snd_audigy2nx_led_update(struct usb_mixer_interface *mixer,
 			      usb_sndctrlpipe(chip->dev, 0), 0x24,
 			      USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_OTHER,
 			      value, index + 2, NULL, 0);
-	snd_usb_unlock_shutdown(chip);
+ out:
+	up_read(&chip->shutdown_rwsem);
 	return err;
 }
 
@@ -439,15 +441,16 @@ static void snd_audigy2nx_proc_read(struct snd_info_entry *entry,
 
 	for (i = 0; jacks[i].name; ++i) {
 		snd_iprintf(buffer, "%s: ", jacks[i].name);
-		err = snd_usb_lock_shutdown(mixer->chip);
-		if (err < 0)
-			return;
-		err = snd_usb_ctl_msg(mixer->chip->dev,
+		down_read(&mixer->chip->shutdown_rwsem);
+		if (mixer->chip->shutdown)
+			err = 0;
+		else
+			err = snd_usb_ctl_msg(mixer->chip->dev,
 				      usb_rcvctrlpipe(mixer->chip->dev, 0),
 				      UAC_GET_MEM, USB_DIR_IN | USB_TYPE_CLASS |
 				      USB_RECIP_INTERFACE, 0,
 				      jacks[i].unitid << 8, buf, 3);
-		snd_usb_unlock_shutdown(mixer->chip);
+		up_read(&mixer->chip->shutdown_rwsem);
 		if (err == 3 && (buf[0] == 3 || buf[0] == 6))
 			snd_iprintf(buffer, "%02x %02x\n", buf[1], buf[2]);
 		else
@@ -478,9 +481,11 @@ static int snd_emu0204_ch_switch_update(struct usb_mixer_interface *mixer,
 	int err;
 	unsigned char buf[2];
 
-	err = snd_usb_lock_shutdown(chip);
-	if (err < 0)
-		return err;
+	down_read(&chip->shutdown_rwsem);
+	if (mixer->chip->shutdown) {
+		err = -ENODEV;
+		goto out;
+	}
 
 	buf[0] = 0x01;
 	buf[1] = value ? 0x02 : 0x01;
@@ -488,7 +493,8 @@ static int snd_emu0204_ch_switch_update(struct usb_mixer_interface *mixer,
 		      usb_sndctrlpipe(chip->dev, 0), UAC_SET_CUR,
 		      USB_RECIP_INTERFACE | USB_TYPE_CLASS | USB_DIR_OUT,
 		      0x0400, 0x0e00, buf, 2);
-	snd_usb_unlock_shutdown(chip);
+ out:
+	up_read(&chip->shutdown_rwsem);
 	return err;
 }
 
@@ -548,14 +554,15 @@ static int snd_xonar_u1_switch_update(struct usb_mixer_interface *mixer,
 	struct snd_usb_audio *chip = mixer->chip;
 	int err;
 
-	err = snd_usb_lock_shutdown(chip);
-	if (err < 0)
-		return err;
-	err = snd_usb_ctl_msg(chip->dev,
+	down_read(&chip->shutdown_rwsem);
+	if (chip->shutdown)
+		err = -ENODEV;
+	else
+		err = snd_usb_ctl_msg(chip->dev,
 			      usb_sndctrlpipe(chip->dev, 0), 0x08,
 			      USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_OTHER,
 			      50, 0, &status, 1);
-	snd_usb_unlock_shutdown(chip);
+	up_read(&chip->shutdown_rwsem);
 	return err;
 }
 
@@ -616,9 +623,11 @@ static int snd_mbox1_switch_update(struct usb_mixer_interface *mixer, int val)
 	int err;
 	unsigned char buff[3];
 
-	err = snd_usb_lock_shutdown(chip);
-	if (err < 0)
-		return err;
+	down_read(&chip->shutdown_rwsem);
+	if (chip->shutdown) {
+		err = -ENODEV;
+		goto err;
+	}
 
 	/* Prepare for magic command to toggle clock source */
 	err = snd_usb_ctl_msg(chip->dev,
@@ -674,7 +683,7 @@ static int snd_mbox1_switch_update(struct usb_mixer_interface *mixer, int val)
 		goto err;
 
 err:
-	snd_usb_unlock_shutdown(chip);
+	up_read(&chip->shutdown_rwsem);
 	return err;
 }
 
@@ -769,14 +778,15 @@ static int snd_ni_update_cur_val(struct usb_mixer_elem_list *list)
 	unsigned int pval = list->kctl->private_value;
 	int err;
 
-	err = snd_usb_lock_shutdown(chip);
-	if (err < 0)
-		return err;
-	err = usb_control_msg(chip->dev, usb_sndctrlpipe(chip->dev, 0),
-			      (pval >> 16) & 0xff,
-			      USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_OUT,
-			      pval >> 24, pval & 0xffff, NULL, 0, 1000);
-	snd_usb_unlock_shutdown(chip);
+	down_read(&chip->shutdown_rwsem);
+	if (chip->shutdown)
+		err = -ENODEV;
+	else
+		err = usb_control_msg(chip->dev, usb_sndctrlpipe(chip->dev, 0),
+				      (pval >> 16) & 0xff,
+				      USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_OUT,
+				      pval >> 24, pval & 0xffff, NULL, 0, 1000);
+	up_read(&chip->shutdown_rwsem);
 	return err;
 }
 
@@ -934,17 +944,18 @@ static int snd_ftu_eff_switch_update(struct usb_mixer_elem_list *list)
 	value[0] = pval >> 24;
 	value[1] = 0;
 
-	err = snd_usb_lock_shutdown(chip);
-	if (err < 0)
-		return err;
-	err = snd_usb_ctl_msg(chip->dev,
-			      usb_sndctrlpipe(chip->dev, 0),
-			      UAC_SET_CUR,
-			      USB_RECIP_INTERFACE | USB_TYPE_CLASS | USB_DIR_OUT,
-			      pval & 0xff00,
-			      snd_usb_ctrl_intf(chip) | ((pval & 0xff) << 8),
-			      value, 2);
-	snd_usb_unlock_shutdown(chip);
+	down_read(&chip->shutdown_rwsem);
+	if (chip->shutdown)
+		err = -ENODEV;
+	else
+		err = snd_usb_ctl_msg(chip->dev,
+				      usb_sndctrlpipe(chip->dev, 0),
+				      UAC_SET_CUR,
+				      USB_RECIP_INTERFACE | USB_TYPE_CLASS | USB_DIR_OUT,
+				      pval & 0xff00,
+				      snd_usb_ctrl_intf(chip) | ((pval & 0xff) << 8),
+				      value, 2);
+	up_read(&chip->shutdown_rwsem);
 	return err;
 }
 
@@ -1508,9 +1519,11 @@ static int snd_microii_spdif_default_get(struct snd_kcontrol *kcontrol,
 	unsigned char data[3];
 	int rate;
 
-	err = snd_usb_lock_shutdown(chip);
-	if (err < 0)
-		return err;
+	down_read(&chip->shutdown_rwsem);
+	if (chip->shutdown) {
+		err = -ENODEV;
+		goto end;
+	}
 
 	ucontrol->value.iec958.status[0] = kcontrol->private_value & 0xff;
 	ucontrol->value.iec958.status[1] = (kcontrol->private_value >> 8) & 0xff;
@@ -1538,7 +1551,7 @@ static int snd_microii_spdif_default_get(struct snd_kcontrol *kcontrol,
 
 	err = 0;
  end:
-	snd_usb_unlock_shutdown(chip);
+	up_read(&chip->shutdown_rwsem);
 	return err;
 }
 
@@ -1549,9 +1562,11 @@ static int snd_microii_spdif_default_update(struct usb_mixer_elem_list *list)
 	u8 reg;
 	int err;
 
-	err = snd_usb_lock_shutdown(chip);
-	if (err < 0)
-		return err;
+	down_read(&chip->shutdown_rwsem);
+	if (chip->shutdown) {
+		err = -ENODEV;
+		goto end;
+	}
 
 	reg = ((pval >> 4) & 0xf0) | (pval & 0x0f);
 	err = snd_usb_ctl_msg(chip->dev,
@@ -1579,7 +1594,7 @@ static int snd_microii_spdif_default_update(struct usb_mixer_elem_list *list)
 		goto end;
 
  end:
-	snd_usb_unlock_shutdown(chip);
+	up_read(&chip->shutdown_rwsem);
 	return err;
 }
 
@@ -1635,9 +1650,11 @@ static int snd_microii_spdif_switch_update(struct usb_mixer_elem_list *list)
 	u8 reg = list->kctl->private_value;
 	int err;
 
-	err = snd_usb_lock_shutdown(chip);
-	if (err < 0)
-		return err;
+	down_read(&chip->shutdown_rwsem);
+	if (chip->shutdown) {
+		err = -ENODEV;
+		goto end;
+	}
 
 	err = snd_usb_ctl_msg(chip->dev,
 			usb_sndctrlpipe(chip->dev, 0),
@@ -1648,7 +1665,8 @@ static int snd_microii_spdif_switch_update(struct usb_mixer_elem_list *list)
 			NULL,
 			0);
 
-	snd_usb_unlock_shutdown(chip);
+ end:
+	up_read(&chip->shutdown_rwsem);
 	return err;
 }
 

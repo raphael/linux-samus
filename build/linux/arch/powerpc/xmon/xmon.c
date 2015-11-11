@@ -1987,6 +1987,7 @@ memex(void)
 			case '^':
 				adrs -= size;
 				break;
+				break;
 			case '/':
 				if (nslash > 0)
 					adrs -= 1 << nslash;
@@ -2730,7 +2731,7 @@ static void xmon_print_symbol(unsigned long address, const char *mid,
 void dump_segments(void)
 {
 	int i;
-	unsigned long esid,vsid;
+	unsigned long esid,vsid,valid;
 	unsigned long llp;
 
 	printf("SLB contents of cpu 0x%x\n", smp_processor_id());
@@ -2738,9 +2739,10 @@ void dump_segments(void)
 	for (i = 0; i < mmu_slb_size; i++) {
 		asm volatile("slbmfee  %0,%1" : "=r" (esid) : "r" (i));
 		asm volatile("slbmfev  %0,%1" : "=r" (vsid) : "r" (i));
-		if (esid || vsid) {
+		valid = (esid & SLB_ESID_V);
+		if (valid | esid | vsid) {
 			printf("%02d %016lx %016lx", i, esid, vsid);
-			if (esid & SLB_ESID_V) {
+			if (valid) {
 				llp = vsid & SLB_VSID_LLP;
 				if (vsid & SLB_VSID_B_1T) {
 					printf("  1T  ESID=%9lx  VSID=%13lx LLP:%3lx \n",

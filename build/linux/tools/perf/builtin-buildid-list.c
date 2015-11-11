@@ -19,25 +19,29 @@
 
 static int sysfs__fprintf_build_id(FILE *fp)
 {
-	char sbuild_id[SBUILD_ID_SIZE];
-	int ret;
+	u8 kallsyms_build_id[BUILD_ID_SIZE];
+	char sbuild_id[BUILD_ID_SIZE * 2 + 1];
 
-	ret = sysfs__sprintf_build_id("/", sbuild_id);
-	if (ret != sizeof(sbuild_id))
-		return ret < 0 ? ret : -EINVAL;
+	if (sysfs__read_build_id("/sys/kernel/notes", kallsyms_build_id,
+				 sizeof(kallsyms_build_id)) != 0)
+		return -1;
 
-	return fprintf(fp, "%s\n", sbuild_id);
+	build_id__sprintf(kallsyms_build_id, sizeof(kallsyms_build_id),
+			  sbuild_id);
+	fprintf(fp, "%s\n", sbuild_id);
+	return 0;
 }
 
 static int filename__fprintf_build_id(const char *name, FILE *fp)
 {
-	char sbuild_id[SBUILD_ID_SIZE];
-	int ret;
+	u8 build_id[BUILD_ID_SIZE];
+	char sbuild_id[BUILD_ID_SIZE * 2 + 1];
 
-	ret = filename__sprintf_build_id(name, sbuild_id);
-	if (ret != sizeof(sbuild_id))
-		return ret < 0 ? ret : -EINVAL;
+	if (filename__read_build_id(name, build_id,
+				    sizeof(build_id)) != sizeof(build_id))
+		return 0;
 
+	build_id__sprintf(build_id, sizeof(build_id), sbuild_id);
 	return fprintf(fp, "%s\n", sbuild_id);
 }
 
@@ -59,7 +63,7 @@ static int perf_session__list_build_ids(bool force, bool with_hits)
 	/*
 	 * See if this is an ELF file first:
 	 */
-	if (filename__fprintf_build_id(input_name, stdout) > 0)
+	if (filename__fprintf_build_id(input_name, stdout))
 		goto out;
 
 	session = perf_session__new(&file, false, &build_id__mark_dso_hit_ops);

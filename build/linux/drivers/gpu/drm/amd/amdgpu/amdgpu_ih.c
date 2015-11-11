@@ -24,7 +24,6 @@
 #include <drm/drmP.h>
 #include "amdgpu.h"
 #include "amdgpu_ih.h"
-#include "amdgpu_amdkfd.h"
 
 /**
  * amdgpu_ih_ring_alloc - allocate memory for the IH ring
@@ -43,7 +42,7 @@ static int amdgpu_ih_ring_alloc(struct amdgpu_device *adev)
 		r = amdgpu_bo_create(adev, adev->irq.ih.ring_size,
 				     PAGE_SIZE, true,
 				     AMDGPU_GEM_DOMAIN_GTT, 0,
-				     NULL, NULL, &adev->irq.ih.ring_obj);
+				     NULL, &adev->irq.ih.ring_obj);
 		if (r) {
 			DRM_ERROR("amdgpu: failed to create ih ring buffer (%d).\n", r);
 			return r;
@@ -194,14 +193,6 @@ restart_ih:
 	rmb();
 
 	while (adev->irq.ih.rptr != wptr) {
-		u32 ring_index = adev->irq.ih.rptr >> 2;
-
-		/* Before dispatching irq to IP blocks, send it to amdkfd */
-		amdgpu_amdkfd_interrupt(adev,
-				(const void *) &adev->irq.ih.ring[ring_index]);
-
-		entry.iv_entry = (const uint32_t *)
-			&adev->irq.ih.ring[ring_index];
 		amdgpu_ih_decode_iv(adev, &entry);
 		adev->irq.ih.rptr &= adev->irq.ih.ptr_mask;
 

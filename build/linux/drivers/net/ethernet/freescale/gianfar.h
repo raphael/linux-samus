@@ -71,6 +71,11 @@ struct ethtool_rx_list {
 /* Number of bytes to align the rx bufs to */
 #define RXBUF_ALIGNMENT 64
 
+/* The number of bytes which composes a unit for the purpose of
+ * allocating data buffers.  ie-for any given MTU, the data buffer
+ * will be the next highest multiple of 512 bytes. */
+#define INCREMENTAL_BUFFER_SIZE 512
+
 #define PHY_INIT_TIMEOUT 100000
 
 #define DRV_NAME "gfar-enet"
@@ -87,8 +92,6 @@ extern const char gfar_driver_version[];
 #define DEFAULT_TX_RING_SIZE	256
 #define DEFAULT_RX_RING_SIZE	256
 
-#define GFAR_RX_BUFF_ALLOC	16
-
 #define GFAR_RX_MAX_RING_SIZE   256
 #define GFAR_TX_MAX_RING_SIZE   256
 
@@ -100,14 +103,11 @@ extern const char gfar_driver_version[];
 #define DEFAULT_RX_LFC_THR  16
 #define DEFAULT_LFC_PTVVAL  4
 
-#define GFAR_RXB_SIZE 1536
-#define GFAR_SKBFRAG_SIZE (RXBUF_ALIGNMENT + GFAR_RXB_SIZE \
-			  + SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
-#define GFAR_RXB_TRUESIZE 2048
-
+#define DEFAULT_RX_BUFFER_SIZE  1536
 #define TX_RING_MOD_MASK(size) (size-1)
 #define RX_RING_MOD_MASK(size) (size-1)
-#define GFAR_JUMBO_FRAME_SIZE 9600
+#define JUMBO_BUFFER_SIZE 9728
+#define JUMBO_FRAME_SIZE 9600
 
 #define DEFAULT_FIFO_TX_THR 0x100
 #define DEFAULT_FIFO_TX_STARVE 0x40
@@ -640,7 +640,6 @@ struct rmon_mib
 };
 
 struct gfar_extra_stats {
-	atomic64_t rx_alloc_err;
 	atomic64_t rx_large;
 	atomic64_t rx_short;
 	atomic64_t rx_nonoctet;
@@ -652,6 +651,7 @@ struct gfar_extra_stats {
 	atomic64_t eberr;
 	atomic64_t tx_babt;
 	atomic64_t tx_underrun;
+	atomic64_t rx_skbmissing;
 	atomic64_t tx_timeout;
 };
 
@@ -1012,42 +1012,34 @@ struct rx_q_stats {
 	unsigned long rx_dropped;
 };
 
-struct gfar_rx_buff {
-	dma_addr_t dma;
-	struct page *page;
-	unsigned int page_offset;
-};
-
 /**
  *	struct gfar_priv_rx_q - per rx queue structure
- *	@rx_buff: Array of buffer info metadata structs
+ *	@rx_skbuff: skb pointers
+ *	@skb_currx: currently use skb pointer
  *	@rx_bd_base: First rx buffer descriptor
- *	@next_to_use: index of the next buffer to be alloc'd
- *	@next_to_clean: index of the next buffer to be cleaned
+ *	@cur_rx: Next free rx ring entry
  *	@qindex: index of this queue
- *	@ndev: back pointer to net_device
+ *	@dev: back pointer to the dev structure
  *	@rx_ring_size: Rx ring size
  *	@rxcoalescing: enable/disable rx-coalescing
  *	@rxic: receive interrupt coalescing vlaue
  */
 
 struct gfar_priv_rx_q {
-	struct	gfar_rx_buff *rx_buff __aligned(SMP_CACHE_BYTES);
+	struct	sk_buff **rx_skbuff __aligned(SMP_CACHE_BYTES);
+	dma_addr_t rx_bd_dma_base;
 	struct	rxbd8 *rx_bd_base;
-	struct	net_device *ndev;
-	struct	device *dev;
-	u16 rx_ring_size;
-	u16 qindex;
-	struct	gfar_priv_grp *grp;
-	u16 next_to_clean;
-	u16 next_to_use;
-	u16 next_to_alloc;
-	struct	sk_buff *skb;
+	struct	rxbd8 *cur_rx;
+	struct	net_device *dev;
+	struct gfar_priv_grp *grp;
 	struct rx_q_stats stats;
-	u32 __iomem *rfbptr;
+	u16	skb_currx;
+	u16	qindex;
+	unsigned int	rx_ring_size;
+	/* RX Coalescing values */
 	unsigned char rxcoalescing;
 	unsigned long rxic;
-	dma_addr_t rx_bd_dma_base;
+	u32 __iomem *rfbptr;
 };
 
 enum gfar_irqinfo_id {
@@ -1117,6 +1109,7 @@ struct gfar_private {
 	struct device *dev;
 	struct net_device *ndev;
 	enum gfar_errata errata;
+	unsigned int rx_buffer_size;
 
 	u16 uses_rxfcb;
 	u16 padding;
@@ -1297,28 +1290,6 @@ static inline void gfar_clear_txbd_status(struct txbd8 *bdp)
 
 	lstatus &= BD_LFLAG(TXBD_WRAP);
 	bdp->lstatus = cpu_to_be32(lstatus);
-}
-
-static inline int gfar_rxbd_unused(struct gfar_priv_rx_q *rxq)
-{
-	if (rxq->next_to_clean > rxq->next_to_use)
-		return rxq->next_to_clean - rxq->next_to_use - 1;
-
-	return rxq->rx_ring_size + rxq->next_to_clean - rxq->next_to_use - 1;
-}
-
-static inline u32 gfar_rxbd_dma_lastfree(struct gfar_priv_rx_q *rxq)
-{
-	struct rxbd8 *bdp;
-	u32 bdp_dma;
-	int i;
-
-	i = rxq->next_to_use ? rxq->next_to_use - 1 : rxq->rx_ring_size - 1;
-	bdp = &rxq->rx_bd_base[i];
-	bdp_dma = lower_32_bits(rxq->rx_bd_dma_base);
-	bdp_dma += (uintptr_t)bdp - (uintptr_t)rxq->rx_bd_base;
-
-	return bdp_dma;
 }
 
 irqreturn_t gfar_receive(int irq, void *dev_id);

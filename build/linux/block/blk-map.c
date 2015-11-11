@@ -9,24 +9,6 @@
 
 #include "blk.h"
 
-static bool iovec_gap_to_prv(struct request_queue *q,
-			     struct iovec *prv, struct iovec *cur)
-{
-	unsigned long prev_end;
-
-	if (!queue_virt_boundary(q))
-		return false;
-
-	if (prv->iov_base == NULL && prv->iov_len == 0)
-		/* prv is not set - don't check */
-		return false;
-
-	prev_end = (unsigned long)(prv->iov_base + prv->iov_len);
-
-	return (((unsigned long)cur->iov_base & queue_virt_boundary(q)) ||
-		prev_end & queue_virt_boundary(q));
-}
-
 int blk_rq_append_bio(struct request_queue *q, struct request *rq,
 		      struct bio *bio)
 {
@@ -85,7 +67,7 @@ int blk_rq_map_user_iov(struct request_queue *q, struct request *rq,
 	struct bio *bio;
 	int unaligned = 0;
 	struct iov_iter i;
-	struct iovec iov, prv = {.iov_base = NULL, .iov_len = 0};
+	struct iovec iov;
 
 	if (!iter || !iter->count)
 		return -EINVAL;
@@ -99,12 +81,8 @@ int blk_rq_map_user_iov(struct request_queue *q, struct request *rq,
 		/*
 		 * Keep going so we check length of all segments
 		 */
-		if ((uaddr & queue_dma_alignment(q)) ||
-		    iovec_gap_to_prv(q, &prv, &iov))
+		if (uaddr & queue_dma_alignment(q))
 			unaligned = 1;
-
-		prv.iov_base = iov.iov_base;
-		prv.iov_len = iov.iov_len;
 	}
 
 	if (unaligned || (q->dma_pad_mask & iter->count) || map_data)
@@ -116,7 +94,7 @@ int blk_rq_map_user_iov(struct request_queue *q, struct request *rq,
 		return PTR_ERR(bio);
 
 	if (map_data && map_data->null_mapped)
-		bio_set_flag(bio, BIO_NULL_MAPPED);
+		bio->bi_flags |= (1 << BIO_NULL_MAPPED);
 
 	if (bio->bi_iter.bi_size != iter->count) {
 		/*
@@ -125,7 +103,7 @@ int blk_rq_map_user_iov(struct request_queue *q, struct request *rq,
 		 * normal IO completion path
 		 */
 		bio_get(bio);
-		bio_endio(bio);
+		bio_endio(bio, 0);
 		__blk_rq_unmap_user(bio);
 		return -EINVAL;
 	}

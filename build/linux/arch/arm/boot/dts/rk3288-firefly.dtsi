@@ -44,7 +44,6 @@
 
 / {
 	memory {
-		device_type = "memory";
 		reg = <0 0x80000000>;
 	};
 
@@ -214,8 +213,6 @@
 		regulator-max-microvolt = <1350000>;
 		regulator-always-on;
 		regulator-boot-on;
-		regulator-enable-ramp-delay = <300>;
-		regulator-ramp-delay = <8000>;
 		vin-supply = <&vcc_sys>;
 	};
 

@@ -31,9 +31,6 @@ static int max98357a_daiops_trigger(struct snd_pcm_substream *substream,
 {
 	struct gpio_desc *sdmode = snd_soc_dai_get_drvdata(dai);
 
-	if (!sdmode)
-		return 0;
-
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
@@ -51,21 +48,24 @@ static int max98357a_daiops_trigger(struct snd_pcm_substream *substream,
 }
 
 static const struct snd_soc_dapm_widget max98357a_dapm_widgets[] = {
+	SND_SOC_DAPM_DAC("SDMode", NULL, SND_SOC_NOPM, 0, 0),
 	SND_SOC_DAPM_OUTPUT("Speaker"),
 };
 
 static const struct snd_soc_dapm_route max98357a_dapm_routes[] = {
-	{"Speaker", NULL, "HiFi Playback"},
+	{"Speaker", NULL, "SDMode"},
 };
 
 static int max98357a_codec_probe(struct snd_soc_codec *codec)
 {
 	struct gpio_desc *sdmode;
 
-	sdmode = devm_gpiod_get_optional(codec->dev, "sdmode", GPIOD_OUT_LOW);
-	if (IS_ERR(sdmode))
+	sdmode = devm_gpiod_get(codec->dev, "sdmode", GPIOD_OUT_LOW);
+	if (IS_ERR(sdmode)) {
+		dev_err(codec->dev, "%s() unable to get sdmode GPIO: %ld\n",
+				__func__, PTR_ERR(sdmode));
 		return PTR_ERR(sdmode);
-
+	}
 	snd_soc_codec_set_drvdata(codec, sdmode);
 
 	return 0;
@@ -79,7 +79,7 @@ static struct snd_soc_codec_driver max98357a_codec_driver = {
 	.num_dapm_routes	= ARRAY_SIZE(max98357a_dapm_routes),
 };
 
-static const struct snd_soc_dai_ops max98357a_dai_ops = {
+static struct snd_soc_dai_ops max98357a_dai_ops = {
 	.trigger	= max98357a_daiops_trigger,
 };
 
@@ -104,8 +104,15 @@ static struct snd_soc_dai_driver max98357a_dai_driver = {
 
 static int max98357a_platform_probe(struct platform_device *pdev)
 {
-	return snd_soc_register_codec(&pdev->dev, &max98357a_codec_driver,
+	int ret;
+
+	ret = snd_soc_register_codec(&pdev->dev, &max98357a_codec_driver,
 			&max98357a_dai_driver, 1);
+	if (ret)
+		dev_err(&pdev->dev, "%s() error registering codec driver: %d\n",
+				__func__, ret);
+
+	return ret;
 }
 
 static int max98357a_platform_remove(struct platform_device *pdev)

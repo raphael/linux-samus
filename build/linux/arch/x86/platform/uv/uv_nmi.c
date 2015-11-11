@@ -492,7 +492,7 @@ static void uv_nmi_touch_watchdogs(void)
 	touch_nmi_watchdog();
 }
 
-#if defined(CONFIG_KEXEC_CORE)
+#if defined(CONFIG_KEXEC)
 static atomic_t uv_nmi_kexec_failed;
 static void uv_nmi_kdump(int cpu, int master, struct pt_regs *regs)
 {
@@ -519,13 +519,13 @@ static void uv_nmi_kdump(int cpu, int master, struct pt_regs *regs)
 	uv_nmi_sync_exit(0);
 }
 
-#else /* !CONFIG_KEXEC_CORE */
+#else /* !CONFIG_KEXEC */
 static inline void uv_nmi_kdump(int cpu, int master, struct pt_regs *regs)
 {
 	if (master)
 		pr_err("UV: NMI kdump: KEXEC not supported in this kernel\n");
 }
-#endif /* !CONFIG_KEXEC_CORE */
+#endif /* !CONFIG_KEXEC */
 
 #ifdef CONFIG_KGDB
 #ifdef CONFIG_KGDB_KDB

@@ -78,7 +78,7 @@ EXPORT_SYMBOL(cfs_cpt_table_free);
 int
 cfs_cpt_table_print(struct cfs_cpt_table *cptab, char *buf, int len)
 {
-	int	rc;
+	int	rc = 0;
 
 	rc = snprintf(buf, len, "%d\t: %d\n", 0, 0);
 	len -= rc;

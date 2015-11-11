@@ -115,7 +115,7 @@ static int kdwc3_probe(struct platform_device *pdev)
 
 	error = clk_prepare_enable(kdwc->clk);
 	if (error < 0) {
-		dev_err(kdwc->dev, "unable to enable usb clock, error %d\n",
+		dev_dbg(kdwc->dev, "unable to enable usb clock, err %d\n",
 			error);
 		return error;
 	}

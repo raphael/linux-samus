@@ -38,9 +38,8 @@ enum {
 	REMAIN_ON_CHANNEL_COMPLETE_EVENT_ID      = BIT(18),
 	DFS_CHANNELS_CONFIG_COMPLETE_EVENT       = BIT(19),
 	PERIODIC_SCAN_REPORT_EVENT_ID            = BIT(20),
-	SMART_CONFIG_SYNC_EVENT_ID               = BIT(22),
-	SMART_CONFIG_DECODE_EVENT_ID             = BIT(23),
-	TIME_SYNC_EVENT_ID                       = BIT(24),
+	SMART_CONFIG_SYNC_EVENT_ID		 = BIT(22),
+	SMART_CONFIG_DECODE_EVENT_ID		 = BIT(23),
 };
 
 enum wl18xx_radar_types {
@@ -96,16 +95,13 @@ struct wl18xx_event_mailbox {
 	/* smart config sync channel */
 	u8 sc_sync_channel;
 	u8 sc_sync_band;
+	u8 padding2[2];
 
-	/* time sync msb*/
-	u16 time_sync_tsf_msb;
 	/* radar detect */
 	u8 radar_channel;
 	u8 radar_type;
 
-	/* time sync lsb*/
-	u16 time_sync_tsf_lsb;
-
+	u8 padding3[2];
 } __packed;
 
 int wl18xx_wait_for_event(struct wl1271 *wl, enum wlcore_wait_event event,

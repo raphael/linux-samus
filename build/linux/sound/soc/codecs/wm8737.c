@@ -79,12 +79,13 @@ static int wm8737_reset(struct snd_soc_codec *codec)
 	return snd_soc_write(codec, WM8737_RESET, 0);
 }
 
-static const DECLARE_TLV_DB_RANGE(micboost_tlv,
+static const unsigned int micboost_tlv[] = {
+	TLV_DB_RANGE_HEAD(4),
 	0, 0, TLV_DB_SCALE_ITEM(1300, 0, 0),
 	1, 1, TLV_DB_SCALE_ITEM(1800, 0, 0),
 	2, 2, TLV_DB_SCALE_ITEM(2800, 0, 0),
-	3, 3, TLV_DB_SCALE_ITEM(3300, 0, 0)
-);
+	3, 3, TLV_DB_SCALE_ITEM(3300, 0, 0),
+};
 static const DECLARE_TLV_DB_SCALE(pga_tlv, -9750, 50, 1);
 static const DECLARE_TLV_DB_SCALE(adc_tlv, -600, 600, 0);
 static const DECLARE_TLV_DB_SCALE(ng_tlv, -7800, 600, 0);
@@ -656,6 +657,7 @@ MODULE_DEVICE_TABLE(i2c, wm8737_i2c_id);
 static struct i2c_driver wm8737_i2c_driver = {
 	.driver = {
 		.name = "wm8737",
+		.owner = THIS_MODULE,
 		.of_match_table = wm8737_of_match,
 	},
 	.probe =    wm8737_i2c_probe,

@@ -212,7 +212,7 @@ acpi_ds_exec_end_control_op(struct acpi_walk_state * walk_state,
 			 */
 			control_state->control.loop_count++;
 			if (control_state->control.loop_count >
-			    acpi_gbl_max_loop_iterations) {
+			    ACPI_MAX_LOOP_ITERATIONS) {
 				status = AE_AML_INFINITE_LOOP;
 				break;
 			}

@@ -26,7 +26,7 @@
 #include <subdev/gpio.h>
 #include <subdev/timer.h>
 
-struct nvkm_fantog {
+struct nvkm_fantog_priv {
 	struct nvkm_fan base;
 	struct nvkm_alarm alarm;
 	spinlock_t lock;
@@ -36,81 +36,83 @@ struct nvkm_fantog {
 };
 
 static void
-nvkm_fantog_update(struct nvkm_fantog *fan, int percent)
+nvkm_fantog_update(struct nvkm_fantog_priv *priv, int percent)
 {
-	struct nvkm_therm *therm = fan->base.parent;
-	struct nvkm_device *device = therm->subdev.device;
-	struct nvkm_timer *tmr = device->timer;
-	struct nvkm_gpio *gpio = device->gpio;
+	struct nvkm_therm_priv *tpriv = (void *)priv->base.parent;
+	struct nvkm_timer *ptimer = nvkm_timer(tpriv);
+	struct nvkm_gpio *gpio = nvkm_gpio(tpriv);
 	unsigned long flags;
 	int duty;
 
-	spin_lock_irqsave(&fan->lock, flags);
+	spin_lock_irqsave(&priv->lock, flags);
 	if (percent < 0)
-		percent = fan->percent;
-	fan->percent = percent;
+		percent = priv->percent;
+	priv->percent = percent;
 
-	duty = !nvkm_gpio_get(gpio, 0, DCB_GPIO_FAN, 0xff);
-	nvkm_gpio_set(gpio, 0, DCB_GPIO_FAN, 0xff, duty);
+	duty = !gpio->get(gpio, 0, DCB_GPIO_FAN, 0xff);
+	gpio->set(gpio, 0, DCB_GPIO_FAN, 0xff, duty);
 
-	if (list_empty(&fan->alarm.head) && percent != (duty * 100)) {
-		u64 next_change = (percent * fan->period_us) / 100;
+	if (list_empty(&priv->alarm.head) && percent != (duty * 100)) {
+		u64 next_change = (percent * priv->period_us) / 100;
 		if (!duty)
-			next_change = fan->period_us - next_change;
-		nvkm_timer_alarm(tmr, next_change * 1000, &fan->alarm);
+			next_change = priv->period_us - next_change;
+		ptimer->alarm(ptimer, next_change * 1000, &priv->alarm);
 	}
-	spin_unlock_irqrestore(&fan->lock, flags);
+	spin_unlock_irqrestore(&priv->lock, flags);
 }
 
 static void
 nvkm_fantog_alarm(struct nvkm_alarm *alarm)
 {
-	struct nvkm_fantog *fan =
-	       container_of(alarm, struct nvkm_fantog, alarm);
-	nvkm_fantog_update(fan, -1);
+	struct nvkm_fantog_priv *priv =
+	       container_of(alarm, struct nvkm_fantog_priv, alarm);
+	nvkm_fantog_update(priv, -1);
 }
 
 static int
 nvkm_fantog_get(struct nvkm_therm *therm)
 {
-	struct nvkm_fantog *fan = (void *)therm->fan;
-	return fan->percent;
+	struct nvkm_therm_priv *tpriv = (void *)therm;
+	struct nvkm_fantog_priv *priv = (void *)tpriv->fan;
+	return priv->percent;
 }
 
 static int
 nvkm_fantog_set(struct nvkm_therm *therm, int percent)
 {
-	struct nvkm_fantog *fan = (void *)therm->fan;
-	if (therm->func->pwm_ctrl)
-		therm->func->pwm_ctrl(therm, fan->func.line, false);
-	nvkm_fantog_update(fan, percent);
+	struct nvkm_therm_priv *tpriv = (void *)therm;
+	struct nvkm_fantog_priv *priv = (void *)tpriv->fan;
+	if (therm->pwm_ctrl)
+		therm->pwm_ctrl(therm, priv->func.line, false);
+	nvkm_fantog_update(priv, percent);
 	return 0;
 }
 
 int
 nvkm_fantog_create(struct nvkm_therm *therm, struct dcb_gpio_func *func)
 {
-	struct nvkm_fantog *fan;
+	struct nvkm_therm_priv *tpriv = (void *)therm;
+	struct nvkm_fantog_priv *priv;
 	int ret;
 
-	if (therm->func->pwm_ctrl) {
-		ret = therm->func->pwm_ctrl(therm, func->line, false);
+	if (therm->pwm_ctrl) {
+		ret = therm->pwm_ctrl(therm, func->line, false);
 		if (ret)
 			return ret;
 	}
 
-	fan = kzalloc(sizeof(*fan), GFP_KERNEL);
-	therm->fan = &fan->base;
-	if (!fan)
+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+	tpriv->fan = &priv->base;
+	if (!priv)
 		return -ENOMEM;
 
-	fan->base.type = "toggle";
-	fan->base.get = nvkm_fantog_get;
-	fan->base.set = nvkm_fantog_set;
-	nvkm_alarm_init(&fan->alarm, nvkm_fantog_alarm);
-	fan->period_us = 100000; /* 10Hz */
-	fan->percent = 100;
-	fan->func = *func;
-	spin_lock_init(&fan->lock);
+	priv->base.type = "toggle";
+	priv->base.get = nvkm_fantog_get;
+	priv->base.set = nvkm_fantog_set;
+	nvkm_alarm_init(&priv->alarm, nvkm_fantog_alarm);
+	priv->period_us = 100000; /* 10Hz */
+	priv->percent = 100;
+	priv->func = *func;
+	spin_lock_init(&priv->lock);
 	return 0;
 }

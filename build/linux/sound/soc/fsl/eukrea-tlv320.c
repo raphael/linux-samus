@@ -182,7 +182,7 @@ static int eukrea_tlv320_probe(struct platform_device *pdev)
 		);
 	} else {
 		if (np) {
-			/* The eukrea,asoc-tlv320 driver was explicitly
+			/* The eukrea,asoc-tlv320 driver was explicitely
 			 * requested (through the device tree).
 			 */
 			dev_err(&pdev->dev,

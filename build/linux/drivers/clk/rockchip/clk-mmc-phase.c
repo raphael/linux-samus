@@ -14,10 +14,7 @@
  */
 
 #include <linux/slab.h>
-#include <linux/clk.h>
 #include <linux/clk-provider.h>
-#include <linux/io.h>
-#include <linux/kernel.h>
 #include "clk.h"
 
 struct rockchip_mmc_clock {
@@ -108,7 +105,7 @@ static int rockchip_mmc_set_phase(struct clk_hw *hw, int degrees)
 	writel(HIWORD_UPDATE(raw_value, 0x07ff, mmc_clock->shift), mmc_clock->reg);
 
 	pr_debug("%s->set_phase(%d) delay_nums=%u reg[0x%p]=0x%03x actual_degrees=%d\n",
-		clk_hw_get_name(hw), degrees, delay_num,
+		__clk_get_name(hw->clk), degrees, delay_num,
 		mmc_clock->reg, raw_value>>(mmc_clock->shift),
 		rockchip_mmc_get_phase(hw)
 	);
@@ -134,7 +131,6 @@ struct clk *rockchip_clk_register_mmc(const char *name,
 	if (!mmc_clock)
 		return NULL;
 
-	init.name = name;
 	init.num_parents = num_parents;
 	init.parent_names = parent_names;
 	init.ops = &rockchip_mmc_clk_ops;
@@ -142,6 +138,9 @@ struct clk *rockchip_clk_register_mmc(const char *name,
 	mmc_clock->hw.init = &init;
 	mmc_clock->reg = reg;
 	mmc_clock->shift = shift;
+
+	if (name)
+		init.name = name;
 
 	clk = clk_register(NULL, &mmc_clock->hw);
 	if (IS_ERR(clk))

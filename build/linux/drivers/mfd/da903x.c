@@ -550,6 +550,7 @@ static int da903x_remove(struct i2c_client *client)
 static struct i2c_driver da903x_driver = {
 	.driver	= {
 		.name	= "da903x",
+		.owner	= THIS_MODULE,
 	},
 	.probe		= da903x_probe,
 	.remove		= da903x_remove,

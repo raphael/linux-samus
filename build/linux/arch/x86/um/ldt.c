@@ -12,10 +12,7 @@
 #include <skas.h>
 #include <sysdep/tls.h>
 
-static inline int modify_ldt (int func, void *ptr, unsigned long bytecount)
-{
-	return syscall(__NR_modify_ldt, func, ptr, bytecount);
-}
+extern int modify_ldt(int func, void *ptr, unsigned long bytecount);
 
 static long write_ldt_entry(struct mm_id *mm_idp, int func,
 		     struct user_desc *desc, void **addr, int done)

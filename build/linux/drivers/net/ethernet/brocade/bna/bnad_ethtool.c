@@ -90,7 +90,6 @@ static const char *bnad_net_stats_strings[BNAD_ETHTOOL_STATS_NUM] = {
 	"tx_skb_headlen_zero",
 	"tx_skb_frag_zero",
 	"tx_skb_len_mismatch",
-	"tx_skb_map_failed",
 	"hw_stats_updates",
 	"netif_rx_dropped",
 
@@ -103,7 +102,6 @@ static const char *bnad_net_stats_strings[BNAD_ETHTOOL_STATS_NUM] = {
 	"tx_unmap_q_alloc_failed",
 	"rx_unmap_q_alloc_failed",
 	"rxbuf_alloc_failed",
-	"rxbuf_map_failed",
 
 	"mac_stats_clr_cnt",
 	"mac_frame_64",
@@ -809,7 +807,6 @@ bnad_per_q_stats_fill(struct bnad *bnad, u64 *buf, int bi)
 							rx_packets_with_error;
 					buf[bi++] = rcb->rxq->
 							rxbuf_alloc_failed;
-					buf[bi++] = rcb->rxq->rxbuf_map_failed;
 					buf[bi++] = rcb->producer_index;
 					buf[bi++] = rcb->consumer_index;
 				}
@@ -824,7 +821,6 @@ bnad_per_q_stats_fill(struct bnad *bnad, u64 *buf, int bi)
 							rx_packets_with_error;
 					buf[bi++] = rcb->rxq->
 							rxbuf_alloc_failed;
-					buf[bi++] = rcb->rxq->rxbuf_map_failed;
 					buf[bi++] = rcb->producer_index;
 					buf[bi++] = rcb->consumer_index;
 				}

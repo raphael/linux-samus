@@ -110,8 +110,10 @@ static inline void qdisc_run(struct Qdisc *q)
 		__qdisc_run(q);
 }
 
+int tc_classify_compat(struct sk_buff *skb, const struct tcf_proto *tp,
+		       struct tcf_result *res);
 int tc_classify(struct sk_buff *skb, const struct tcf_proto *tp,
-		struct tcf_result *res, bool compat_mode);
+		struct tcf_result *res);
 
 static inline __be16 tc_skb_protocol(const struct sk_buff *skb)
 {

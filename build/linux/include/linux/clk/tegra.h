@@ -17,8 +17,7 @@
 #ifndef __LINUX_CLK_TEGRA_H_
 #define __LINUX_CLK_TEGRA_H_
 
-#include <linux/types.h>
-#include <linux/bug.h>
+#include <linux/clk.h>
 
 /*
  * Tegra CPU clock and reset control ops

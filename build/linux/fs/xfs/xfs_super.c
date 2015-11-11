@@ -261,8 +261,16 @@ xfs_parseargs(
 			mp->m_rtname = kstrndup(value, MAXNAMELEN, GFP_KERNEL);
 			if (!mp->m_rtname)
 				return -ENOMEM;
-		} else if (!strcmp(this_char, MNTOPT_ALLOCSIZE) ||
-			   !strcmp(this_char, MNTOPT_BIOSIZE)) {
+		} else if (!strcmp(this_char, MNTOPT_BIOSIZE)) {
+			if (!value || !*value) {
+				xfs_warn(mp, "%s option requires an argument",
+					this_char);
+				return -EINVAL;
+			}
+			if (kstrtoint(value, 10, &iosize))
+				return -EINVAL;
+			iosizelog = ffs(iosize) - 1;
+		} else if (!strcmp(this_char, MNTOPT_ALLOCSIZE)) {
 			if (!value || !*value) {
 				xfs_warn(mp, "%s option requires an argument",
 					this_char);
@@ -1519,10 +1527,6 @@ xfs_fs_fill_super(
 			mp->m_flags &= ~XFS_MOUNT_DAX;
 		}
 	}
-
-	if (xfs_sb_version_hassparseinodes(&mp->m_sb))
-		xfs_alert(mp,
-	"EXPERIMENTAL sparse inode feature enabled. Use at your own risk!");
 
 	error = xfs_mountfs(mp);
 	if (error)

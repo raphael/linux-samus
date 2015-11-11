@@ -346,7 +346,8 @@ static void acerhdf_check_param(struct thermal_zone_device *thermal)
  * as late as the polling interval is since we can't do that in the respective
  * accessors of the module parameters.
  */
-static int acerhdf_get_ec_temp(struct thermal_zone_device *thermal, int *t)
+static int acerhdf_get_ec_temp(struct thermal_zone_device *thermal,
+			       unsigned long *t)
 {
 	int temp, err = 0;
 
@@ -452,7 +453,7 @@ static int acerhdf_get_trip_type(struct thermal_zone_device *thermal, int trip,
 }
 
 static int acerhdf_get_trip_hyst(struct thermal_zone_device *thermal, int trip,
-				 int *temp)
+				 unsigned long *temp)
 {
 	if (trip != 0)
 		return -EINVAL;
@@ -463,7 +464,7 @@ static int acerhdf_get_trip_hyst(struct thermal_zone_device *thermal, int trip,
 }
 
 static int acerhdf_get_trip_temp(struct thermal_zone_device *thermal, int trip,
-				 int *temp)
+				 unsigned long *temp)
 {
 	if (trip == 0)
 		*temp = fanon;
@@ -476,7 +477,7 @@ static int acerhdf_get_trip_temp(struct thermal_zone_device *thermal, int trip,
 }
 
 static int acerhdf_get_crit_temp(struct thermal_zone_device *thermal,
-				 int *temperature)
+				 unsigned long *temperature)
 {
 	*temperature = ACERHDF_TEMP_CRIT;
 	return 0;

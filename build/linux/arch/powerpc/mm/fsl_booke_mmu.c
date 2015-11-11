@@ -112,7 +112,7 @@ static void settlbcam(int index, unsigned long virt, phys_addr_t phys,
 
 	tsize = __ilog2(size) - 10;
 
-#if defined(CONFIG_SMP) || defined(CONFIG_PPC_E500MC)
+#ifdef CONFIG_SMP
 	if ((flags & _PAGE_NO_CACHE) == 0)
 		flags |= _PAGE_COHERENT;
 #endif

@@ -154,38 +154,6 @@ sbc_emulate_readcapacity_16(struct se_cmd *cmd)
 	return 0;
 }
 
-static sense_reason_t
-sbc_emulate_startstop(struct se_cmd *cmd)
-{
-	unsigned char *cdb = cmd->t_task_cdb;
-
-	/*
-	 * See sbc3r36 section 5.25
-	 * Immediate bit should be set since there is nothing to complete
-	 * POWER CONDITION MODIFIER 0h
-	 */
-	if (!(cdb[1] & 1) || cdb[2] || cdb[3])
-		return TCM_INVALID_CDB_FIELD;
-
-	/*
-	 * See sbc3r36 section 5.25
-	 * POWER CONDITION 0h START_VALID - process START and LOEJ
-	 */
-	if (cdb[4] >> 4 & 0xf)
-		return TCM_INVALID_CDB_FIELD;
-
-	/*
-	 * See sbc3r36 section 5.25
-	 * LOEJ 0h - nothing to load or unload
-	 * START 1h - we are ready
-	 */
-	if (!(cdb[4] & 1) || (cdb[4] & 2) || (cdb[4] & 4))
-		return TCM_INVALID_CDB_FIELD;
-
-	target_complete_cmd(cmd, SAM_STAT_GOOD);
-	return 0;
-}
-
 sector_t sbc_get_write_same_sectors(struct se_cmd *cmd)
 {
 	u32 num_blocks;
@@ -992,9 +960,6 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 			       " than 1\n", sectors);
 			return TCM_INVALID_CDB_FIELD;
 		}
-		if (sbc_check_dpofua(dev, cmd, cdb))
-			return TCM_INVALID_CDB_FIELD;
-
 		/*
 		 * Double size because we have two buffers, note that
 		 * zero is not an error..
@@ -1103,10 +1068,6 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 		 */
 		size = 0;
 		cmd->execute_cmd = sbc_emulate_noop;
-		break;
-	case START_STOP:
-		size = 0;
-		cmd->execute_cmd = sbc_emulate_startstop;
 		break;
 	default:
 		ret = spc_parse_cdb(cmd, &size);
@@ -1230,7 +1191,7 @@ void
 sbc_dif_generate(struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
-	struct t10_pi_tuple *sdt;
+	struct se_dif_v1_tuple *sdt;
 	struct scatterlist *dsg = cmd->t_data_sg, *psg;
 	sector_t sector = cmd->t_task_lba;
 	void *daddr, *paddr;
@@ -1242,7 +1203,7 @@ sbc_dif_generate(struct se_cmd *cmd)
 		daddr = kmap_atomic(sg_page(dsg)) + dsg->offset;
 
 		for (j = 0; j < psg->length;
-				j += sizeof(*sdt)) {
+				j += sizeof(struct se_dif_v1_tuple)) {
 			__u16 crc;
 			unsigned int avail;
 
@@ -1295,7 +1256,7 @@ sbc_dif_generate(struct se_cmd *cmd)
 }
 
 static sense_reason_t
-sbc_dif_v1_verify(struct se_cmd *cmd, struct t10_pi_tuple *sdt,
+sbc_dif_v1_verify(struct se_cmd *cmd, struct se_dif_v1_tuple *sdt,
 		  __u16 crc, sector_t sector, unsigned int ei_lba)
 {
 	__be16 csum;
@@ -1385,7 +1346,7 @@ sbc_dif_verify(struct se_cmd *cmd, sector_t start, unsigned int sectors,
 	       unsigned int ei_lba, struct scatterlist *psg, int psg_off)
 {
 	struct se_device *dev = cmd->se_dev;
-	struct t10_pi_tuple *sdt;
+	struct se_dif_v1_tuple *sdt;
 	struct scatterlist *dsg = cmd->t_data_sg;
 	sector_t sector = start;
 	void *daddr, *paddr;
@@ -1400,7 +1361,7 @@ sbc_dif_verify(struct se_cmd *cmd, sector_t start, unsigned int sectors,
 
 		for (i = psg_off; i < psg->length &&
 				sector < start + sectors;
-				i += sizeof(*sdt)) {
+				i += sizeof(struct se_dif_v1_tuple)) {
 			__u16 crc;
 			unsigned int avail;
 

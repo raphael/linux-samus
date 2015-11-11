@@ -498,11 +498,11 @@ int client_fid_init(struct obd_device *obd,
 	int rc;
 
 	cli->cl_seq = kzalloc(sizeof(*cli->cl_seq), GFP_NOFS);
-	if (!cli->cl_seq)
+	if (cli->cl_seq == NULL)
 		return -ENOMEM;
 
 	prefix = kzalloc(MAX_OBD_NAME + 5, GFP_NOFS);
-	if (!prefix) {
+	if (prefix == NULL) {
 		rc = -ENOMEM;
 		goto out_free_seq;
 	}

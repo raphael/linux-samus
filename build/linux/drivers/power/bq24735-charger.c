@@ -267,9 +267,8 @@ static int bq24735_charger_probe(struct i2c_client *client,
 
 	name = (char *)charger->pdata->name;
 	if (!name) {
-		name = devm_kasprintf(&client->dev, GFP_KERNEL,
-				      "bq24735@%s",
-				      dev_name(&client->dev));
+		name = kasprintf(GFP_KERNEL, "bq24735@%s",
+				 dev_name(&client->dev));
 		if (!name) {
 			dev_err(&client->dev, "Failed to alloc device name\n");
 			return -ENOMEM;
@@ -297,21 +296,23 @@ static int bq24735_charger_probe(struct i2c_client *client,
 	if (ret < 0) {
 		dev_err(&client->dev, "Failed to read manufacturer id : %d\n",
 			ret);
-		return ret;
+		goto err_free_name;
 	} else if (ret != 0x0040) {
 		dev_err(&client->dev,
 			"manufacturer id mismatch. 0x0040 != 0x%04x\n", ret);
-		return -ENODEV;
+		ret = -ENODEV;
+		goto err_free_name;
 	}
 
 	ret = bq24735_read_word(client, BQ24735_DEVICE_ID);
 	if (ret < 0) {
 		dev_err(&client->dev, "Failed to read device id : %d\n", ret);
-		return ret;
+		goto err_free_name;
 	} else if (ret != 0x000B) {
 		dev_err(&client->dev,
 			"device id mismatch. 0x000b != 0x%04x\n", ret);
-		return -ENODEV;
+		ret = -ENODEV;
+		goto err_free_name;
 	}
 
 	if (gpio_is_valid(charger->pdata->status_gpio)) {
@@ -330,7 +331,7 @@ static int bq24735_charger_probe(struct i2c_client *client,
 	ret = bq24735_config_charger(charger);
 	if (ret < 0) {
 		dev_err(&client->dev, "failed in configuring charger");
-		return ret;
+		goto err_free_name;
 	}
 
 	/* check for AC adapter presence */
@@ -338,17 +339,17 @@ static int bq24735_charger_probe(struct i2c_client *client,
 		ret = bq24735_enable_charging(charger);
 		if (ret < 0) {
 			dev_err(&client->dev, "Failed to enable charging\n");
-			return ret;
+			goto err_free_name;
 		}
 	}
 
-	charger->charger = devm_power_supply_register(&client->dev, supply_desc,
-						      &psy_cfg);
+	charger->charger = power_supply_register(&client->dev, supply_desc,
+						 &psy_cfg);
 	if (IS_ERR(charger->charger)) {
 		ret = PTR_ERR(charger->charger);
 		dev_err(&client->dev, "Failed to register power supply: %d\n",
 			ret);
-		return ret;
+		goto err_free_name;
 	}
 
 	if (client->irq) {
@@ -363,9 +364,32 @@ static int bq24735_charger_probe(struct i2c_client *client,
 			dev_err(&client->dev,
 				"Unable to register IRQ %d err %d\n",
 				client->irq, ret);
-			return ret;
+			goto err_unregister_supply;
 		}
 	}
+
+	return 0;
+err_unregister_supply:
+	power_supply_unregister(charger->charger);
+err_free_name:
+	if (name != charger->pdata->name)
+		kfree(name);
+
+	return ret;
+}
+
+static int bq24735_charger_remove(struct i2c_client *client)
+{
+	struct bq24735 *charger = i2c_get_clientdata(client);
+
+	if (charger->client->irq)
+		devm_free_irq(&charger->client->dev, charger->client->irq,
+			      &charger->charger);
+
+	power_supply_unregister(charger->charger);
+
+	if (charger->charger_desc.name != charger->pdata->name)
+		kfree(charger->charger_desc.name);
 
 	return 0;
 }
@@ -385,9 +409,11 @@ MODULE_DEVICE_TABLE(of, bq24735_match_ids);
 static struct i2c_driver bq24735_charger_driver = {
 	.driver = {
 		.name = "bq24735-charger",
+		.owner = THIS_MODULE,
 		.of_match_table = bq24735_match_ids,
 	},
 	.probe = bq24735_charger_probe,
+	.remove = bq24735_charger_remove,
 	.id_table = bq24735_charger_id,
 };
 

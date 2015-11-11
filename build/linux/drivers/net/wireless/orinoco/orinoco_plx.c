@@ -262,15 +262,13 @@ static int orinoco_plx_init_one(struct pci_dev *pdev,
 	err = orinoco_if_add(priv, 0, 0, NULL);
 	if (err) {
 		printk(KERN_ERR PFX "orinoco_if_add() failed\n");
-		goto fail_wiphy;
+		goto fail;
 	}
 
 	pci_set_drvdata(pdev, priv);
 
 	return 0;
 
- fail_wiphy:
-	wiphy_unregister(priv_to_wiphy(priv));
  fail:
 	free_irq(pdev->irq, priv);
 
@@ -301,7 +299,6 @@ static void orinoco_plx_remove_one(struct pci_dev *pdev)
 	struct orinoco_pci_card *card = priv->card;
 
 	orinoco_if_del(priv);
-	wiphy_unregister(priv_to_wiphy(priv));
 	free_irq(pdev->irq, priv);
 	free_orinocodev(priv);
 	pci_iounmap(pdev, priv->hw.iobase);

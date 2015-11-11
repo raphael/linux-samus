@@ -130,7 +130,11 @@ static int dac02_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 	s->range_table	= &das02_ao_ranges;
 	s->insn_write	= dac02_ao_insn_write;
 
-	return comedi_alloc_subdev_readback(s);
+	ret = comedi_alloc_subdev_readback(s);
+	if (ret)
+		return ret;
+
+	return 0;
 }
 
 static struct comedi_driver dac02_driver = {

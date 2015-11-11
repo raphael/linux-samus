@@ -57,8 +57,13 @@ VECTOR	handle_interrupt	; (23) End of fixed IRQs
 
 	.section .text, "ax",@progbits
 
-reserved:
-	flag 1		; Unexpected event, halt
+res_service:		; processor restart
+	flag    0x1     ; not implemented
+	nop
+	nop
+
+reserved:		; processor restart
+	rtie            ; jump to processor initializations
 
 ;##################### Interrupt Handling ##############################
 

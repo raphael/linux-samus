@@ -72,21 +72,12 @@ extern int of_platform_populate(struct device_node *root,
 				const struct of_device_id *matches,
 				const struct of_dev_auxdata *lookup,
 				struct device *parent);
-extern int of_platform_default_populate(struct device_node *root,
-					const struct of_dev_auxdata *lookup,
-					struct device *parent);
 extern void of_platform_depopulate(struct device *parent);
 #else
 static inline int of_platform_populate(struct device_node *root,
 					const struct of_device_id *matches,
 					const struct of_dev_auxdata *lookup,
 					struct device *parent)
-{
-	return -ENODEV;
-}
-static inline int of_platform_default_populate(struct device_node *root,
-					       const struct of_dev_auxdata *lookup,
-					       struct device *parent)
 {
 	return -ENODEV;
 }

@@ -23,10 +23,7 @@
 #include <linux/ieee80211.h>
 #include "dot11d.h"
 
-static void rtllib_sta_wakeup(struct rtllib_device *ieee, short nl);
-
-
-static short rtllib_is_54g(struct rtllib_network *net)
+short rtllib_is_54g(struct rtllib_network *net)
 {
 	return (net->rates_ex_len > 0) || (net->rates_len > 4);
 }
@@ -110,7 +107,7 @@ static void rtllib_WMM_Info(struct rtllib_device *ieee, u8 **tag_p)
 	*tag_p = tag;
 }
 
-static void rtllib_TURBO_Info(struct rtllib_device *ieee, u8 **tag_p)
+void rtllib_TURBO_Info(struct rtllib_device *ieee, u8 **tag_p)
 {
 	u8 *tag = *tag_p;
 
@@ -372,7 +369,7 @@ static inline struct sk_buff *rtllib_probe_req(struct rtllib_device *ieee)
 	return skb;
 }
 
-static struct sk_buff *rtllib_get_beacon_(struct rtllib_device *ieee);
+struct sk_buff *rtllib_get_beacon_(struct rtllib_device *ieee);
 
 static void rtllib_send_beacon(struct rtllib_device *ieee)
 {
@@ -486,7 +483,7 @@ static void rtllib_send_probe(struct rtllib_device *ieee, u8 is_mesh)
 }
 
 
-static void rtllib_send_probe_requests(struct rtllib_device *ieee, u8 is_mesh)
+void rtllib_send_probe_requests(struct rtllib_device *ieee, u8 is_mesh)
 {
 	if (ieee->active_scan && (ieee->softmac_features &
 	    IEEE_SOFTMAC_PROBERQ)) {
@@ -495,7 +492,7 @@ static void rtllib_send_probe_requests(struct rtllib_device *ieee, u8 is_mesh)
 	}
 }
 
-static void rtllib_update_active_chan_map(struct rtllib_device *ieee)
+void rtllib_update_active_chan_map(struct rtllib_device *ieee)
 {
 	memcpy(ieee->active_channel_map, GET_DOT11D_INFO(ieee)->channel_map,
 	       MAX_CHANNEL_NUMBER+1);
@@ -504,7 +501,7 @@ static void rtllib_update_active_chan_map(struct rtllib_device *ieee)
 /* this performs syncro scan blocking the caller until all channels
  * in the allowed channel map has been checked.
  */
-static void rtllib_softmac_scan_syncro(struct rtllib_device *ieee, u8 is_mesh)
+void rtllib_softmac_scan_syncro(struct rtllib_device *ieee, u8 is_mesh)
 {
 	union iwreq_data wrqu;
 	short ch = 0;
@@ -1404,7 +1401,7 @@ inline struct sk_buff *rtllib_association_req(struct rtllib_network *beacon,
 	return skb;
 }
 
-static void rtllib_associate_abort(struct rtllib_device *ieee)
+void rtllib_associate_abort(struct rtllib_device *ieee)
 {
 	unsigned long flags;
 
@@ -1514,6 +1511,7 @@ static void rtllib_associate_step2(struct rtllib_device *ieee)
 	}
 }
 
+#define CANCELLED  2
 static void rtllib_associate_complete_wq(void *data)
 {
 	struct rtllib_device *ieee = (struct rtllib_device *)
@@ -1755,7 +1753,7 @@ inline void rtllib_softmac_new_net(struct rtllib_device *ieee,
 	}
 }
 
-static void rtllib_softmac_check_all_nets(struct rtllib_device *ieee)
+void rtllib_softmac_check_all_nets(struct rtllib_device *ieee)
 {
 	unsigned long flags;
 	struct rtllib_network *target;
@@ -2111,7 +2109,7 @@ out:
 
 }
 
-static void rtllib_sta_wakeup(struct rtllib_device *ieee, short nl)
+void rtllib_sta_wakeup(struct rtllib_device *ieee, short nl)
 {
 	if (ieee->sta_sleep == LPS_IS_WAKE) {
 		if (nl) {
@@ -2547,7 +2545,7 @@ inline void rtllib_randomize_cell(struct rtllib_device *ieee)
 }
 
 /* called in user context only */
-static void rtllib_start_master_bss(struct rtllib_device *ieee)
+void rtllib_start_master_bss(struct rtllib_device *ieee)
 {
 	ieee->assoc_id = 1;
 
@@ -2722,7 +2720,7 @@ inline void rtllib_start_ibss(struct rtllib_device *ieee)
 }
 
 /* this is called only in user context, with wx_sem held */
-static void rtllib_start_bss(struct rtllib_device *ieee)
+void rtllib_start_bss(struct rtllib_device *ieee)
 {
 	unsigned long flags;
 
@@ -2819,7 +2817,7 @@ exit:
 	up(&ieee->wx_sem);
 }
 
-static struct sk_buff *rtllib_get_beacon_(struct rtllib_device *ieee)
+struct sk_buff *rtllib_get_beacon_(struct rtllib_device *ieee)
 {
 	const u8 broadcast_addr[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
@@ -3086,7 +3084,7 @@ static int rtllib_wpa_enable(struct rtllib_device *ieee, int value)
 	 */
 	netdev_info(ieee->dev, "%s WPA\n", value ? "enabling" : "disabling");
 	ieee->wpa_enabled = value;
-	eth_zero_addr(ieee->ap_mac_addr);
+	memset(ieee->ap_mac_addr, 0, 6);
 	return 0;
 }
 

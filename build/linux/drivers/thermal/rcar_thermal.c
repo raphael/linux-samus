@@ -200,7 +200,8 @@ err_out_unlock:
 	return ret;
 }
 
-static int rcar_thermal_get_temp(struct thermal_zone_device *zone, int *temp)
+static int rcar_thermal_get_temp(struct thermal_zone_device *zone,
+				 unsigned long *temp)
 {
 	struct rcar_thermal_priv *priv = rcar_zone_to_priv(zone);
 
@@ -234,7 +235,7 @@ static int rcar_thermal_get_trip_type(struct thermal_zone_device *zone,
 }
 
 static int rcar_thermal_get_trip_temp(struct thermal_zone_device *zone,
-				      int trip, int *temp)
+				      int trip, unsigned long *temp)
 {
 	struct rcar_thermal_priv *priv = rcar_zone_to_priv(zone);
 	struct device *dev = rcar_priv_to_dev(priv);
@@ -298,7 +299,7 @@ static void _rcar_thermal_irq_ctrl(struct rcar_thermal_priv *priv, int enable)
 static void rcar_thermal_work(struct work_struct *work)
 {
 	struct rcar_thermal_priv *priv;
-	int cctemp, nctemp;
+	unsigned long cctemp, nctemp;
 
 	priv = container_of(work, struct rcar_thermal_priv, work.work);
 

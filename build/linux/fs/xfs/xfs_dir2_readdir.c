@@ -171,7 +171,6 @@ xfs_dir2_block_getdents(
 	int			wantoff;	/* starting block offset */
 	xfs_off_t		cook;
 	struct xfs_da_geometry	*geo = args->geo;
-	int			lock_mode;
 
 	/*
 	 * If the block number in the offset is out of range, we're done.
@@ -179,9 +178,7 @@ xfs_dir2_block_getdents(
 	if (xfs_dir2_dataptr_to_db(geo, ctx->pos) > geo->datablk)
 		return 0;
 
-	lock_mode = xfs_ilock_data_map_shared(dp);
 	error = xfs_dir3_block_read(NULL, dp, &bp);
-	xfs_iunlock(dp, lock_mode);
 	if (error)
 		return error;
 
@@ -532,12 +529,9 @@ xfs_dir2_leaf_getdents(
 		 * current buffer, need to get another one.
 		 */
 		if (!bp || ptr >= (char *)bp->b_addr + geo->blksize) {
-			int	lock_mode;
 
-			lock_mode = xfs_ilock_data_map_shared(dp);
 			error = xfs_dir2_leaf_readbuf(args, bufsize, map_info,
 						      &curoff, &bp);
-			xfs_iunlock(dp, lock_mode);
 			if (error || !map_info->map_valid)
 				break;
 
@@ -659,6 +653,7 @@ xfs_readdir(
 	struct xfs_da_args	args = { NULL };
 	int			rval;
 	int			v;
+	uint			lock_mode;
 
 	trace_xfs_readdir(dp);
 
@@ -671,7 +666,7 @@ xfs_readdir(
 	args.dp = dp;
 	args.geo = dp->i_mount->m_dir_geo;
 
-	xfs_ilock(dp, XFS_IOLOCK_SHARED);
+	lock_mode = xfs_ilock_data_map_shared(dp);
 	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL)
 		rval = xfs_dir2_sf_getdents(&args, ctx);
 	else if ((rval = xfs_dir2_isblock(&args, &v)))
@@ -680,7 +675,7 @@ xfs_readdir(
 		rval = xfs_dir2_block_getdents(&args, ctx);
 	else
 		rval = xfs_dir2_leaf_getdents(&args, ctx, bufsize);
-	xfs_iunlock(dp, XFS_IOLOCK_SHARED);
+	xfs_iunlock(dp, lock_mode);
 
 	return rval;
 }

@@ -285,6 +285,7 @@ static void drm_minor_free(struct drm_device *dev, unsigned int type)
 	if (!minor)
 		return;
 
+	drm_mode_group_destroy(&minor->mode_group);
 	put_device(minor->kdev);
 
 	spin_lock_irqsave(&drm_minor_lock, flags);
@@ -581,7 +582,11 @@ struct drm_device *drm_dev_alloc(struct drm_driver *driver,
 	if (drm_ht_create(&dev->map_hash, 12))
 		goto err_minors;
 
-	drm_legacy_ctxbitmap_init(dev);
+	ret = drm_legacy_ctxbitmap_init(dev);
+	if (ret) {
+		DRM_ERROR("Cannot allocate memory for context bitmap.\n");
+		goto err_ht;
+	}
 
 	if (drm_core_check_feature(dev, DRIVER_GEM)) {
 		ret = drm_gem_init(dev);
@@ -595,6 +600,7 @@ struct drm_device *drm_dev_alloc(struct drm_driver *driver,
 
 err_ctxbitmap:
 	drm_legacy_ctxbitmap_cleanup(dev);
+err_ht:
 	drm_ht_remove(&dev->map_hash);
 err_minors:
 	drm_minor_free(dev, DRM_MINOR_LEGACY);
@@ -699,9 +705,20 @@ int drm_dev_register(struct drm_device *dev, unsigned long flags)
 			goto err_minors;
 	}
 
+	/* setup grouping for legacy outputs */
+	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
+		ret = drm_mode_group_init_legacy_group(dev,
+				&dev->primary->mode_group);
+		if (ret)
+			goto err_unload;
+	}
+
 	ret = 0;
 	goto out_unlock;
 
+err_unload:
+	if (dev->driver->unload)
+		dev->driver->unload(dev);
 err_minors:
 	drm_minor_unregister(dev, DRM_MINOR_LEGACY);
 	drm_minor_unregister(dev, DRM_MINOR_RENDER);

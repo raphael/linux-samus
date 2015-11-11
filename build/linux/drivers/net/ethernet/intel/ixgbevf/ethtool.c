@@ -813,15 +813,22 @@ static u32 ixgbevf_get_rxfh_indir_size(struct net_device *netdev)
 {
 	struct ixgbevf_adapter *adapter = netdev_priv(netdev);
 
-	if (adapter->hw.mac.type >= ixgbe_mac_X550_vf)
-		return IXGBEVF_X550_VFRETA_SIZE;
+	/* We support this operation only for 82599 and x540 at the moment */
+	if (adapter->hw.mac.type < ixgbe_mac_X550_vf)
+		return IXGBEVF_82599_RETA_SIZE;
 
-	return IXGBEVF_82599_RETA_SIZE;
+	return 0;
 }
 
 static u32 ixgbevf_get_rxfh_key_size(struct net_device *netdev)
 {
-	return IXGBEVF_RSS_HASH_KEY_SIZE;
+	struct ixgbevf_adapter *adapter = netdev_priv(netdev);
+
+	/* We support this operation only for 82599 and x540 at the moment */
+	if (adapter->hw.mac.type < ixgbe_mac_X550_vf)
+		return IXGBEVF_RSS_HASH_KEY_SIZE;
+
+	return 0;
 }
 
 static int ixgbevf_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key,
@@ -833,33 +840,21 @@ static int ixgbevf_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key,
 	if (hfunc)
 		*hfunc = ETH_RSS_HASH_TOP;
 
-	if (adapter->hw.mac.type >= ixgbe_mac_X550_vf) {
-		if (key)
-			memcpy(key, adapter->rss_key, sizeof(adapter->rss_key));
+	/* If neither indirection table nor hash key was requested - just
+	 * return a success avoiding taking any locks.
+	 */
+	if (!indir && !key)
+		return 0;
 
-		if (indir) {
-			int i;
+	spin_lock_bh(&adapter->mbx_lock);
+	if (indir)
+		err = ixgbevf_get_reta_locked(&adapter->hw, indir,
+					      adapter->num_rx_queues);
 
-			for (i = 0; i < IXGBEVF_X550_VFRETA_SIZE; i++)
-				indir[i] = adapter->rss_indir_tbl[i];
-		}
-	} else {
-		/* If neither indirection table nor hash key was requested
-		 *  - just return a success avoiding taking any locks.
-		 */
-		if (!indir && !key)
-			return 0;
+	if (!err && key)
+		err = ixgbevf_get_rss_key_locked(&adapter->hw, key);
 
-		spin_lock_bh(&adapter->mbx_lock);
-		if (indir)
-			err = ixgbevf_get_reta_locked(&adapter->hw, indir,
-						      adapter->num_rx_queues);
-
-		if (!err && key)
-			err = ixgbevf_get_rss_key_locked(&adapter->hw, key);
-
-		spin_unlock_bh(&adapter->mbx_lock);
-	}
+	spin_unlock_bh(&adapter->mbx_lock);
 
 	return err;
 }

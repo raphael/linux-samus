@@ -18,8 +18,8 @@
 #include <linux/io.h>
 #include <linux/delay.h>
 #include <linux/err.h>
-#include <linux/clk.h>
 #include <linux/clk-provider.h>
+#include <linux/clk.h>
 
 #include "clk.h"
 
@@ -264,7 +264,7 @@ static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll)
 	}
 
 	pr_err("%s: Timed out waiting for pll %s lock\n", __func__,
-	       clk_hw_get_name(&pll->hw));
+	       __clk_get_name(pll->hw.clk));
 
 	return -1;
 }
@@ -595,7 +595,7 @@ static int clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 	if (pll->params->flags & TEGRA_PLL_FIXED) {
 		if (rate != pll->params->fixed_rate) {
 			pr_err("%s: Can not change %s fixed rate %lu to %lu\n",
-				__func__, clk_hw_get_name(hw),
+				__func__, __clk_get_name(hw->clk),
 				pll->params->fixed_rate, rate);
 			return -EINVAL;
 		}
@@ -605,7 +605,7 @@ static int clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 	if (_get_table_rate(hw, &cfg, rate, parent_rate) &&
 	    _calc_rate(hw, &cfg, rate, parent_rate)) {
 		pr_err("%s: Failed to set %s rate %lu\n", __func__,
-		       clk_hw_get_name(hw), rate);
+		       __clk_get_name(hw->clk), rate);
 		WARN_ON(1);
 		return -EINVAL;
 	}
@@ -634,7 +634,7 @@ static long clk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
 
 	/* PLLM is used for memory; we do not change rate */
 	if (pll->params->flags & TEGRA_PLLM)
-		return clk_hw_get_rate(hw);
+		return __clk_get_rate(hw->clk);
 
 	if (_get_table_rate(hw, &cfg, rate, *prate) &&
 	    _calc_rate(hw, &cfg, rate, *prate))
@@ -663,7 +663,7 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
 		if (_get_table_rate(hw, &sel, pll->params->fixed_rate,
 					parent_rate)) {
 			pr_err("Clock %s has unknown fixed frequency\n",
-			       clk_hw_get_name(hw));
+			       __clk_get_name(hw->clk));
 			BUG();
 		}
 		return pll->params->fixed_rate;
@@ -1577,7 +1577,7 @@ struct clk *tegra_clk_register_pllxc(const char *name, const char *parent_name,
 	if (!pll_params->pdiv_tohw)
 		return ERR_PTR(-EINVAL);
 
-	parent_rate = clk_get_rate(parent);
+	parent_rate = __clk_get_rate(parent);
 
 	pll_params->vco_min = _clip_vco_min(pll_params->vco_min, parent_rate);
 
@@ -1674,7 +1674,7 @@ struct clk *tegra_clk_register_pllm(const char *name, const char *parent_name,
 		return ERR_PTR(-EINVAL);
 	}
 
-	parent_rate = clk_get_rate(parent);
+	parent_rate = __clk_get_rate(parent);
 
 	pll_params->vco_min = _clip_vco_min(pll_params->vco_min, parent_rate);
 
@@ -1715,7 +1715,7 @@ struct clk *tegra_clk_register_pllc(const char *name, const char *parent_name,
 		return ERR_PTR(-EINVAL);
 	}
 
-	parent_rate = clk_get_rate(parent);
+	parent_rate = __clk_get_rate(parent);
 
 	pll_params->vco_min = _clip_vco_min(pll_params->vco_min, parent_rate);
 
@@ -1848,7 +1848,7 @@ struct clk *tegra_clk_register_pllss(const char *name, const char *parent_name,
 	val &= ~PLLSS_REF_SRC_SEL_MASK;
 	pll_writel_base(val, pll);
 
-	parent_rate = clk_get_rate(parent);
+	parent_rate = __clk_get_rate(parent);
 
 	pll_params->vco_min = _clip_vco_min(pll_params->vco_min, parent_rate);
 

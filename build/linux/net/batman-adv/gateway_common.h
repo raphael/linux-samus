@@ -22,6 +22,7 @@
 
 #include <linux/types.h>
 
+struct batadv_priv;
 struct net_device;
 
 enum batadv_gw_modes {

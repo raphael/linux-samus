@@ -542,9 +542,6 @@ static inline int cvmx_pko_get_base_queue_per_core(int port, int core)
  */
 static inline int cvmx_pko_get_base_queue(int port)
 {
-	if (OCTEON_IS_MODEL(OCTEON_CN68XX))
-		return port;
-
 	return cvmx_pko_get_base_queue_per_core(port, 0);
 }
 

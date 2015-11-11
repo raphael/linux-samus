@@ -272,7 +272,6 @@ nfsd4_list_rec_dir(recdir_func *f, struct nfsd_net *nn)
 		.ctx.actor = nfsd4_build_namelist,
 		.names = LIST_HEAD_INIT(ctx.names)
 	};
-	struct name_list *entry, *tmp;
 	int status;
 
 	status = nfs4_save_creds(&original_cred);
@@ -287,8 +286,9 @@ nfsd4_list_rec_dir(recdir_func *f, struct nfsd_net *nn)
 
 	status = iterate_dir(nn->rec_file, &ctx.ctx);
 	mutex_lock_nested(&d_inode(dir)->i_mutex, I_MUTEX_PARENT);
-
-	list_for_each_entry_safe(entry, tmp, &ctx.names, list) {
+	while (!list_empty(&ctx.names)) {
+		struct name_list *entry;
+		entry = list_entry(ctx.names.next, struct name_list, list);
 		if (!status) {
 			struct dentry *dentry;
 			dentry = lookup_one_len(entry->name, dir, HEXDIR_LEN-1);
@@ -304,12 +304,6 @@ nfsd4_list_rec_dir(recdir_func *f, struct nfsd_net *nn)
 	}
 	mutex_unlock(&d_inode(dir)->i_mutex);
 	nfs4_reset_creds(original_cred);
-
-	list_for_each_entry_safe(entry, tmp, &ctx.names, list) {
-		dprintk("NFSD: %s. Left entry %s\n", __func__, entry->name);
-		list_del(&entry->list);
-		kfree(entry);
-	}
 	return status;
 }
 
@@ -547,7 +541,8 @@ nfsd4_legacy_tracking_init(struct net *net)
 
 	/* XXX: The legacy code won't work in a container */
 	if (net != &init_net) {
-		pr_warn("NFSD: attempt to initialize legacy client tracking in a container ignored.\n");
+		WARN(1, KERN_ERR "NFSD: attempt to initialize legacy client "
+			"tracking in a container!\n");
 		return -EINVAL;
 	}
 
@@ -1259,7 +1254,8 @@ nfsd4_umh_cltrack_init(struct net *net)
 
 	/* XXX: The usermode helper s not working in container yet. */
 	if (net != &init_net) {
-		pr_warn("NFSD: attempt to initialize umh client tracking in a container ignored.\n");
+		WARN(1, KERN_ERR "NFSD: attempt to initialize umh client "
+			"tracking in a container!\n");
 		return -EINVAL;
 	}
 

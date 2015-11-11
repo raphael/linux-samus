@@ -107,10 +107,6 @@ static void lov_putref(struct obd_device *obd)
 			/* Disconnect */
 			__lov_del_obd(obd, tgt);
 		}
-
-		if (lov->lov_tgts_kobj)
-			kobject_put(lov->lov_tgts_kobj);
-
 	} else {
 		mutex_unlock(&lov->lov_lock);
 	}
@@ -325,6 +321,9 @@ static int lov_disconnect(struct obd_export *exp)
 			lov_del_target(obd, i, NULL, lov->lov_tgts[i]->ltd_gen);
 		}
 	}
+
+	if (lov->lov_tgts_kobj)
+		kobject_put(lov->lov_tgts_kobj);
 
 	obd_putref(obd);
 
@@ -977,7 +976,7 @@ static int lov_recreate(struct obd_export *exp, struct obdo *src_oa,
 		src_oa->o_flags & OBD_FL_RECREATE_OBJS);
 
 	obj_mdp = kzalloc(sizeof(*obj_mdp), GFP_NOFS);
-	if (!obj_mdp)
+	if (obj_mdp == NULL)
 		return -ENOMEM;
 
 	ost_idx = src_oa->o_nlink;
@@ -1440,7 +1439,7 @@ static int lov_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
 		__u32 *genp;
 
 		len = 0;
-		if (obd_ioctl_getdata(&buf, &len, uarg))
+		if (obd_ioctl_getdata(&buf, &len, (void *)uarg))
 			return -EINVAL;
 
 		data = (struct obd_ioctl_data *)buf;
@@ -1473,7 +1472,7 @@ static int lov_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
 			*genp = lov->lov_tgts[i]->ltd_gen;
 		}
 
-		if (copy_to_user(uarg, buf, len))
+		if (copy_to_user((void *)uarg, buf, len))
 			rc = -EFAULT;
 		obd_ioctl_freedata(buf, len);
 		break;

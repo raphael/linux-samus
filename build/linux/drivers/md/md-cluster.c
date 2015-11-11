@@ -45,7 +45,6 @@ struct resync_info {
 /* md_cluster_info flags */
 #define		MD_CLUSTER_WAITING_FOR_NEWDISK		1
 #define		MD_CLUSTER_SUSPEND_READ_BALANCING	2
-#define		MD_CLUSTER_BEGIN_JOIN_CLUSTER		3
 
 
 struct md_cluster_info {
@@ -53,6 +52,7 @@ struct md_cluster_info {
 	dlm_lockspace_t *lockspace;
 	int slot_number;
 	struct completion completion;
+	struct dlm_lock_resource *sb_lock;
 	struct mutex sb_mutex;
 	struct dlm_lock_resource *bitmap_lockres;
 	struct list_head suspend_list;
@@ -75,7 +75,6 @@ enum msg_type {
 	NEWDISK,
 	REMOVE,
 	RE_ADD,
-	BITMAP_NEEDS_SYNC,
 };
 
 struct cluster_msg {
@@ -100,6 +99,7 @@ static int dlm_lock_sync(struct dlm_lock_resource *res, int mode)
 {
 	int ret = 0;
 
+	init_completion(&res->completion);
 	ret = dlm_lock(res->ls, mode, &res->lksb,
 			res->flags, res->name, strlen(res->name),
 			0, sync_ast, res, res->bast);
@@ -124,7 +124,6 @@ static struct dlm_lock_resource *lockres_init(struct mddev *mddev,
 	res = kzalloc(sizeof(struct dlm_lock_resource), GFP_KERNEL);
 	if (!res)
 		return NULL;
-	init_completion(&res->completion);
 	res->ls = cinfo->lockspace;
 	res->mddev = mddev;
 	namelen = strlen(name);
@@ -166,29 +165,28 @@ out_err:
 
 static void lockres_free(struct dlm_lock_resource *res)
 {
-	int ret;
-
 	if (!res)
 		return;
 
-	/* cancel a lock request or a conversion request that is blocked */
-	res->flags |= DLM_LKF_CANCEL;
-retry:
-	ret = dlm_unlock(res->ls, res->lksb.sb_lkid, 0, &res->lksb, res);
-	if (unlikely(ret != 0)) {
-		pr_info("%s: failed to unlock %s return %d\n", __func__, res->name, ret);
-
-		/* if a lock conversion is cancelled, then the lock is put
-		 * back to grant queue, need to ensure it is unlocked */
-		if (ret == -DLM_ECANCEL)
-			goto retry;
-	}
-	res->flags &= ~DLM_LKF_CANCEL;
+	init_completion(&res->completion);
+	dlm_unlock(res->ls, res->lksb.sb_lkid, 0, &res->lksb, res);
 	wait_for_completion(&res->completion);
 
 	kfree(res->name);
 	kfree(res->lksb.sb_lvbptr);
 	kfree(res);
+}
+
+static char *pretty_uuid(char *dest, char *src)
+{
+	int i, len = 0;
+
+	for (i = 0; i < 16; i++) {
+		if (i == 4 || i == 6 || i == 8 || i == 10)
+			len += sprintf(dest + len, "-");
+		len += sprintf(dest + len, "%02x", (__u8)src[i]);
+	}
+	return dest;
 }
 
 static void add_resync_info(struct mddev *mddev, struct dlm_lock_resource *lockres,
@@ -283,11 +281,16 @@ static void recover_prep(void *arg)
 	set_bit(MD_CLUSTER_SUSPEND_READ_BALANCING, &cinfo->state);
 }
 
-static void __recover_slot(struct mddev *mddev, int slot)
+static void recover_slot(void *arg, struct dlm_slot *slot)
 {
+	struct mddev *mddev = arg;
 	struct md_cluster_info *cinfo = mddev->cluster_info;
 
-	set_bit(slot, &cinfo->recovery_map);
+	pr_info("md-cluster: %s Node %d/%d down. My slot: %d. Initiating recovery.\n",
+			mddev->bitmap_info.cluster_name,
+			slot->nodeid, slot->slot,
+			cinfo->slot_number);
+	set_bit(slot->slot - 1, &cinfo->recovery_map);
 	if (!cinfo->recovery_thread) {
 		cinfo->recovery_thread = md_register_thread(recover_bitmaps,
 				mddev, "recover");
@@ -299,20 +302,6 @@ static void __recover_slot(struct mddev *mddev, int slot)
 	md_wakeup_thread(cinfo->recovery_thread);
 }
 
-static void recover_slot(void *arg, struct dlm_slot *slot)
-{
-	struct mddev *mddev = arg;
-	struct md_cluster_info *cinfo = mddev->cluster_info;
-
-	pr_info("md-cluster: %s Node %d/%d down. My slot: %d. Initiating recovery.\n",
-			mddev->bitmap_info.cluster_name,
-			slot->nodeid, slot->slot,
-			cinfo->slot_number);
-	/* deduct one since dlm slot starts from one while the num of
-	 * cluster-md begins with 0 */
-	__recover_slot(mddev, slot->slot - 1);
-}
-
 static void recover_done(void *arg, struct dlm_slot *slots,
 		int num_slots, int our_slot,
 		uint32_t generation)
@@ -321,17 +310,10 @@ static void recover_done(void *arg, struct dlm_slot *slots,
 	struct md_cluster_info *cinfo = mddev->cluster_info;
 
 	cinfo->slot_number = our_slot;
-	/* completion is only need to be complete when node join cluster,
-	 * it doesn't need to run during another node's failure */
-	if (test_bit(MD_CLUSTER_BEGIN_JOIN_CLUSTER, &cinfo->state)) {
-		complete(&cinfo->completion);
-		clear_bit(MD_CLUSTER_BEGIN_JOIN_CLUSTER, &cinfo->state);
-	}
+	complete(&cinfo->completion);
 	clear_bit(MD_CLUSTER_SUSPEND_READ_BALANCING, &cinfo->state);
 }
 
-/* the ops is called when node join the cluster, and do lock recovery
- * if node failure occurs */
 static const struct dlm_lockspace_ops md_ls_ops = {
 	.recover_prep = recover_prep,
 	.recover_slot = recover_slot,
@@ -406,7 +388,7 @@ static void process_add_new_disk(struct mddev *mddev, struct cluster_msg *cmsg)
 	int len;
 
 	len = snprintf(disk_uuid, 64, "DEVICE_UUID=");
-	sprintf(disk_uuid + len, "%pU", cmsg->uuid);
+	pretty_uuid(disk_uuid + len, cmsg->uuid);
 	snprintf(raid_slot, 16, "RAID_DISK=%d", cmsg->raid_slot);
 	pr_info("%s:%d Sending kobject change with %s and %s\n", __func__, __LINE__, disk_uuid, raid_slot);
 	init_completion(&cinfo->newdisk_completion);
@@ -475,11 +457,6 @@ static void process_recvd_msg(struct mddev *mddev, struct cluster_msg *msg)
 			__func__, __LINE__, msg->slot);
 		process_readd_disk(mddev, msg);
 		break;
-	case BITMAP_NEEDS_SYNC:
-		pr_info("%s: %d Received BITMAP_NEEDS_SYNC from %d\n",
-			__func__, __LINE__, msg->slot);
-		__recover_slot(mddev, msg->slot);
-		break;
 	default:
 		pr_warn("%s:%d Received unknown message from %d\n",
 			__func__, __LINE__, msg->slot);
@@ -495,7 +472,6 @@ static void recv_daemon(struct md_thread *thread)
 	struct dlm_lock_resource *ack_lockres = cinfo->ack_lockres;
 	struct dlm_lock_resource *message_lockres = cinfo->message_lockres;
 	struct cluster_msg msg;
-	int ret;
 
 	/*get CR on Message*/
 	if (dlm_lock_sync(message_lockres, DLM_LOCK_CR)) {
@@ -508,21 +484,13 @@ static void recv_daemon(struct md_thread *thread)
 	process_recvd_msg(thread->mddev, &msg);
 
 	/*release CR on ack_lockres*/
-	ret = dlm_unlock_sync(ack_lockres);
-	if (unlikely(ret != 0))
-		pr_info("unlock ack failed return %d\n", ret);
-	/*up-convert to PR on message_lockres*/
-	ret = dlm_lock_sync(message_lockres, DLM_LOCK_PR);
-	if (unlikely(ret != 0))
-		pr_info("lock PR on msg failed return %d\n", ret);
+	dlm_unlock_sync(ack_lockres);
+	/*up-convert to EX on message_lockres*/
+	dlm_lock_sync(message_lockres, DLM_LOCK_EX);
 	/*get CR on ack_lockres again*/
-	ret = dlm_lock_sync(ack_lockres, DLM_LOCK_CR);
-	if (unlikely(ret != 0))
-		pr_info("lock CR on ack failed return %d\n", ret);
+	dlm_lock_sync(ack_lockres, DLM_LOCK_CR);
 	/*release CR on message_lockres*/
-	ret = dlm_unlock_sync(message_lockres);
-	if (unlikely(ret != 0))
-		pr_info("unlock msg failed return %d\n", ret);
+	dlm_unlock_sync(message_lockres);
 }
 
 /* lock_comm()
@@ -551,7 +519,7 @@ static void unlock_comm(struct md_cluster_info *cinfo)
  * The function:
  * 1. Grabs the message lockresource in EX mode
  * 2. Copies the message to the message LVB
- * 3. Downconverts message lockresource to CW
+ * 3. Downconverts message lockresource to CR
  * 4. Upconverts ack lock resource from CR to EX. This forces the BAST on other nodes
  *    and the other nodes read the message. The thread will wait here until all other
  *    nodes have released ack lock resource.
@@ -572,12 +540,12 @@ static int __sendmsg(struct md_cluster_info *cinfo, struct cluster_msg *cmsg)
 
 	memcpy(cinfo->message_lockres->lksb.sb_lvbptr, (void *)cmsg,
 			sizeof(struct cluster_msg));
-	/*down-convert EX to CW on Message*/
-	error = dlm_lock_sync(cinfo->message_lockres, DLM_LOCK_CW);
+	/*down-convert EX to CR on Message*/
+	error = dlm_lock_sync(cinfo->message_lockres, DLM_LOCK_CR);
 	if (error) {
-		pr_err("md-cluster: failed to convert EX to CW on MESSAGE(%d)\n",
+		pr_err("md-cluster: failed to convert EX to CR on MESSAGE(%d)\n",
 				error);
-		goto failed_ack;
+		goto failed_message;
 	}
 
 	/*up-convert CR to EX on Ack*/
@@ -597,13 +565,7 @@ static int __sendmsg(struct md_cluster_info *cinfo, struct cluster_msg *cmsg)
 	}
 
 failed_ack:
-	error = dlm_unlock_sync(cinfo->message_lockres);
-	if (unlikely(error != 0)) {
-		pr_err("md-cluster: failed convert to NL on MESSAGE(%d)\n",
-			error);
-		/* in case the message can't be released due to some reason */
-		goto failed_ack;
-	}
+	dlm_unlock_sync(cinfo->message_lockres);
 failed_message:
 	return error;
 }
@@ -625,7 +587,6 @@ static int gather_all_resync_info(struct mddev *mddev, int total_slots)
 	struct dlm_lock_resource *bm_lockres;
 	struct suspend_info *s;
 	char str[64];
-	sector_t lo, hi;
 
 
 	for (i = 0; i < total_slots; i++) {
@@ -656,24 +617,9 @@ static int gather_all_resync_info(struct mddev *mddev, int total_slots)
 			lockres_free(bm_lockres);
 			continue;
 		}
-		if (ret) {
-			lockres_free(bm_lockres);
+		if (ret)
 			goto out;
-		}
-
-		/* Read the disk bitmap sb and check if it needs recovery */
-		ret = bitmap_copy_from_slot(mddev, i, &lo, &hi, false);
-		if (ret) {
-			pr_warn("md-cluster: Could not gather bitmaps from slot %d", i);
-			lockres_free(bm_lockres);
-			continue;
-		}
-		if ((hi > 0) && (lo < mddev->recovery_cp)) {
-			set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
-			mddev->recovery_cp = lo;
-			md_check_recovery(mddev);
-		}
-
+		/* TODO: Read the disk bitmap sb and check if it needs recovery */
 		dlm_unlock_sync(bm_lockres);
 		lockres_free(bm_lockres);
 	}
@@ -687,20 +633,20 @@ static int join(struct mddev *mddev, int nodes)
 	int ret, ops_rv;
 	char str[64];
 
+	if (!try_module_get(THIS_MODULE))
+		return -ENOENT;
+
 	cinfo = kzalloc(sizeof(struct md_cluster_info), GFP_KERNEL);
 	if (!cinfo)
 		return -ENOMEM;
 
-	INIT_LIST_HEAD(&cinfo->suspend_list);
-	spin_lock_init(&cinfo->suspend_lock);
 	init_completion(&cinfo->completion);
-	set_bit(MD_CLUSTER_BEGIN_JOIN_CLUSTER, &cinfo->state);
 
 	mutex_init(&cinfo->sb_mutex);
 	mddev->cluster_info = cinfo;
 
 	memset(str, 0, 64);
-	sprintf(str, "%pU", mddev->uuid);
+	pretty_uuid(str, mddev->uuid);
 	ret = dlm_new_lockspace(str, mddev->bitmap_info.cluster_name,
 				DLM_LSFL_FS, LVB_SIZE,
 				&md_ls_ops, mddev, &ops_rv, &cinfo->lockspace);
@@ -711,6 +657,12 @@ static int join(struct mddev *mddev, int nodes)
 		pr_err("md-cluster: Slot allotted(%d) is greater than available slots(%d).",
 			cinfo->slot_number, nodes);
 		ret = -ERANGE;
+		goto err;
+	}
+	cinfo->sb_lock = lockres_init(mddev, "cmd-super",
+					NULL, 0);
+	if (!cinfo->sb_lock) {
+		ret = -ENOMEM;
 		goto err;
 	}
 	/* Initiate the communication resources */
@@ -753,6 +705,9 @@ static int join(struct mddev *mddev, int nodes)
 		goto err;
 	}
 
+	INIT_LIST_HEAD(&cinfo->suspend_list);
+	spin_lock_init(&cinfo->suspend_lock);
+
 	ret = gather_all_resync_info(mddev, nodes);
 	if (ret)
 		goto err;
@@ -764,10 +719,12 @@ err:
 	lockres_free(cinfo->ack_lockres);
 	lockres_free(cinfo->no_new_dev_lockres);
 	lockres_free(cinfo->bitmap_lockres);
+	lockres_free(cinfo->sb_lock);
 	if (cinfo->lockspace)
 		dlm_release_lockspace(cinfo->lockspace, 2);
 	mddev->cluster_info = NULL;
 	kfree(cinfo);
+	module_put(THIS_MODULE);
 	return ret;
 }
 
@@ -783,6 +740,7 @@ static int leave(struct mddev *mddev)
 	lockres_free(cinfo->token_lockres);
 	lockres_free(cinfo->ack_lockres);
 	lockres_free(cinfo->no_new_dev_lockres);
+	lockres_free(cinfo->sb_lock);
 	lockres_free(cinfo->bitmap_lockres);
 	dlm_release_lockspace(cinfo->lockspace, 2);
 	return 0;
@@ -859,17 +817,8 @@ static int resync_start(struct mddev *mddev, sector_t lo, sector_t hi)
 
 static void resync_finish(struct mddev *mddev)
 {
-	struct md_cluster_info *cinfo = mddev->cluster_info;
-	struct cluster_msg cmsg;
-	int slot = cinfo->slot_number - 1;
-
 	pr_info("%s:%d\n", __func__, __LINE__);
 	resync_send(mddev, RESYNCING, 0, 0);
-	if (test_bit(MD_RECOVERY_INTR, &mddev->recovery)) {
-		cmsg.type = cpu_to_le32(BITMAP_NEEDS_SYNC);
-		cmsg.slot = cpu_to_le32(slot);
-		sendmsg(cinfo, &cmsg);
-	}
 }
 
 static int area_resyncing(struct mddev *mddev, int direction,

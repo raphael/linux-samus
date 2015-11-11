@@ -22,6 +22,7 @@
 
 #include <linux/kconfig.h>
 
+struct batadv_hard_iface;
 struct net_device;
 
 #define BATADV_DEBUGFS_SUBDIR "batman_adv"

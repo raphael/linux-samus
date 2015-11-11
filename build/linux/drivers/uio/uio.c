@@ -896,7 +896,6 @@ static int __init uio_init(void)
 static void __exit uio_exit(void)
 {
 	release_uio_class();
-	idr_destroy(&uio_idr);
 }
 
 module_init(uio_init)

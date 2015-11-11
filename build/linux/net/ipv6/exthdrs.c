@@ -632,7 +632,7 @@ int ipv6_parse_hopopts(struct sk_buff *skb)
 		return -1;
 	}
 
-	opt->flags |= IP6SKB_HOPBYHOP;
+	opt->hop = sizeof(struct ipv6hdr);
 	if (ip6_parse_tlv(tlvprochopopt_lst, skb)) {
 		skb->transport_header += (skb_transport_header(skb)[1] + 1) << 3;
 		opt = IP6CB(skb);

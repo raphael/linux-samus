@@ -207,7 +207,7 @@ void do_page_fault(struct pt_regs *regs, unsigned long code,
 	int fault;
 	unsigned int flags;
 
-	if (faulthandler_disabled())
+	if (pagefault_disabled())
 		goto no_context;
 
 	tsk = current;

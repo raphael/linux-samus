@@ -512,11 +512,12 @@ assume_stream_formats(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 	if (err < 0)
 		goto end;
 
-	formats[eid] = kmemdup(buf, *len, GFP_KERNEL);
+	formats[eid] = kmalloc(*len, GFP_KERNEL);
 	if (formats[eid] == NULL) {
 		err = -ENOMEM;
 		goto end;
 	}
+	memcpy(formats[eid], buf, *len);
 
 	/* apply the format for each available sampling rate */
 	for (i = 0; i < ARRAY_SIZE(oxfw_rate_table); i++) {
@@ -530,11 +531,12 @@ assume_stream_formats(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 			continue;
 
 		eid++;
-		formats[eid] = kmemdup(buf, *len, GFP_KERNEL);
+		formats[eid] = kmalloc(*len, GFP_KERNEL);
 		if (formats[eid] == NULL) {
 			err = -ENOMEM;
 			goto end;
 		}
+		memcpy(formats[eid], buf, *len);
 		formats[eid][2] = avc_stream_rate_table[i];
 	}
 
@@ -592,11 +594,12 @@ static int fill_stream_formats(struct snd_oxfw *oxfw,
 		if (err < 0)
 			break;
 
-		formats[eid] = kmemdup(buf, len, GFP_KERNEL);
+		formats[eid] = kmalloc(len, GFP_KERNEL);
 		if (formats[eid] == NULL) {
 			err = -ENOMEM;
 			break;
 		}
+		memcpy(formats[eid], buf, len);
 
 		/* get next entry */
 		len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;

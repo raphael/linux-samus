@@ -54,7 +54,7 @@ static int fifo_init(struct Qdisc *sch, struct nlattr *opt)
 	bool is_bfifo = sch->ops == &bfifo_qdisc_ops;
 
 	if (opt == NULL) {
-		u32 limit = qdisc_dev(sch)->tx_queue_len;
+		u32 limit = qdisc_dev(sch)->tx_queue_len ? : 1;
 
 		if (is_bfifo)
 			limit *= psched_mtu(qdisc_dev(sch));

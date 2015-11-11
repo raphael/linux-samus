@@ -169,7 +169,6 @@ my $vpmsumd	= sub { vcrypto_op(@_, 1224); };
 my $vpmsubh	= sub { vcrypto_op(@_, 1096); };
 my $vpmsumw	= sub { vcrypto_op(@_, 1160); };
 my $vaddudm	= sub { vcrypto_op(@_, 192);  };
-my $vadduqm	= sub { vcrypto_op(@_, 256);  };
 
 my $mtsle	= sub {
     my ($f, $arg) = @_;

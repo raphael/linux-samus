@@ -1551,7 +1551,7 @@ static void __init filter_events(struct attribute **attrs)
 }
 
 /* Merge two pointer arrays */
-__init struct attribute **merge_attr(struct attribute **a, struct attribute **b)
+static __init struct attribute **merge_attr(struct attribute **a, struct attribute **b)
 {
 	struct attribute **new;
 	int j, i;
@@ -2179,7 +2179,6 @@ static unsigned long get_segment_base(unsigned int segment)
 	int idx = segment >> 3;
 
 	if ((segment & SEGMENT_TI_MASK) == SEGMENT_LDT) {
-#ifdef CONFIG_MODIFY_LDT_SYSCALL
 		struct ldt_struct *ldt;
 
 		if (idx > LDT_ENTRIES)
@@ -2191,9 +2190,6 @@ static unsigned long get_segment_base(unsigned int segment)
 			return 0;
 
 		desc = &ldt->entries[idx];
-#else
-		return 0;
-#endif
 	} else {
 		if (idx > GDT_ENTRIES)
 			return 0;
@@ -2204,7 +2200,7 @@ static unsigned long get_segment_base(unsigned int segment)
 	return get_desc_base(desc);
 }
 
-#ifdef CONFIG_IA32_EMULATION
+#ifdef CONFIG_COMPAT
 
 #include <asm/compat.h>
 

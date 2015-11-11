@@ -165,9 +165,11 @@ DEFINE_BASIC_FETCH_FUNCS(memory)
 static void FETCH_FUNC_NAME(memory, string)(struct pt_regs *regs,
 					    void *addr, void *dest)
 {
+	long ret;
 	int maxlen = get_rloc_len(*(u32 *)dest);
 	u8 *dst = get_rloc_data(dest);
-	long ret;
+	u8 *src = addr;
+	mm_segment_t old_fs = get_fs();
 
 	if (!maxlen)
 		return;
@@ -176,13 +178,23 @@ static void FETCH_FUNC_NAME(memory, string)(struct pt_regs *regs,
 	 * Try to get string again, since the string can be changed while
 	 * probing.
 	 */
-	ret = strncpy_from_unsafe(dst, addr, maxlen);
+	set_fs(KERNEL_DS);
+	pagefault_disable();
+
+	do
+		ret = __copy_from_user_inatomic(dst++, src++, 1);
+	while (dst[-1] && ret == 0 && src - (u8 *)addr < maxlen);
+
+	dst[-1] = '\0';
+	pagefault_enable();
+	set_fs(old_fs);
 
 	if (ret < 0) {	/* Failed to fetch string */
-		dst[0] = '\0';
+		((u8 *)get_rloc_data(dest))[0] = '\0';
 		*(u32 *)dest = make_data_rloc(0, get_rloc_offs(*(u32 *)dest));
 	} else {
-		*(u32 *)dest = make_data_rloc(ret, get_rloc_offs(*(u32 *)dest));
+		*(u32 *)dest = make_data_rloc(src - (u8 *)addr,
+					      get_rloc_offs(*(u32 *)dest));
 	}
 }
 NOKPROBE_SYMBOL(FETCH_FUNC_NAME(memory, string));

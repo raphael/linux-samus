@@ -7,7 +7,6 @@
 
 #include "dm-exception-store.h"
 
-#include <linux/ctype.h>
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/vmalloc.h>
@@ -534,7 +533,7 @@ static int read_exceptions(struct pstore *ps,
 		chunk = area_location(ps, ps->current_area);
 
 		area = dm_bufio_read(client, chunk, &bp);
-		if (IS_ERR(area)) {
+		if (unlikely(IS_ERR(area))) {
 			r = PTR_ERR(area);
 			goto ret_destroy_bufio;
 		}
@@ -844,10 +843,10 @@ static void persistent_drop_snapshot(struct dm_exception_store *store)
 		DMWARN("write header failed");
 }
 
-static int persistent_ctr(struct dm_exception_store *store, char *options)
+static int persistent_ctr(struct dm_exception_store *store,
+			  unsigned argc, char **argv)
 {
 	struct pstore *ps;
-	int r;
 
 	/* allocate the pstore */
 	ps = kzalloc(sizeof(*ps), GFP_KERNEL);
@@ -869,32 +868,14 @@ static int persistent_ctr(struct dm_exception_store *store, char *options)
 
 	ps->metadata_wq = alloc_workqueue("ksnaphd", WQ_MEM_RECLAIM, 0);
 	if (!ps->metadata_wq) {
+		kfree(ps);
 		DMERR("couldn't start header metadata update thread");
-		r = -ENOMEM;
-		goto err_workqueue;
-	}
-
-	if (options) {
-		char overflow = toupper(options[0]);
-		if (overflow == 'O')
-			store->userspace_supports_overflow = true;
-		else {
-			DMERR("Unsupported persistent store option: %s", options);
-			r = -EINVAL;
-			goto err_options;
-		}
+		return -ENOMEM;
 	}
 
 	store->context = ps;
 
 	return 0;
-
-err_options:
-	destroy_workqueue(ps->metadata_wq);
-err_workqueue:
-	kfree(ps);
-
-	return r;
 }
 
 static unsigned persistent_status(struct dm_exception_store *store,
@@ -907,8 +888,7 @@ static unsigned persistent_status(struct dm_exception_store *store,
 	case STATUSTYPE_INFO:
 		break;
 	case STATUSTYPE_TABLE:
-		DMEMIT(" %s %llu", store->userspace_supports_overflow ? "PO" : "P",
-		       (unsigned long long)store->chunk_size);
+		DMEMIT(" P %llu", (unsigned long long)store->chunk_size);
 	}
 
 	return sz;

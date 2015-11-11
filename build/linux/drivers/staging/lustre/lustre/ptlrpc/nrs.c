@@ -1156,7 +1156,7 @@ int ptlrpc_nrs_policy_register(struct ptlrpc_nrs_pol_conf *conf)
 	}
 
 	desc = kzalloc(sizeof(*desc), GFP_NOFS);
-	if (!desc) {
+	if (desc == NULL) {
 		rc = -ENOMEM;
 		goto fail;
 	}

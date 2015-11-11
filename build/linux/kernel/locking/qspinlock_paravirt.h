@@ -22,14 +22,9 @@
 
 #define _Q_SLOW_VAL	(3U << _Q_LOCKED_OFFSET)
 
-/*
- * Queue node uses: vcpu_running & vcpu_halted.
- * Queue head uses: vcpu_running & vcpu_hashed.
- */
 enum vcpu_state {
 	vcpu_running = 0,
-	vcpu_halted,		/* Used only in pv_wait_node */
-	vcpu_hashed,		/* = pv_hash'ed + vcpu_halted */
+	vcpu_halted,
 };
 
 struct pv_node {
@@ -158,8 +153,7 @@ static void pv_init_node(struct mcs_spinlock *node)
 
 /*
  * Wait for node->locked to become true, halt the vcpu after a short spin.
- * pv_kick_node() is used to set _Q_SLOW_VAL and fill in hash table on its
- * behalf.
+ * pv_kick_node() is used to wake the vcpu again.
  */
 static void pv_wait_node(struct mcs_spinlock *node)
 {
@@ -178,9 +172,9 @@ static void pv_wait_node(struct mcs_spinlock *node)
 		 *
 		 * [S] pn->state = vcpu_halted	  [S] next->locked = 1
 		 *     MB			      MB
-		 * [L] pn->locked		[RmW] pn->state = vcpu_hashed
+		 * [L] pn->locked		[RmW] pn->state = vcpu_running
 		 *
-		 * Matches the cmpxchg() from pv_kick_node().
+		 * Matches the xchg() from pv_kick_node().
 		 */
 		smp_store_mb(pn->state, vcpu_halted);
 
@@ -188,10 +182,9 @@ static void pv_wait_node(struct mcs_spinlock *node)
 			pv_wait(&pn->state, vcpu_halted);
 
 		/*
-		 * If pv_kick_node() changed us to vcpu_hashed, retain that value
-		 * so that pv_wait_head() knows to not also try to hash this lock.
+		 * Reset the vCPU state to avoid unncessary CPU kicking
 		 */
-		cmpxchg(&pn->state, vcpu_halted, vcpu_running);
+		WRITE_ONCE(pn->state, vcpu_running);
 
 		/*
 		 * If the locked flag is still not set after wakeup, it is a
@@ -201,7 +194,6 @@ static void pv_wait_node(struct mcs_spinlock *node)
 		 * MCS lock will be released soon.
 		 */
 	}
-
 	/*
 	 * By now our node->locked should be 1 and our caller will not actually
 	 * spin-wait for it. We do however rely on our caller to do a
@@ -210,35 +202,24 @@ static void pv_wait_node(struct mcs_spinlock *node)
 }
 
 /*
- * Called after setting next->locked = 1 when we're the lock owner.
- *
- * Instead of waking the waiters stuck in pv_wait_node() advance their state such
- * that they're waiting in pv_wait_head(), this avoids a wake/sleep cycle.
+ * Called after setting next->locked = 1, used to wake those stuck in
+ * pv_wait_node().
  */
-static void pv_kick_node(struct qspinlock *lock, struct mcs_spinlock *node)
+static void pv_kick_node(struct mcs_spinlock *node)
 {
 	struct pv_node *pn = (struct pv_node *)node;
-	struct __qspinlock *l = (void *)lock;
 
 	/*
-	 * If the vCPU is indeed halted, advance its state to match that of
-	 * pv_wait_node(). If OTOH this fails, the vCPU was running and will
-	 * observe its next->locked value and advance itself.
+	 * Note that because node->locked is already set, this actual
+	 * mcs_spinlock entry could be re-used already.
 	 *
-	 * Matches with smp_store_mb() and cmpxchg() in pv_wait_node()
-	 */
-	if (cmpxchg(&pn->state, vcpu_halted, vcpu_hashed) != vcpu_halted)
-		return;
-
-	/*
-	 * Put the lock into the hash table and set the _Q_SLOW_VAL.
+	 * This should be fine however, kicking people for no reason is
+	 * harmless.
 	 *
-	 * As this is the same vCPU that will check the _Q_SLOW_VAL value and
-	 * the hash table later on at unlock time, no atomic instruction is
-	 * needed.
+	 * See the comment in pv_wait_node().
 	 */
-	WRITE_ONCE(l->locked, _Q_SLOW_VAL);
-	(void)pv_hash(lock, pn);
+	if (xchg(&pn->state, vcpu_running) == vcpu_halted)
+		pv_kick(pn->cpu);
 }
 
 /*
@@ -252,13 +233,6 @@ static void pv_wait_head(struct qspinlock *lock, struct mcs_spinlock *node)
 	struct qspinlock **lp = NULL;
 	int loop;
 
-	/*
-	 * If pv_kick_node() already advanced our state, we don't need to
-	 * insert ourselves into the hash table anymore.
-	 */
-	if (READ_ONCE(pn->state) == vcpu_hashed)
-		lp = (struct qspinlock **)1;
-
 	for (;;) {
 		for (loop = SPIN_THRESHOLD; loop; loop--) {
 			if (!READ_ONCE(l->locked))
@@ -266,22 +240,17 @@ static void pv_wait_head(struct qspinlock *lock, struct mcs_spinlock *node)
 			cpu_relax();
 		}
 
+		WRITE_ONCE(pn->state, vcpu_halted);
 		if (!lp) { /* ONCE */
-			WRITE_ONCE(pn->state, vcpu_hashed);
 			lp = pv_hash(lock, pn);
-
 			/*
-			 * We must hash before setting _Q_SLOW_VAL, such that
-			 * when we observe _Q_SLOW_VAL in __pv_queued_spin_unlock()
-			 * we'll be sure to be able to observe our hash entry.
+			 * lp must be set before setting _Q_SLOW_VAL
 			 *
-			 *   [S] pn->state
-			 *   [S] <hash>                 [Rmw] l->locked == _Q_SLOW_VAL
-			 *       MB                           RMB
-			 * [RmW] l->locked = _Q_SLOW_VAL  [L] <unhash>
-			 *                                [L] pn->state
+			 * [S] lp = lock                [RmW] l = l->locked = 0
+			 *     MB                             MB
+			 * [S] l->locked = _Q_SLOW_VAL  [L]   lp
 			 *
-			 * Matches the smp_rmb() in __pv_queued_spin_unlock().
+			 * Matches the cmpxchg() in __pv_queued_spin_unlock().
 			 */
 			if (!cmpxchg(&l->locked, _Q_LOCKED_VAL, _Q_SLOW_VAL)) {
 				/*
@@ -318,32 +287,22 @@ __visible void __pv_queued_spin_unlock(struct qspinlock *lock)
 {
 	struct __qspinlock *l = (void *)lock;
 	struct pv_node *node;
-	u8 locked;
+	u8 lockval = cmpxchg(&l->locked, _Q_LOCKED_VAL, 0);
 
 	/*
 	 * We must not unlock if SLOW, because in that case we must first
 	 * unhash. Otherwise it would be possible to have multiple @lock
 	 * entries, which would be BAD.
 	 */
-	locked = cmpxchg(&l->locked, _Q_LOCKED_VAL, 0);
-	if (likely(locked == _Q_LOCKED_VAL))
+	if (likely(lockval == _Q_LOCKED_VAL))
 		return;
 
-	if (unlikely(locked != _Q_SLOW_VAL)) {
-		WARN(!debug_locks_silent,
-		     "pvqspinlock: lock 0x%lx has corrupted value 0x%x!\n",
-		     (unsigned long)lock, atomic_read(&lock->val));
+	if (unlikely(lockval != _Q_SLOW_VAL)) {
+		if (debug_locks_silent)
+			return;
+		WARN(1, "pvqspinlock: lock %p has corrupted value 0x%x!\n", lock, atomic_read(&lock->val));
 		return;
 	}
-
-	/*
-	 * A failed cmpxchg doesn't provide any memory-ordering guarantees,
-	 * so we need a barrier to order the read of the node data in
-	 * pv_unhash *after* we've read the lock being _Q_SLOW_VAL.
-	 *
-	 * Matches the cmpxchg() in pv_wait_head() setting _Q_SLOW_VAL.
-	 */
-	smp_rmb();
 
 	/*
 	 * Since the above failed to release, this must be the SLOW path.
@@ -360,11 +319,8 @@ __visible void __pv_queued_spin_unlock(struct qspinlock *lock)
 	/*
 	 * At this point the memory pointed at by lock can be freed/reused,
 	 * however we can still use the pv_node to kick the CPU.
-	 * The other vCPU may not really be halted, but kicking an active
-	 * vCPU is harmless other than the additional latency in completing
-	 * the unlock.
 	 */
-	if (READ_ONCE(node->state) == vcpu_hashed)
+	if (READ_ONCE(node->state) == vcpu_halted)
 		pv_kick(node->cpu);
 }
 /*

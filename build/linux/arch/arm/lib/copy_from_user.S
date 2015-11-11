@@ -17,7 +17,7 @@
 /*
  * Prototype:
  *
- *	size_t arm_copy_from_user(void *to, const void *from, size_t n)
+ *	size_t __copy_from_user(void *to, const void *from, size_t n)
  *
  * Purpose:
  *
@@ -89,11 +89,11 @@
 
 	.text
 
-ENTRY(arm_copy_from_user)
+ENTRY(__copy_from_user)
 
 #include "copy_template.S"
 
-ENDPROC(arm_copy_from_user)
+ENDPROC(__copy_from_user)
 
 	.pushsection .fixup,"ax"
 	.align 0

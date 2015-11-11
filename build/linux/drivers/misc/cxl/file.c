@@ -73,11 +73,6 @@ static int __afu_open(struct inode *inode, struct file *file, bool master)
 	if (!afu->current_mode)
 		goto err_put_afu;
 
-	if (!cxl_adapter_link_ok(adapter)) {
-		rc = -EIO;
-		goto err_put_afu;
-	}
-
 	if (!(ctx = cxl_context_alloc())) {
 		rc = -ENOMEM;
 		goto err_put_afu;
@@ -120,16 +115,9 @@ int afu_release(struct inode *inode, struct file *file)
 		 __func__, ctx->pe);
 	cxl_context_detach(ctx);
 
-
-	/*
-	 * Delete the context's mapping pointer, unless it's created by the
-	 * kernel API, in which case leave it so it can be freed by reclaim_ctx()
-	 */
-	if (!ctx->kernelapi) {
-		mutex_lock(&ctx->mapping_lock);
-		ctx->mapping = NULL;
-		mutex_unlock(&ctx->mapping_lock);
-	}
+	mutex_lock(&ctx->mapping_lock);
+	ctx->mapping = NULL;
+	mutex_unlock(&ctx->mapping_lock);
 
 	put_device(&ctx->afu->dev);
 
@@ -191,8 +179,6 @@ static long afu_ioctl_start_work(struct cxl_context *ctx,
 	if (work.flags & CXL_START_WORK_AMR)
 		amr = work.amr & mfspr(SPRN_UAMOR);
 
-	ctx->mmio_err_ff = !!(work.flags & CXL_START_WORK_ERR_FF);
-
 	/*
 	 * We grab the PID here and not in the file open to allow for the case
 	 * where a process (master, some daemon, etc) has opened the chardev on
@@ -252,9 +238,6 @@ long afu_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	if (ctx->status == CLOSED)
 		return -EIO;
 
-	if (!cxl_adapter_link_ok(ctx->afu->adapter))
-		return -EIO;
-
 	pr_devel("afu_ioctl\n");
 	switch (cmd) {
 	case CXL_IOCTL_START_WORK:
@@ -268,7 +251,7 @@ long afu_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	return -EINVAL;
 }
 
-static long afu_compat_ioctl(struct file *file, unsigned int cmd,
+long afu_compat_ioctl(struct file *file, unsigned int cmd,
 			     unsigned long arg)
 {
 	return afu_ioctl(file, cmd, arg);
@@ -280,9 +263,6 @@ int afu_mmap(struct file *file, struct vm_area_struct *vm)
 
 	/* AFU must be started before we can MMIO */
 	if (ctx->status != STARTED)
-		return -EIO;
-
-	if (!cxl_adapter_link_ok(ctx->afu->adapter))
 		return -EIO;
 
 	return cxl_context_iomap(ctx, vm);
@@ -329,9 +309,6 @@ ssize_t afu_read(struct file *file, char __user *buf, size_t count,
 	int rc;
 	DEFINE_WAIT(wait);
 
-	if (!cxl_adapter_link_ok(ctx->afu->adapter))
-		return -EIO;
-
 	if (count < CXL_READ_MIN_SIZE)
 		return -EINVAL;
 
@@ -341,11 +318,6 @@ ssize_t afu_read(struct file *file, char __user *buf, size_t count,
 		prepare_to_wait(&ctx->wq, &wait, TASK_INTERRUPTIBLE);
 		if (ctx_event_pending(ctx))
 			break;
-
-		if (!cxl_adapter_link_ok(ctx->afu->adapter)) {
-			rc = -EIO;
-			goto out;
-		}
 
 		if (file->f_flags & O_NONBLOCK) {
 			rc = -EAGAIN;
@@ -424,7 +396,7 @@ const struct file_operations afu_fops = {
 	.mmap           = afu_mmap,
 };
 
-static const struct file_operations afu_master_fops = {
+const struct file_operations afu_master_fops = {
 	.owner		= THIS_MODULE,
 	.open           = afu_master_open,
 	.poll		= afu_poll,
@@ -547,7 +519,7 @@ int __init cxl_file_init(void)
 	 * If these change we really need to update API.  Either change some
 	 * flags or update API version number CXL_API_VERSION.
 	 */
-	BUILD_BUG_ON(CXL_API_VERSION != 2);
+	BUILD_BUG_ON(CXL_API_VERSION != 1);
 	BUILD_BUG_ON(sizeof(struct cxl_ioctl_start_work) != 64);
 	BUILD_BUG_ON(sizeof(struct cxl_event_header) != 8);
 	BUILD_BUG_ON(sizeof(struct cxl_event_afu_interrupt) != 8);

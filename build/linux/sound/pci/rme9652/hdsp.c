@@ -1526,7 +1526,7 @@ static struct snd_rawmidi_ops snd_hdsp_midi_input =
 
 static int snd_hdsp_create_midi (struct snd_card *card, struct hdsp *hdsp, int id)
 {
-	char buf[40];
+	char buf[32];
 
 	hdsp->midi[id].id = id;
 	hdsp->midi[id].rmidi = NULL;
@@ -1537,7 +1537,7 @@ static int snd_hdsp_create_midi (struct snd_card *card, struct hdsp *hdsp, int i
 	hdsp->midi[id].pending = 0;
 	spin_lock_init (&hdsp->midi[id].lock);
 
-	snprintf(buf, sizeof(buf), "%s MIDI %d", card->shortname, id + 1);
+	sprintf (buf, "%s MIDI %d", card->shortname, id+1);
 	if (snd_rawmidi_new (card, buf, id, 1, 1, &hdsp->midi[id].rmidi) < 0)
 		return -1;
 
@@ -2806,8 +2806,7 @@ static int snd_hdsp_get_adat_sync_check(struct snd_kcontrol *kcontrol, struct sn
 	struct hdsp *hdsp = snd_kcontrol_chip(kcontrol);
 
 	offset = ucontrol->id.index - 1;
-	if (snd_BUG_ON(offset < 0))
-		return -EINVAL;
+	snd_BUG_ON(offset < 0);
 
 	switch (hdsp->io_type) {
 	case Digiface:

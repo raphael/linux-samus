@@ -594,7 +594,7 @@ static struct acpi_device *acpi_pci_find_companion(struct device *dev)
 /**
  * pci_acpi_optimize_delay - optimize PCI D3 and D3cold delay from ACPI
  * @pdev: the PCI device whose delay is to be updated
- * @handle: ACPI handle of this device
+ * @adev: the companion ACPI device of this PCI device
  *
  * Update the d3_delay and d3cold_delay of a PCI device from the ACPI _DSM
  * control method of either the device itself or the PCI host bridge.

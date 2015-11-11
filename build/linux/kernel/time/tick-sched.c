@@ -197,9 +197,27 @@ static bool can_stop_full_tick(void)
 	return true;
 }
 
+static void tick_nohz_restart_sched_tick(struct tick_sched *ts, ktime_t now);
+
+/*
+ * Re-evaluate the need for the tick on the current CPU
+ * and restart it if necessary.
+ */
+void __tick_nohz_full_check(void)
+{
+	struct tick_sched *ts = this_cpu_ptr(&tick_cpu_sched);
+
+	if (tick_nohz_full_cpu(smp_processor_id())) {
+		if (ts->tick_stopped && !is_idle_task(current)) {
+			if (!can_stop_full_tick())
+				tick_nohz_restart_sched_tick(ts, ktime_get());
+		}
+	}
+}
+
 static void nohz_full_kick_work_func(struct irq_work *work)
 {
-	/* Empty, the tick restart happens on tick_nohz_irq_exit() */
+	__tick_nohz_full_check();
 }
 
 static DEFINE_PER_CPU(struct irq_work, nohz_full_kick_work) = {
@@ -234,7 +252,7 @@ void tick_nohz_full_kick_cpu(int cpu)
 
 static void nohz_full_kick_ipi(void *info)
 {
-	/* Empty, the tick restart happens on tick_nohz_irq_exit() */
+	__tick_nohz_full_check();
 }
 
 /*
@@ -258,7 +276,7 @@ void tick_nohz_full_kick_all(void)
  * It might need the tick due to per task/process properties:
  * perf events, posix cpu timers, ...
  */
-void __tick_nohz_task_switch(void)
+void __tick_nohz_task_switch(struct task_struct *tsk)
 {
 	unsigned long flags;
 
@@ -290,17 +308,16 @@ static int __init tick_nohz_full_setup(char *str)
 __setup("nohz_full=", tick_nohz_full_setup);
 
 static int tick_nohz_cpu_down_callback(struct notifier_block *nfb,
-				       unsigned long action,
-				       void *hcpu)
+						 unsigned long action,
+						 void *hcpu)
 {
 	unsigned int cpu = (unsigned long)hcpu;
 
 	switch (action & ~CPU_TASKS_FROZEN) {
 	case CPU_DOWN_PREPARE:
 		/*
-		 * The boot CPU handles housekeeping duty (unbound timers,
-		 * workqueues, timekeeping, ...) on behalf of full dynticks
-		 * CPUs. It must remain online when nohz full is enabled.
+		 * If we handle the timekeeping duty for full dynticks CPUs,
+		 * we can't safely shutdown that CPU.
 		 */
 		if (tick_nohz_full_running && tick_do_timer_cpu == cpu)
 			return NOTIFY_BAD;
@@ -371,12 +388,6 @@ void __init tick_nohz_init(void)
 	cpu_notifier(tick_nohz_cpu_down_callback, 0);
 	pr_info("NO_HZ: Full dynticks CPUs: %*pbl.\n",
 		cpumask_pr_args(tick_nohz_full_mask));
-
-	/*
-	 * We need at least one CPU to handle housekeeping work such
-	 * as timekeeping, unbound timers, workqueues, ...
-	 */
-	WARN_ON_ONCE(cpumask_empty(housekeeping_mask));
 }
 #endif
 
@@ -694,38 +705,21 @@ out:
 	return tick;
 }
 
-static void tick_nohz_restart_sched_tick(struct tick_sched *ts, ktime_t now)
-{
-	/* Update jiffies first */
-	tick_do_update_jiffies64(now);
-	update_cpu_load_nohz();
-
-	calc_load_exit_idle();
-	touch_softlockup_watchdog();
-	/*
-	 * Cancel the scheduled timer and restore the tick
-	 */
-	ts->tick_stopped  = 0;
-	ts->idle_exittime = now;
-
-	tick_nohz_restart(ts, now);
-}
-
-static void tick_nohz_full_update_tick(struct tick_sched *ts)
+static void tick_nohz_full_stop_tick(struct tick_sched *ts)
 {
 #ifdef CONFIG_NO_HZ_FULL
 	int cpu = smp_processor_id();
 
-	if (!tick_nohz_full_cpu(cpu))
+	if (!tick_nohz_full_cpu(cpu) || is_idle_task(current))
 		return;
 
 	if (!ts->tick_stopped && ts->nohz_mode == NOHZ_MODE_INACTIVE)
 		return;
 
-	if (can_stop_full_tick())
-		tick_nohz_stop_sched_tick(ts, ktime_get(), cpu);
-	else if (ts->tick_stopped)
-		tick_nohz_restart_sched_tick(ts, ktime_get());
+	if (!can_stop_full_tick())
+		return;
+
+	tick_nohz_stop_sched_tick(ts, ktime_get(), cpu);
 #endif
 }
 
@@ -855,7 +849,7 @@ void tick_nohz_irq_exit(void)
 	if (ts->inidle)
 		__tick_nohz_idle_enter(ts);
 	else
-		tick_nohz_full_update_tick(ts);
+		tick_nohz_full_stop_tick(ts);
 }
 
 /**
@@ -868,6 +862,23 @@ ktime_t tick_nohz_get_sleep_length(void)
 	struct tick_sched *ts = this_cpu_ptr(&tick_cpu_sched);
 
 	return ts->sleep_length;
+}
+
+static void tick_nohz_restart_sched_tick(struct tick_sched *ts, ktime_t now)
+{
+	/* Update jiffies first */
+	tick_do_update_jiffies64(now);
+	update_cpu_load_nohz();
+
+	calc_load_exit_idle();
+	touch_softlockup_watchdog();
+	/*
+	 * Cancel the scheduled timer and restore the tick
+	 */
+	ts->tick_stopped  = 0;
+	ts->idle_exittime = now;
+
+	tick_nohz_restart(ts, now);
 }
 
 static void tick_nohz_account_idle_ticks(struct tick_sched *ts)

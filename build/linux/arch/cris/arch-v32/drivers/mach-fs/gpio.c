@@ -425,11 +425,12 @@ gpio_open(struct inode *inode, struct file *filp)
 	if (p > GPIO_MINOR_LAST)
 		return -EINVAL;
 
-	priv = kzalloc(sizeof(struct gpio_private), GFP_KERNEL);
+	priv = kmalloc(sizeof(struct gpio_private), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 
 	mutex_lock(&gpio_mutex);
+	memset(priv, 0, sizeof(*priv));
 
 	priv->minor = p;
 

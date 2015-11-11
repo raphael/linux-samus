@@ -1,6 +1,6 @@
 CFLAGS = -Wall
 BINARIES = execveat
-DEPS = execveat.symlink execveat.denatured script subdir
+DEPS = execveat.symlink execveat.denatured script
 all: $(BINARIES) $(DEPS)
 
 subdir:
@@ -21,6 +21,8 @@ TEST_PROGS := execveat
 TEST_FILES := $(DEPS)
 
 include ../lib.mk
+
+override EMIT_TESTS := echo "mkdir -p subdir; (./execveat && echo \"selftests: execveat [PASS]\") || echo \"selftests: execveat [FAIL]\""
 
 clean:
 	rm -rf $(BINARIES) $(DEPS) subdir.moved execveat.moved xxxxx*

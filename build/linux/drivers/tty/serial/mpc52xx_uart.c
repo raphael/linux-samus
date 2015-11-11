@@ -239,9 +239,8 @@ static int mpc52xx_psc_tx_rdy(struct uart_port *port)
 
 static int mpc52xx_psc_tx_empty(struct uart_port *port)
 {
-	u16 sts = in_be16(&PSC(port)->mpc52xx_psc_status);
-
-	return (sts & MPC52xx_PSC_SR_TXEMP) ? TIOCSER_TEMT : 0;
+	return in_be16(&PSC(port)->mpc52xx_psc_status)
+	    & MPC52xx_PSC_SR_TXEMP;
 }
 
 static void mpc52xx_psc_start_tx(struct uart_port *port)

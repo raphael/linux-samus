@@ -6,7 +6,6 @@ TARGETS += firmware
 TARGETS += ftrace
 TARGETS += futex
 TARGETS += kcmp
-TARGETS += membarrier
 TARGETS += memfd
 TARGETS += memory-hotplug
 TARGETS += mount
@@ -16,7 +15,6 @@ TARGETS += powerpc
 TARGETS += ptrace
 TARGETS += seccomp
 TARGETS += size
-TARGETS += static_keys
 TARGETS += sysctl
 ifneq (1, $(quicktest))
 TARGETS += timers
@@ -24,7 +22,6 @@ endif
 TARGETS += user
 TARGETS += vm
 TARGETS += x86
-TARGETS += zram
 #Please keep the TARGETS list alphabetically sorted
 # Run "make quicktest=1 run_tests" or
 # "make quicktest=1 kselftest from top level Makefile
@@ -74,6 +71,7 @@ ifdef INSTALL_PATH
 	@# Ask all targets to install their files
 	mkdir -p $(INSTALL_PATH)
 	for TARGET in $(TARGETS); do \
+		mkdir -p $(INSTALL_PATH)/$$TARGET ; \
 		make -C $$TARGET INSTALL_PATH=$(INSTALL_PATH)/$$TARGET install; \
 	done;
 

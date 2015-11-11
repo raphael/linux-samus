@@ -74,7 +74,7 @@ struct kvm_pic {
 };
 
 struct kvm_pic *kvm_create_pic(struct kvm *kvm);
-void kvm_destroy_pic(struct kvm_pic *vpic);
+void kvm_destroy_pic(struct kvm *kvm);
 int kvm_pic_read_irq(struct kvm *kvm);
 void kvm_pic_update_irq(struct kvm_pic *s);
 
@@ -85,11 +85,11 @@ static inline struct kvm_pic *pic_irqchip(struct kvm *kvm)
 
 static inline int irqchip_in_kernel(struct kvm *kvm)
 {
-	struct kvm_pic *vpic = pic_irqchip(kvm);
+	int ret;
 
-	/* Read vpic before kvm->irq_routing.  */
+	ret = (pic_irqchip(kvm) != NULL);
 	smp_rmb();
-	return vpic != NULL;
+	return ret;
 }
 
 void kvm_pic_reset(struct kvm_kpic_state *s);

@@ -199,7 +199,8 @@ static ssize_t tx4939_rtc_nvram_read(struct file *filp, struct kobject *kobj,
 	ssize_t count;
 
 	spin_lock_irq(&pdata->lock);
-	for (count = 0; count < size; count++) {
+	for (count = 0; size > 0 && pos < TX4939_RTC_REG_RAMSIZE;
+	     count++, size--) {
 		__raw_writel(pos++, &rtcreg->adr);
 		*buf++ = __raw_readl(&rtcreg->dat);
 	}
@@ -217,7 +218,8 @@ static ssize_t tx4939_rtc_nvram_write(struct file *filp, struct kobject *kobj,
 	ssize_t count;
 
 	spin_lock_irq(&pdata->lock);
-	for (count = 0; count < size; count++) {
+	for (count = 0; size > 0 && pos < TX4939_RTC_REG_RAMSIZE;
+	     count++, size--) {
 		__raw_writel(pos++, &rtcreg->adr);
 		__raw_writel(*buf++, &rtcreg->dat);
 	}

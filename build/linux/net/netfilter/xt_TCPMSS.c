@@ -144,7 +144,7 @@ tcpmss_mangle_packet(struct sk_buff *skb,
 
 			inet_proto_csum_replace2(&tcph->check, skb,
 						 htons(oldmss), htons(newmss),
-						 false);
+						 0);
 			return 0;
 		}
 	}
@@ -185,18 +185,18 @@ tcpmss_mangle_packet(struct sk_buff *skb,
 	memmove(opt + TCPOLEN_MSS, opt, len - sizeof(struct tcphdr));
 
 	inet_proto_csum_replace2(&tcph->check, skb,
-				 htons(len), htons(len + TCPOLEN_MSS), true);
+				 htons(len), htons(len + TCPOLEN_MSS), 1);
 	opt[0] = TCPOPT_MSS;
 	opt[1] = TCPOLEN_MSS;
 	opt[2] = (newmss & 0xff00) >> 8;
 	opt[3] = newmss & 0x00ff;
 
-	inet_proto_csum_replace4(&tcph->check, skb, 0, *((__be32 *)opt), false);
+	inet_proto_csum_replace4(&tcph->check, skb, 0, *((__be32 *)opt), 0);
 
 	oldval = ((__be16 *)tcph)[6];
 	tcph->doff += TCPOLEN_MSS/4;
 	inet_proto_csum_replace2(&tcph->check, skb,
-				 oldval, ((__be16 *)tcph)[6], false);
+				 oldval, ((__be16 *)tcph)[6], 0);
 	return TCPOLEN_MSS;
 }
 

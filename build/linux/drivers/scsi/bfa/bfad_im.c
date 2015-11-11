@@ -851,8 +851,6 @@ bfad_im_module_exit(void)
 
 	if (bfad_im_scsi_vport_transport_template)
 		fc_release_transport(bfad_im_scsi_vport_transport_template);
-
-	idr_destroy(&bfad_im_port_index);
 }
 
 void

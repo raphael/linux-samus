@@ -1924,9 +1924,6 @@ static void adpt_alpha_info(sysInfo_S* si)
 #endif
 
 #if defined __i386__
-
-#include <uapi/asm/vm86.h>
-
 static void adpt_i386_info(sysInfo_S* si)
 {
 	// This is all the info we need for now

@@ -41,7 +41,6 @@
 #include <linux/irqdomain.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
-#include <linux/irqchip.h>
 #include <linux/irqchip/arm-gic.h>
 
 #include <asm/irq.h>
@@ -49,6 +48,7 @@
 #include <asm/smp_plat.h>
 
 #include "irq-gic-common.h"
+#include "irqchip.h"
 
 #define HIP04_MAX_IRQS		510
 
@@ -202,9 +202,7 @@ static struct irq_chip hip04_irq_chip = {
 #ifdef CONFIG_SMP
 	.irq_set_affinity	= hip04_irq_set_affinity,
 #endif
-	.flags			= IRQCHIP_SET_TYPE_MASKED |
-				  IRQCHIP_SKIP_SET_WAKE |
-				  IRQCHIP_MASK_ON_SUSPEND,
+	.flags			= IRQCHIP_SET_TYPE_MASKED,
 };
 
 static u16 hip04_get_cpumask(struct hip04_irq_data *intc)
@@ -307,11 +305,11 @@ static int hip04_irq_domain_map(struct irq_domain *d, unsigned int irq,
 		irq_set_percpu_devid(irq);
 		irq_set_chip_and_handler(irq, &hip04_irq_chip,
 					 handle_percpu_devid_irq);
-		irq_set_status_flags(irq, IRQ_NOAUTOEN);
+		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
 	} else {
 		irq_set_chip_and_handler(irq, &hip04_irq_chip,
 					 handle_fasteoi_irq);
-		irq_set_probe(irq);
+		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
 	irq_set_chip_data(irq, d->host_data);
 	return 0;

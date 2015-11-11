@@ -715,7 +715,6 @@ static bool check_device_tree(struct ath6kl *ar)
 				   board_filename, ret);
 			continue;
 		}
-		of_node_put(node);
 		return true;
 	}
 	return false;

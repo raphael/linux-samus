@@ -348,8 +348,7 @@ acpi_rs_create_pci_routing_table(union acpi_operand_object *package_object,
 				status =
 				    acpi_ns_handle_to_pathname((acpi_handle)
 							       node,
-							       &path_buffer,
-							       FALSE);
+							       &path_buffer);
 
 				/* +1 to include null terminator */
 

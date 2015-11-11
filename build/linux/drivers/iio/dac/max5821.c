@@ -392,6 +392,7 @@ static struct i2c_driver max5821_driver = {
 	.driver = {
 		.name	= "max5821",
 		.pm     = MAX5821_PM_OPS,
+		.owner	= THIS_MODULE,
 	},
 	.probe		= max5821_probe,
 	.remove		= max5821_remove,

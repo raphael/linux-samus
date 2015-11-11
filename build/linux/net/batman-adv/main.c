@@ -30,7 +30,6 @@
 #include <linux/ipv6.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
-#include <linux/lockdep.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/netdevice.h>
@@ -149,7 +148,7 @@ int batadv_mesh_init(struct net_device *soft_iface)
 	INIT_HLIST_HEAD(&bat_priv->mcast.want_all_ipv6_list);
 #endif
 	INIT_LIST_HEAD(&bat_priv->tt.changes_list);
-	INIT_HLIST_HEAD(&bat_priv->tt.req_list);
+	INIT_LIST_HEAD(&bat_priv->tt.req_list);
 	INIT_LIST_HEAD(&bat_priv->tt.roam_list);
 #ifdef CONFIG_BATMAN_ADV_MCAST
 	INIT_HLIST_HEAD(&bat_priv->mcast.mla_list);
@@ -199,7 +198,7 @@ void batadv_mesh_free(struct net_device *soft_iface)
 
 	batadv_purge_outstanding_packets(bat_priv, NULL);
 
-	batadv_gw_node_free(bat_priv);
+	batadv_gw_node_purge(bat_priv);
 	batadv_nc_mesh_free(bat_priv);
 	batadv_dat_free(bat_priv);
 	batadv_bla_free(bat_priv);
@@ -235,7 +234,7 @@ void batadv_mesh_free(struct net_device *soft_iface)
  *
  * Returns 'true' if the mac address was found, false otherwise.
  */
-bool batadv_is_my_mac(struct batadv_priv *bat_priv, const u8 *addr)
+bool batadv_is_my_mac(struct batadv_priv *bat_priv, const uint8_t *addr)
 {
 	const struct batadv_hard_iface *hard_iface;
 	bool is_my_mac = false;
@@ -388,7 +387,7 @@ int batadv_batman_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	struct batadv_priv *bat_priv;
 	struct batadv_ogm_packet *batadv_ogm_packet;
 	struct batadv_hard_iface *hard_iface;
-	u8 idx;
+	uint8_t idx;
 	int ret;
 
 	hard_iface = container_of(ptype, struct batadv_hard_iface,
@@ -497,7 +496,7 @@ static void batadv_recv_handler_init(void)
 }
 
 int
-batadv_recv_handler_register(u8 packet_type,
+batadv_recv_handler_register(uint8_t packet_type,
 			     int (*recv_handler)(struct sk_buff *,
 						 struct batadv_hard_iface *))
 {
@@ -513,7 +512,7 @@ batadv_recv_handler_register(u8 packet_type,
 	return 0;
 }
 
-void batadv_recv_handler_unregister(u8 packet_type)
+void batadv_recv_handler_unregister(uint8_t packet_type)
 {
 	batadv_rx_handler[packet_type] = batadv_recv_unhandled_packet;
 }
@@ -584,7 +583,7 @@ int batadv_algo_seq_print_text(struct seq_file *seq, void *offset)
 	seq_puts(seq, "Available routing algorithms:\n");
 
 	hlist_for_each_entry(bat_algo_ops, &batadv_algo_list, list) {
-		seq_printf(seq, " * %s\n", bat_algo_ops->name);
+		seq_printf(seq, "%s\n", bat_algo_ops->name);
 	}
 
 	return 0;
@@ -643,7 +642,8 @@ batadv_tvlv_handler_free_ref(struct batadv_tvlv_handler *tvlv_handler)
  * Returns tvlv handler if found or NULL otherwise.
  */
 static struct batadv_tvlv_handler
-*batadv_tvlv_handler_get(struct batadv_priv *bat_priv, u8 type, u8 version)
+*batadv_tvlv_handler_get(struct batadv_priv *bat_priv,
+			 uint8_t type, uint8_t version)
 {
 	struct batadv_tvlv_handler *tvlv_handler_tmp, *tvlv_handler = NULL;
 
@@ -691,7 +691,8 @@ static void batadv_tvlv_container_free_ref(struct batadv_tvlv_container *tvlv)
  * Returns tvlv container if found or NULL otherwise.
  */
 static struct batadv_tvlv_container
-*batadv_tvlv_container_get(struct batadv_priv *bat_priv, u8 type, u8 version)
+*batadv_tvlv_container_get(struct batadv_priv *bat_priv,
+			   uint8_t type, uint8_t version)
 {
 	struct batadv_tvlv_container *tvlv_tmp, *tvlv = NULL;
 
@@ -722,10 +723,10 @@ static struct batadv_tvlv_container
  *
  * Returns size of all currently registered tvlv containers in bytes.
  */
-static u16 batadv_tvlv_container_list_size(struct batadv_priv *bat_priv)
+static uint16_t batadv_tvlv_container_list_size(struct batadv_priv *bat_priv)
 {
 	struct batadv_tvlv_container *tvlv;
-	u16 tvlv_len = 0;
+	uint16_t tvlv_len = 0;
 
 	hlist_for_each_entry(tvlv, &bat_priv->tvlv.container_list, list) {
 		tvlv_len += sizeof(struct batadv_tvlv_hdr);
@@ -738,17 +739,13 @@ static u16 batadv_tvlv_container_list_size(struct batadv_priv *bat_priv)
 /**
  * batadv_tvlv_container_remove - remove tvlv container from the tvlv container
  *  list
- * @bat_priv: the bat priv with all the soft interface information
  * @tvlv: the to be removed tvlv container
  *
  * Has to be called with the appropriate locks being acquired
  * (tvlv.container_list_lock).
  */
-static void batadv_tvlv_container_remove(struct batadv_priv *bat_priv,
-					 struct batadv_tvlv_container *tvlv)
+static void batadv_tvlv_container_remove(struct batadv_tvlv_container *tvlv)
 {
-	lockdep_assert_held(&bat_priv->tvlv.handler_list_lock);
-
 	if (!tvlv)
 		return;
 
@@ -767,13 +764,13 @@ static void batadv_tvlv_container_remove(struct batadv_priv *bat_priv,
  * @version: tvlv container type to unregister
  */
 void batadv_tvlv_container_unregister(struct batadv_priv *bat_priv,
-				      u8 type, u8 version)
+				      uint8_t type, uint8_t version)
 {
 	struct batadv_tvlv_container *tvlv;
 
 	spin_lock_bh(&bat_priv->tvlv.container_list_lock);
 	tvlv = batadv_tvlv_container_get(bat_priv, type, version);
-	batadv_tvlv_container_remove(bat_priv, tvlv);
+	batadv_tvlv_container_remove(tvlv);
 	spin_unlock_bh(&bat_priv->tvlv.container_list_lock);
 }
 
@@ -790,8 +787,8 @@ void batadv_tvlv_container_unregister(struct batadv_priv *bat_priv,
  * content is going to replace the old one.
  */
 void batadv_tvlv_container_register(struct batadv_priv *bat_priv,
-				    u8 type, u8 version,
-				    void *tvlv_value, u16 tvlv_value_len)
+				    uint8_t type, uint8_t version,
+				    void *tvlv_value, uint16_t tvlv_value_len)
 {
 	struct batadv_tvlv_container *tvlv_old, *tvlv_new;
 
@@ -812,7 +809,7 @@ void batadv_tvlv_container_register(struct batadv_priv *bat_priv,
 
 	spin_lock_bh(&bat_priv->tvlv.container_list_lock);
 	tvlv_old = batadv_tvlv_container_get(bat_priv, type, version);
-	batadv_tvlv_container_remove(bat_priv, tvlv_old);
+	batadv_tvlv_container_remove(tvlv_old);
 	hlist_add_head(&tvlv_new->list, &bat_priv->tvlv.container_list);
 	spin_unlock_bh(&bat_priv->tvlv.container_list_lock);
 }
@@ -864,13 +861,14 @@ static bool batadv_tvlv_realloc_packet_buff(unsigned char **packet_buff,
  *
  * Returns size of all appended tvlv containers in bytes.
  */
-u16 batadv_tvlv_container_ogm_append(struct batadv_priv *bat_priv,
-				     unsigned char **packet_buff,
-				     int *packet_buff_len, int packet_min_len)
+uint16_t batadv_tvlv_container_ogm_append(struct batadv_priv *bat_priv,
+					  unsigned char **packet_buff,
+					  int *packet_buff_len,
+					  int packet_min_len)
 {
 	struct batadv_tvlv_container *tvlv;
 	struct batadv_tvlv_hdr *tvlv_hdr;
-	u16 tvlv_value_len;
+	uint16_t tvlv_value_len;
 	void *tvlv_value;
 	bool ret;
 
@@ -895,7 +893,7 @@ u16 batadv_tvlv_container_ogm_append(struct batadv_priv *bat_priv,
 		tvlv_hdr->len = tvlv->tvlv_hdr.len;
 		tvlv_value = tvlv_hdr + 1;
 		memcpy(tvlv_value, tvlv + 1, ntohs(tvlv->tvlv_hdr.len));
-		tvlv_value = (u8 *)tvlv_value + ntohs(tvlv->tvlv_hdr.len);
+		tvlv_value = (uint8_t *)tvlv_value + ntohs(tvlv->tvlv_hdr.len);
 	}
 
 end:
@@ -922,8 +920,8 @@ static int batadv_tvlv_call_handler(struct batadv_priv *bat_priv,
 				    struct batadv_tvlv_handler *tvlv_handler,
 				    bool ogm_source,
 				    struct batadv_orig_node *orig_node,
-				    u8 *src, u8 *dst,
-				    void *tvlv_value, u16 tvlv_value_len)
+				    uint8_t *src, uint8_t *dst,
+				    void *tvlv_value, uint16_t tvlv_value_len)
 {
 	if (!tvlv_handler)
 		return NET_RX_SUCCESS;
@@ -974,13 +972,13 @@ static int batadv_tvlv_call_handler(struct batadv_priv *bat_priv,
 int batadv_tvlv_containers_process(struct batadv_priv *bat_priv,
 				   bool ogm_source,
 				   struct batadv_orig_node *orig_node,
-				   u8 *src, u8 *dst,
-				   void *tvlv_value, u16 tvlv_value_len)
+				   uint8_t *src, uint8_t *dst,
+				   void *tvlv_value, uint16_t tvlv_value_len)
 {
 	struct batadv_tvlv_handler *tvlv_handler;
 	struct batadv_tvlv_hdr *tvlv_hdr;
-	u16 tvlv_value_cont_len;
-	u8 cifnotfound = BATADV_TVLV_HANDLER_OGM_CIFNOTFND;
+	uint16_t tvlv_value_cont_len;
+	uint8_t cifnotfound = BATADV_TVLV_HANDLER_OGM_CIFNOTFND;
 	int ret = NET_RX_SUCCESS;
 
 	while (tvlv_value_len >= sizeof(*tvlv_hdr)) {
@@ -1002,7 +1000,7 @@ int batadv_tvlv_containers_process(struct batadv_priv *bat_priv,
 						tvlv_value_cont_len);
 		if (tvlv_handler)
 			batadv_tvlv_handler_free_ref(tvlv_handler);
-		tvlv_value = (u8 *)tvlv_value + tvlv_value_cont_len;
+		tvlv_value = (uint8_t *)tvlv_value + tvlv_value_cont_len;
 		tvlv_value_len -= tvlv_value_cont_len;
 	}
 
@@ -1036,7 +1034,7 @@ void batadv_tvlv_ogm_receive(struct batadv_priv *bat_priv,
 			     struct batadv_orig_node *orig_node)
 {
 	void *tvlv_value;
-	u16 tvlv_value_len;
+	uint16_t tvlv_value_len;
 
 	if (!batadv_ogm_packet)
 		return;
@@ -1068,14 +1066,14 @@ void batadv_tvlv_ogm_receive(struct batadv_priv *bat_priv,
 void batadv_tvlv_handler_register(struct batadv_priv *bat_priv,
 				  void (*optr)(struct batadv_priv *bat_priv,
 					       struct batadv_orig_node *orig,
-					       u8 flags,
+					       uint8_t flags,
 					       void *tvlv_value,
-					       u16 tvlv_value_len),
+					       uint16_t tvlv_value_len),
 				  int (*uptr)(struct batadv_priv *bat_priv,
-					      u8 *src, u8 *dst,
+					      uint8_t *src, uint8_t *dst,
 					      void *tvlv_value,
-					      u16 tvlv_value_len),
-				  u8 type, u8 version, u8 flags)
+					      uint16_t tvlv_value_len),
+				  uint8_t type, uint8_t version, uint8_t flags)
 {
 	struct batadv_tvlv_handler *tvlv_handler;
 
@@ -1110,7 +1108,7 @@ void batadv_tvlv_handler_register(struct batadv_priv *bat_priv,
  * @version: tvlv handler version to be unregistered
  */
 void batadv_tvlv_handler_unregister(struct batadv_priv *bat_priv,
-				    u8 type, u8 version)
+				    uint8_t type, uint8_t version)
 {
 	struct batadv_tvlv_handler *tvlv_handler;
 
@@ -1136,9 +1134,9 @@ void batadv_tvlv_handler_unregister(struct batadv_priv *bat_priv,
  * @tvlv_value: tvlv content
  * @tvlv_value_len: tvlv content length
  */
-void batadv_tvlv_unicast_send(struct batadv_priv *bat_priv, u8 *src,
-			      u8 *dst, u8 type, u8 version,
-			      void *tvlv_value, u16 tvlv_value_len)
+void batadv_tvlv_unicast_send(struct batadv_priv *bat_priv, uint8_t *src,
+			      uint8_t *dst, uint8_t type, uint8_t version,
+			      void *tvlv_value, uint16_t tvlv_value_len)
 {
 	struct batadv_unicast_tvlv_packet *unicast_tvlv_packet;
 	struct batadv_tvlv_hdr *tvlv_hdr;

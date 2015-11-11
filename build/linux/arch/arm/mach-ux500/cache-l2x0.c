@@ -8,7 +8,6 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 
-#include <asm/outercache.h>
 #include <asm/hardware/cache-l2x0.h>
 
 #include "db8500-regs.h"

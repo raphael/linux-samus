@@ -38,8 +38,8 @@
 #include <xen/interface/xen.h>
 #include <xen/interface/memory.h>
 
-/* map fgfn of domid to lpfn in the current domain */
-static int map_foreign_page(unsigned long lpfn, unsigned long fgfn,
+/* map fgmfn of domid to lpfn in the current domain */
+static int map_foreign_page(unsigned long lpfn, unsigned long fgmfn,
 			    unsigned int domid)
 {
 	int rc;
@@ -49,7 +49,7 @@ static int map_foreign_page(unsigned long lpfn, unsigned long fgfn,
 		.size = 1,
 		.space = XENMAPSPACE_gmfn_foreign,
 	};
-	xen_ulong_t idx = fgfn;
+	xen_ulong_t idx = fgmfn;
 	xen_pfn_t gpfn = lpfn;
 	int err = 0;
 
@@ -62,13 +62,13 @@ static int map_foreign_page(unsigned long lpfn, unsigned long fgfn,
 }
 
 struct remap_data {
-	xen_pfn_t *fgfn; /* foreign domain's gfn */
+	xen_pfn_t *fgmfn; /* foreign domain's gmfn */
 	pgprot_t prot;
 	domid_t  domid;
 	struct vm_area_struct *vma;
 	int index;
 	struct page **pages;
-	struct xen_remap_gfn_info *info;
+	struct xen_remap_mfn_info *info;
 	int *err_ptr;
 	int mapped;
 };
@@ -82,20 +82,20 @@ static int remap_pte_fn(pte_t *ptep, pgtable_t token, unsigned long addr,
 	pte_t pte = pte_mkspecial(pfn_pte(pfn, info->prot));
 	int rc;
 
-	rc = map_foreign_page(pfn, *info->fgfn, info->domid);
+	rc = map_foreign_page(pfn, *info->fgmfn, info->domid);
 	*info->err_ptr++ = rc;
 	if (!rc) {
 		set_pte_at(info->vma->vm_mm, addr, ptep, pte);
 		info->mapped++;
 	}
-	info->fgfn++;
+	info->fgmfn++;
 
 	return 0;
 }
 
 int xen_xlate_remap_gfn_array(struct vm_area_struct *vma,
 			      unsigned long addr,
-			      xen_pfn_t *gfn, int nr,
+			      xen_pfn_t *mfn, int nr,
 			      int *err_ptr, pgprot_t prot,
 			      unsigned domid,
 			      struct page **pages)
@@ -108,7 +108,7 @@ int xen_xlate_remap_gfn_array(struct vm_area_struct *vma,
 	   x86 PVOPS */
 	BUG_ON(!((vma->vm_flags & (VM_PFNMAP | VM_IO)) == (VM_PFNMAP | VM_IO)));
 
-	data.fgfn = gfn;
+	data.fgmfn = mfn;
 	data.prot  = prot;
 	data.domid = domid;
 	data.vma   = vma;

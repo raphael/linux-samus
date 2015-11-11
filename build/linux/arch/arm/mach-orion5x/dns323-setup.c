@@ -236,7 +236,9 @@ static int __init dns323_read_mac_addr(void)
 	}
 
 	iounmap(mac_page);
-	printk("DNS-323: Found ethernet MAC address: %pM\n", addr);
+	printk("DNS-323: Found ethernet MAC address: ");
+	for (i = 0; i < 6; i++)
+		printk("%.2x%s", addr[i], (i < 5) ? ":" : ".\n");
 
 	memcpy(dns323_eth_data.mac_addr, addr, 6);
 

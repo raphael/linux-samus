@@ -1,6 +1,5 @@
 #ifndef __NVBIOS_INIT_H__
 #define __NVBIOS_INIT_H__
-
 struct nvbios_init {
 	struct nvkm_subdev *subdev;
 	struct nvkm_bios *bios;

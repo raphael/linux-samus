@@ -21,8 +21,7 @@
 	compatible = "altr,socfpga-arria10", "altr,socfpga";
 
 	chosen {
-		bootargs = "earlyprintk";
-		stdout-path = "serial1:115200n8";
+		bootargs = "console=ttyS0,115200 rootwait";
 	};
 
 	memory {

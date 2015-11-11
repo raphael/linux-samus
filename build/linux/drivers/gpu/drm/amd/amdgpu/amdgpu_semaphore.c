@@ -87,7 +87,7 @@ bool amdgpu_semaphore_emit_wait(struct amdgpu_ring *ring,
 
 void amdgpu_semaphore_free(struct amdgpu_device *adev,
 			   struct amdgpu_semaphore **semaphore,
-			   struct fence *fence)
+			   struct amdgpu_fence *fence)
 {
 	if (semaphore == NULL || *semaphore == NULL) {
 		return;

@@ -485,7 +485,7 @@ int ptlrpc_uuid_to_peer(struct obd_uuid *uuid,
 	return rc;
 }
 
-static void ptlrpc_ni_fini(void)
+void ptlrpc_ni_fini(void)
 {
 	wait_queue_head_t waitq;
 	struct l_wait_info lwi;
@@ -529,7 +529,7 @@ lnet_pid_t ptl_get_pid(void)
 	return pid;
 }
 
-static int ptlrpc_ni_init(void)
+int ptlrpc_ni_init(void)
 {
 	int rc;
 	lnet_pid_t pid;

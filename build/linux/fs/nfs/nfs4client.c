@@ -729,7 +729,10 @@ static bool nfs4_cb_match_client(const struct sockaddr *addr,
 		return false;
 
 	/* Match only the IP address, not the port number */
-	return rpc_cmp_addr(addr, clap);
+	if (!nfs_sockaddr_match_ipaddr(addr, clap))
+		return false;
+
+	return true;
 }
 
 /*

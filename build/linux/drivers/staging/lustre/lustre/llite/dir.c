@@ -203,6 +203,7 @@ static int ll_dir_filler(void *_hash, struct page *page0)
 
 	CDEBUG(D_VFSTRACE, "read %d/%d pages\n", nrdpgs, npages);
 
+	ll_pagevec_init(&lru_pvec, 0);
 	for (i = 1; i < npages; i++) {
 		unsigned long offset;
 		int ret;
@@ -224,15 +225,18 @@ static int ll_dir_filler(void *_hash, struct page *page0)
 
 		prefetchw(&page->flags);
 		ret = add_to_page_cache_lru(page, inode->i_mapping, offset,
-					    GFP_NOFS);
+					    GFP_KERNEL);
 		if (ret == 0) {
 			unlock_page(page);
+			if (ll_pagevec_add(&lru_pvec, page) == 0)
+				ll_pagevec_lru_add_file(&lru_pvec);
 		} else {
 			CDEBUG(D_VFSTRACE, "page %lu add to page cache failed: %d\n",
 			       offset, ret);
 		}
 		page_cache_release(page);
 	}
+	ll_pagevec_lru_add_file(&lru_pvec);
 
 	if (page_pool != &page0)
 		kfree(page_pool);

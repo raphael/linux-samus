@@ -587,7 +587,6 @@ struct bna_rxq {
 	u64		rx_bytes;
 	u64		rx_packets_with_error;
 	u64		rxbuf_alloc_failed;
-	u64		rxbuf_map_failed;
 };
 
 /* RxQ pair */

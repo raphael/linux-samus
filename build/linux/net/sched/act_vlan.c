@@ -116,8 +116,7 @@ static int tcf_vlan_init(struct net *net, struct nlattr *nla,
 	action = parm->v_action;
 
 	if (!tcf_hash_check(parm->index, a, bind)) {
-		ret = tcf_hash_create(parm->index, est, a, sizeof(*v),
-				      bind, false);
+		ret = tcf_hash_create(parm->index, est, a, sizeof(*v), bind);
 		if (ret)
 			return ret;
 

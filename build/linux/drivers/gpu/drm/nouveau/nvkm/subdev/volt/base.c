@@ -21,45 +21,49 @@
  *
  * Authors: Ben Skeggs
  */
-#include "priv.h"
-
+#include <subdev/volt.h>
 #include <subdev/bios.h>
 #include <subdev/bios/vmap.h>
 #include <subdev/bios/volt.h>
 
-int
+static int
 nvkm_volt_get(struct nvkm_volt *volt)
 {
-	int ret = volt->func->vid_get(volt), i;
-	if (ret >= 0) {
-		for (i = 0; i < volt->vid_nr; i++) {
-			if (volt->vid[i].vid == ret)
-				return volt->vid[i].uv;
+	if (volt->vid_get) {
+		int ret = volt->vid_get(volt), i;
+		if (ret >= 0) {
+			for (i = 0; i < volt->vid_nr; i++) {
+				if (volt->vid[i].vid == ret)
+					return volt->vid[i].uv;
+			}
+			ret = -EINVAL;
 		}
-		ret = -EINVAL;
+		return ret;
 	}
-	return ret;
+	return -ENODEV;
 }
 
 static int
 nvkm_volt_set(struct nvkm_volt *volt, u32 uv)
 {
-	struct nvkm_subdev *subdev = &volt->subdev;
-	int i, ret = -EINVAL;
-	for (i = 0; i < volt->vid_nr; i++) {
-		if (volt->vid[i].uv == uv) {
-			ret = volt->func->vid_set(volt, volt->vid[i].vid);
-			nvkm_debug(subdev, "set %duv: %d\n", uv, ret);
-			break;
+	if (volt->vid_set) {
+		int i, ret = -EINVAL;
+		for (i = 0; i < volt->vid_nr; i++) {
+			if (volt->vid[i].uv == uv) {
+				ret = volt->vid_set(volt, volt->vid[i].vid);
+				nv_debug(volt, "set %duv: %d\n", uv, ret);
+				break;
+			}
 		}
+		return ret;
 	}
-	return ret;
+	return -ENODEV;
 }
 
 static int
 nvkm_volt_map(struct nvkm_volt *volt, u8 id)
 {
-	struct nvkm_bios *bios = volt->subdev.device->bios;
+	struct nvkm_bios *bios = nvkm_bios(volt);
 	struct nvbios_vmap_entry info;
 	u8  ver, len;
 	u16 vmap;
@@ -78,15 +82,10 @@ nvkm_volt_map(struct nvkm_volt *volt, u8 id)
 	return id ? id * 10000 : -ENODEV;
 }
 
-int
+static int
 nvkm_volt_set_id(struct nvkm_volt *volt, u8 id, int condition)
 {
-	int ret;
-
-	if (volt->func->set_id)
-		return volt->func->set_id(volt, id, condition);
-
-	ret = nvkm_volt_map(volt, id);
+	int ret = nvkm_volt_map(volt, id);
 	if (ret >= 0) {
 		int prev = nvkm_volt_get(volt);
 		if (!condition || prev < 0 ||
@@ -135,41 +134,51 @@ nvkm_volt_parse_bios(struct nvkm_bios *bios, struct nvkm_volt *volt)
 	}
 }
 
-static int
-nvkm_volt_init(struct nvkm_subdev *subdev)
+int
+_nvkm_volt_init(struct nvkm_object *object)
 {
-	struct nvkm_volt *volt = nvkm_volt(subdev);
-	int ret = nvkm_volt_get(volt);
+	struct nvkm_volt *volt = (void *)object;
+	int ret;
+
+	ret = nvkm_subdev_init(&volt->base);
+	if (ret)
+		return ret;
+
+	ret = volt->get(volt);
 	if (ret < 0) {
 		if (ret != -ENODEV)
-			nvkm_debug(subdev, "current voltage unknown\n");
+			nv_debug(volt, "current voltage unknown\n");
 		return 0;
 	}
-	nvkm_debug(subdev, "current voltage: %duv\n", ret);
+
+	nv_info(volt, "GPU voltage: %duv\n", ret);
 	return 0;
 }
 
-static void *
-nvkm_volt_dtor(struct nvkm_subdev *subdev)
+void
+_nvkm_volt_dtor(struct nvkm_object *object)
 {
-	return nvkm_volt(subdev);
+	struct nvkm_volt *volt = (void *)object;
+	nvkm_subdev_destroy(&volt->base);
 }
 
-static const struct nvkm_subdev_func
-nvkm_volt = {
-	.dtor = nvkm_volt_dtor,
-	.init = nvkm_volt_init,
-};
-
-void
-nvkm_volt_ctor(const struct nvkm_volt_func *func, struct nvkm_device *device,
-	       int index, struct nvkm_volt *volt)
+int
+nvkm_volt_create_(struct nvkm_object *parent, struct nvkm_object *engine,
+		  struct nvkm_oclass *oclass, int length, void **pobject)
 {
-	struct nvkm_bios *bios = device->bios;
-	int i;
+	struct nvkm_bios *bios = nvkm_bios(parent);
+	struct nvkm_volt *volt;
+	int ret, i;
 
-	nvkm_subdev_ctor(&nvkm_volt, device, index, 0, &volt->subdev);
-	volt->func = func;
+	ret = nvkm_subdev_create_(parent, engine, oclass, 0, "VOLT",
+				  "voltage", length, pobject);
+	volt = *pobject;
+	if (ret)
+		return ret;
+
+	volt->get = nvkm_volt_get;
+	volt->set = nvkm_volt_set;
+	volt->set_id = nvkm_volt_set_id;
 
 	/* Assuming the non-bios device should build the voltage table later */
 	if (bios)
@@ -177,18 +186,19 @@ nvkm_volt_ctor(const struct nvkm_volt_func *func, struct nvkm_device *device,
 
 	if (volt->vid_nr) {
 		for (i = 0; i < volt->vid_nr; i++) {
-			nvkm_debug(&volt->subdev, "VID %02x: %duv\n",
-				   volt->vid[i].vid, volt->vid[i].uv);
+			nv_debug(volt, "VID %02x: %duv\n",
+				 volt->vid[i].vid, volt->vid[i].uv);
+		}
+
+		/*XXX: this is an assumption.. there probably exists boards
+		 * out there with i2c-connected voltage controllers too..
+		 */
+		ret = nvkm_voltgpio_init(volt);
+		if (ret == 0) {
+			volt->vid_get = nvkm_voltgpio_get;
+			volt->vid_set = nvkm_voltgpio_set;
 		}
 	}
-}
 
-int
-nvkm_volt_new_(const struct nvkm_volt_func *func, struct nvkm_device *device,
-	       int index, struct nvkm_volt **pvolt)
-{
-	if (!(*pvolt = kzalloc(sizeof(**pvolt), GFP_KERNEL)))
-		return -ENOMEM;
-	nvkm_volt_ctor(func, device, index, *pvolt);
-	return 0;
+	return ret;
 }

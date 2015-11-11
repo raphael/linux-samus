@@ -638,7 +638,7 @@ static int receive(struct net_device *dev, int cnt)
 #define GETTICK(x)                                                \
 ({                                                                \
 	if (cpu_has_tsc)                                          \
-		x = (unsigned int)rdtsc();		  \
+		rdtscl(x);                                        \
 })
 #else /* __i386__ */
 #define GETTICK(x)

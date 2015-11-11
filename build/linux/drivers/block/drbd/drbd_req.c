@@ -201,8 +201,7 @@ void start_new_tl_epoch(struct drbd_connection *connection)
 void complete_master_bio(struct drbd_device *device,
 		struct bio_and_error *m)
 {
-	m->bio->bi_error = m->error;
-	bio_endio(m->bio);
+	bio_endio(m->bio, m->error);
 	dec_ap_bio(device);
 }
 
@@ -1154,12 +1153,12 @@ drbd_submit_req_private_bio(struct drbd_request *req)
 				      rw == WRITE ? DRBD_FAULT_DT_WR
 				    : rw == READ  ? DRBD_FAULT_DT_RD
 				    :               DRBD_FAULT_DT_RA))
-			bio_io_error(bio);
+			bio_endio(bio, -EIO);
 		else
 			generic_make_request(bio);
 		put_ldev(device);
 	} else
-		bio_io_error(bio);
+		bio_endio(bio, -EIO);
 }
 
 static void drbd_queue_write(struct drbd_device *device, struct drbd_request *req)
@@ -1192,8 +1191,7 @@ drbd_request_prepare(struct drbd_device *device, struct bio *bio, unsigned long 
 		/* only pass the error to the upper layers.
 		 * if user cannot handle io errors, that's not our business. */
 		drbd_err(device, "could not kmalloc() req\n");
-		bio->bi_error = -ENOMEM;
-		bio_endio(bio);
+		bio_endio(bio, -ENOMEM);
 		return ERR_PTR(-ENOMEM);
 	}
 	req->start_jif = start_jif;
@@ -1499,8 +1497,6 @@ void drbd_make_request(struct request_queue *q, struct bio *bio)
 	struct drbd_device *device = (struct drbd_device *) q->queuedata;
 	unsigned long start_jif;
 
-	blk_queue_split(q, &bio, q->bio_split);
-
 	start_jif = jiffies;
 
 	/*
@@ -1510,6 +1506,41 @@ void drbd_make_request(struct request_queue *q, struct bio *bio)
 
 	inc_ap_bio(device);
 	__drbd_make_request(device, bio, start_jif);
+}
+
+/* This is called by bio_add_page().
+ *
+ * q->max_hw_sectors and other global limits are already enforced there.
+ *
+ * We need to call down to our lower level device,
+ * in case it has special restrictions.
+ *
+ * We also may need to enforce configured max-bio-bvecs limits.
+ *
+ * As long as the BIO is empty we have to allow at least one bvec,
+ * regardless of size and offset, so no need to ask lower levels.
+ */
+int drbd_merge_bvec(struct request_queue *q, struct bvec_merge_data *bvm, struct bio_vec *bvec)
+{
+	struct drbd_device *device = (struct drbd_device *) q->queuedata;
+	unsigned int bio_size = bvm->bi_size;
+	int limit = DRBD_MAX_BIO_SIZE;
+	int backing_limit;
+
+	if (bio_size && get_ldev(device)) {
+		unsigned int max_hw_sectors = queue_max_hw_sectors(q);
+		struct request_queue * const b =
+			device->ldev->backing_bdev->bd_disk->queue;
+		if (b->merge_bvec_fn) {
+			bvm->bi_bdev = device->ldev->backing_bdev;
+			backing_limit = b->merge_bvec_fn(b, bvm, bvec);
+			limit = min(limit, backing_limit);
+		}
+		put_ldev(device);
+		if ((limit >> 9) > max_hw_sectors)
+			limit = max_hw_sectors << 9;
+	}
+	return limit;
 }
 
 void request_timer_fn(unsigned long data)

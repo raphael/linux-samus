@@ -438,6 +438,7 @@ _xfs_buf_find(
 	xfs_buf_flags_t		flags,
 	xfs_buf_t		*new_bp)
 {
+	size_t			numbytes;
 	struct xfs_perag	*pag;
 	struct rb_node		**rbp;
 	struct rb_node		*parent;
@@ -449,9 +450,10 @@ _xfs_buf_find(
 
 	for (i = 0; i < nmaps; i++)
 		numblks += map[i].bm_len;
+	numbytes = BBTOB(numblks);
 
 	/* Check for IOs smaller than the sector size / not sector aligned */
-	ASSERT(!(BBTOB(numblks) < btp->bt_meta_sectorsize));
+	ASSERT(!(numbytes < btp->bt_meta_sectorsize));
 	ASSERT(!(BBTOB(blkno) & (xfs_off_t)btp->bt_meta_sectormask));
 
 	/*
@@ -1094,7 +1096,8 @@ xfs_bwrite(
 
 STATIC void
 xfs_buf_bio_end_io(
-	struct bio		*bio)
+	struct bio		*bio,
+	int			error)
 {
 	xfs_buf_t		*bp = (xfs_buf_t *)bio->bi_private;
 
@@ -1102,10 +1105,10 @@ xfs_buf_bio_end_io(
 	 * don't overwrite existing errors - otherwise we can lose errors on
 	 * buffers that require multiple bios to complete.
 	 */
-	if (bio->bi_error) {
+	if (error) {
 		spin_lock(&bp->b_lock);
 		if (!bp->b_io_error)
-			bp->b_io_error = bio->bi_error;
+			bp->b_io_error = error;
 		spin_unlock(&bp->b_lock);
 	}
 
@@ -1530,10 +1533,9 @@ xfs_wait_buftarg(
 			list_del_init(&bp->b_lru);
 			if (bp->b_flags & XBF_WRITE_FAIL) {
 				xfs_alert(btp->bt_mount,
-"Corruption Alert: Buffer at block 0x%llx had permanent write failures!",
+"Corruption Alert: Buffer at block 0x%llx had permanent write failures!\n"
+"Please run xfs_repair to determine the extent of the problem.",
 					(long long)bp->b_bn);
-				xfs_alert(btp->bt_mount,
-"Please run xfs_repair to determine the extent of the problem.");
 			}
 			xfs_buf_rele(bp);
 		}

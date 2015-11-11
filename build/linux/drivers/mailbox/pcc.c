@@ -352,10 +352,4 @@ static int __init pcc_init(void)
 
 	return 0;
 }
-
-/*
- * Make PCC init postcore so that users of this mailbox
- * such as the ACPI Processor driver have it available
- * at their init.
- */
-postcore_initcall(pcc_init);
+device_initcall(pcc_init);

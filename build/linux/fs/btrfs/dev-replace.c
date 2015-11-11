@@ -183,7 +183,8 @@ no_valid_dev_replace_entry_found:
 	}
 
 out:
-	btrfs_free_path(path);
+	if (path)
+		btrfs_free_path(path);
 	return ret;
 }
 

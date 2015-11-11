@@ -295,7 +295,7 @@ static bool rf6052_conf_para(struct adapter *adapt)
 			break;
 		}
 
-		if (!rtstatus)
+		if (rtstatus != true)
 			return false;
 	}
 

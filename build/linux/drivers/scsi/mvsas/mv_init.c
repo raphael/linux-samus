@@ -324,9 +324,13 @@ int mvs_ioremap(struct mvs_info *mvi, int bar, int bar_ex)
 			goto err_out;
 
 		res_flag_ex = pci_resource_flags(pdev, bar_ex);
-		if (res_flag_ex & IORESOURCE_MEM)
-			mvi->regs_ex = ioremap(res_start, res_len);
-		else
+		if (res_flag_ex & IORESOURCE_MEM) {
+			if (res_flag_ex & IORESOURCE_CACHEABLE)
+				mvi->regs_ex = ioremap(res_start, res_len);
+			else
+				mvi->regs_ex = ioremap_nocache(res_start,
+						res_len);
+		} else
 			mvi->regs_ex = (void *)res_start;
 		if (!mvi->regs_ex)
 			goto err_out;
@@ -334,14 +338,14 @@ int mvs_ioremap(struct mvs_info *mvi, int bar, int bar_ex)
 
 	res_start = pci_resource_start(pdev, bar);
 	res_len = pci_resource_len(pdev, bar);
-	if (!res_start || !res_len) {
-		iounmap(mvi->regs_ex);
-		mvi->regs_ex = NULL;
+	if (!res_start || !res_len)
 		goto err_out;
-	}
 
 	res_flag = pci_resource_flags(pdev, bar);
-	mvi->regs = ioremap(res_start, res_len);
+	if (res_flag & IORESOURCE_CACHEABLE)
+		mvi->regs = ioremap(res_start, res_len);
+	else
+		mvi->regs = ioremap_nocache(res_start, res_len);
 
 	if (!mvi->regs) {
 		if (mvi->regs_ex && (res_flag_ex & IORESOURCE_MEM))

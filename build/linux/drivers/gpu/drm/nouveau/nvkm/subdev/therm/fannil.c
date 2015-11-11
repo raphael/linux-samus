@@ -38,10 +38,11 @@ nvkm_fannil_set(struct nvkm_therm *therm, int percent)
 int
 nvkm_fannil_create(struct nvkm_therm *therm)
 {
+	struct nvkm_therm_priv *tpriv = (void *)therm;
 	struct nvkm_fan *priv;
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-	therm->fan = priv;
+	tpriv->fan = priv;
 	if (!priv)
 		return -ENOMEM;
 

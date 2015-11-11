@@ -148,7 +148,6 @@ struct regulator_ops {
 	int (*get_current_limit) (struct regulator_dev *);
 
 	int (*set_input_current_limit) (struct regulator_dev *, int lim_uA);
-	int (*set_over_current_protection) (struct regulator_dev *);
 
 	/* enable/disable regulator */
 	int (*enable) (struct regulator_dev *);

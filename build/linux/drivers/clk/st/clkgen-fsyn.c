@@ -15,7 +15,6 @@
 
 #include <linux/slab.h>
 #include <linux/of_address.h>
-#include <linux/clk.h>
 #include <linux/clk-provider.h>
 
 #include "clkgen.h"
@@ -307,7 +306,7 @@ static const struct clkgen_quadfs_data st_fs660c32_F_416 = {
 	.get_rate	= clk_fs660c32_dig_get_rate,
 };
 
-static const struct clkgen_quadfs_data st_fs660c32_C = {
+static const struct clkgen_quadfs_data st_fs660c32_C_407 = {
 	.nrst_present = true,
 	.nrst	= { CLKGEN_FIELD(0x2f0, 0x1, 0),
 		    CLKGEN_FIELD(0x2f0, 0x1, 1),
@@ -350,7 +349,7 @@ static const struct clkgen_quadfs_data st_fs660c32_C = {
 	.get_rate	= clk_fs660c32_dig_get_rate,
 };
 
-static const struct clkgen_quadfs_data st_fs660c32_D = {
+static const struct clkgen_quadfs_data st_fs660c32_D_407 = {
 	.nrst_present = true,
 	.nrst	= { CLKGEN_FIELD(0x2a0, 0x1, 0),
 		    CLKGEN_FIELD(0x2a0, 0x1, 1),
@@ -513,7 +512,7 @@ static unsigned long quadfs_pll_fs660c32_recalc_rate(struct clk_hw *hw,
 	params.ndiv = CLKGEN_READ(pll, ndiv);
 	if (clk_fs660c32_vco_get_rate(parent_rate, &params, &rate))
 		pr_err("%s:%s error calculating rate\n",
-		       clk_hw_get_name(hw), __func__);
+		       __clk_get_name(hw->clk), __func__);
 
 	pll->ndiv = params.ndiv;
 
@@ -558,7 +557,7 @@ static long quadfs_pll_fs660c32_round_rate(struct clk_hw *hw, unsigned long rate
 		clk_fs660c32_vco_get_rate(*prate, &params, &rate);
 
 	pr_debug("%s: %s new rate %ld [sdiv=0x%x,md=0x%x,pe=0x%x,nsdiv3=%u]\n",
-		 __func__, clk_hw_get_name(hw),
+		 __func__, __clk_get_name(hw->clk),
 		 rate, (unsigned int)params.sdiv,
 		 (unsigned int)params.mdiv,
 		 (unsigned int)params.pe, (unsigned int)params.nsdiv);
@@ -581,7 +580,7 @@ static int quadfs_pll_fs660c32_set_rate(struct clk_hw *hw, unsigned long rate,
 		clk_fs660c32_vco_get_rate(parent_rate, &params, &hwrate);
 
 	pr_debug("%s: %s new rate %ld [ndiv=0x%x]\n",
-		 __func__, clk_hw_get_name(hw),
+		 __func__, __clk_get_name(hw->clk),
 		 hwrate, (unsigned int)params.ndiv);
 
 	if (!hwrate)
@@ -745,7 +744,7 @@ static int quadfs_fsynth_enable(struct clk_hw *hw)
 	struct st_clk_quadfs_fsynth *fs = to_quadfs_fsynth(hw);
 	unsigned long flags = 0;
 
-	pr_debug("%s: %s\n", __func__, clk_hw_get_name(hw));
+	pr_debug("%s: %s\n", __func__, __clk_get_name(hw->clk));
 
 	quadfs_fsynth_program_rate(fs);
 
@@ -770,7 +769,7 @@ static void quadfs_fsynth_disable(struct clk_hw *hw)
 	struct st_clk_quadfs_fsynth *fs = to_quadfs_fsynth(hw);
 	unsigned long flags = 0;
 
-	pr_debug("%s: %s\n", __func__, clk_hw_get_name(hw));
+	pr_debug("%s: %s\n", __func__, __clk_get_name(hw->clk));
 
 	if (fs->lock)
 		spin_lock_irqsave(fs->lock, flags);
@@ -787,7 +786,7 @@ static int quadfs_fsynth_is_enabled(struct clk_hw *hw)
 	u32 nsb = CLKGEN_READ(fs, nsb[fs->chan]);
 
 	pr_debug("%s: %s enable bit = 0x%x\n",
-		 __func__, clk_hw_get_name(hw), nsb);
+		 __func__, __clk_get_name(hw->clk), nsb);
 
 	return fs->data->standby_polarity ? !nsb : !!nsb;
 }
@@ -946,10 +945,10 @@ static unsigned long quadfs_recalc_rate(struct clk_hw *hw,
 
 	if (clk_fs_get_rate(parent_rate, &params, &rate)) {
 		pr_err("%s:%s error calculating rate\n",
-		       clk_hw_get_name(hw), __func__);
+		       __clk_get_name(hw->clk), __func__);
 	}
 
-	pr_debug("%s:%s rate %lu\n", clk_hw_get_name(hw), __func__, rate);
+	pr_debug("%s:%s rate %lu\n", __clk_get_name(hw->clk), __func__, rate);
 
 	return rate;
 }
@@ -962,7 +961,7 @@ static long quadfs_round_rate(struct clk_hw *hw, unsigned long rate,
 	rate = quadfs_find_best_rate(hw, rate, *prate, &params);
 
 	pr_debug("%s: %s new rate %ld [sdiv=0x%x,md=0x%x,pe=0x%x,nsdiv3=%u]\n",
-		 __func__, clk_hw_get_name(hw),
+		 __func__, __clk_get_name(hw->clk),
 		 rate, (unsigned int)params.sdiv, (unsigned int)params.mdiv,
 			 (unsigned int)params.pe, (unsigned int)params.nsdiv);
 
@@ -1077,11 +1076,11 @@ static const struct of_device_id quadfs_of_match[] = {
 	},
 	{
 		.compatible = "st,stih407-quadfs660-C",
-		.data = &st_fs660c32_C
+		.data = &st_fs660c32_C_407
 	},
 	{
 		.compatible = "st,stih407-quadfs660-D",
-		.data = &st_fs660c32_D
+		.data = &st_fs660c32_D_407
 	},
 	{}
 };

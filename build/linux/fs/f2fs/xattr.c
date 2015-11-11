@@ -499,11 +499,8 @@ static int __f2fs_setxattr(struct inode *inode, int index,
 
 	len = strlen(name);
 
-	if (len > F2FS_NAME_LEN)
+	if (len > F2FS_NAME_LEN || size > MAX_VALUE_LEN(inode))
 		return -ERANGE;
-
-	if (size > MAX_VALUE_LEN(inode))
-		return -E2BIG;
 
 	base_addr = read_all_xattrs(inode, ipage);
 	if (!base_addr)

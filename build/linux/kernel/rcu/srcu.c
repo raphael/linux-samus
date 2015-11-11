@@ -252,15 +252,14 @@ static bool srcu_readers_active_idx_check(struct srcu_struct *sp, int idx)
 }
 
 /**
- * srcu_readers_active - returns true if there are readers. and false
- *                       otherwise
+ * srcu_readers_active - returns approximate number of readers.
  * @sp: which srcu_struct to count active readers (holding srcu_read_lock).
  *
  * Note that this is not an atomic primitive, and can therefore suffer
  * severe errors when invoked on an active srcu_struct.  That said, it
  * can be useful as an error check at cleanup time.
  */
-static bool srcu_readers_active(struct srcu_struct *sp)
+static int srcu_readers_active(struct srcu_struct *sp)
 {
 	int cpu;
 	unsigned long sum = 0;
@@ -415,11 +414,11 @@ static void __synchronize_srcu(struct srcu_struct *sp, int trycount)
 	struct rcu_head *head = &rcu.head;
 	bool done = false;
 
-	RCU_LOCKDEP_WARN(lock_is_held(&sp->dep_map) ||
-			 lock_is_held(&rcu_bh_lock_map) ||
-			 lock_is_held(&rcu_lock_map) ||
-			 lock_is_held(&rcu_sched_lock_map),
-			 "Illegal synchronize_srcu() in same-type SRCU (or in RCU) read-side critical section");
+	rcu_lockdep_assert(!lock_is_held(&sp->dep_map) &&
+			   !lock_is_held(&rcu_bh_lock_map) &&
+			   !lock_is_held(&rcu_lock_map) &&
+			   !lock_is_held(&rcu_sched_lock_map),
+			   "Illegal synchronize_srcu() in same-type SRCU (or RCU) read-side critical section");
 
 	might_sleep();
 	init_completion(&rcu.completion);

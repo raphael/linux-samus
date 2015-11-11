@@ -324,7 +324,8 @@ static void bdc_mem_free(struct bdc *bdc)
 				bdc->scratchpad.buff, bdc->scratchpad.sp_dma);
 
 	/* Destroy the dma pools */
-	dma_pool_destroy(bdc->bd_table_pool);
+	if (bdc->bd_table_pool)
+		dma_pool_destroy(bdc->bd_table_pool);
 
 	/* Free the bdc_ep array */
 	kfree(bdc->bdc_ep_array);

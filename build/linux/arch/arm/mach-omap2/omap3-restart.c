@@ -14,7 +14,6 @@
 #include <linux/init.h>
 #include <linux/reboot.h>
 
-#include "common.h"
 #include "control.h"
 #include "prm.h"
 

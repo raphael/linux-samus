@@ -1072,9 +1072,9 @@ void fb_edid_add_monspecs(unsigned char *edid, struct fb_monspecs *specs)
 
 	for (i = specs->modedb_len + num; i < specs->modedb_len + num + svd_n; i++) {
 		int idx = svd[i - specs->modedb_len - num];
-		if (!idx || idx >= ARRAY_SIZE(cea_modes)) {
+		if (!idx || idx > 63) {
 			pr_warning("Reserved SVD code %d\n", idx);
-		} else if (!cea_modes[idx].xres) {
+		} else if (idx > ARRAY_SIZE(cea_modes) || !cea_modes[idx].xres) {
 			pr_warning("Unimplemented SVD code %d\n", idx);
 		} else {
 			memcpy(&m[i], cea_modes + idx, sizeof(m[i]));

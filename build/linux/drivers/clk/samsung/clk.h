@@ -13,10 +13,9 @@
 #ifndef __SAMSUNG_CLK_H
 #define __SAMSUNG_CLK_H
 
+#include <linux/clkdev.h>
 #include <linux/clk-provider.h>
 #include "clk-pll.h"
-
-struct clk;
 
 /**
  * struct samsung_clk_provider: information about clock provider

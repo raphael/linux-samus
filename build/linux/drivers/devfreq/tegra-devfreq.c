@@ -541,20 +541,18 @@ static struct devfreq_dev_profile tegra_devfreq_profile = {
 static int tegra_governor_get_target(struct devfreq *devfreq,
 				     unsigned long *freq)
 {
-	struct devfreq_dev_status *stat;
+	struct devfreq_dev_status stat;
 	struct tegra_devfreq *tegra;
 	struct tegra_devfreq_device *dev;
 	unsigned long target_freq = 0;
 	unsigned int i;
 	int err;
 
-	err = devfreq_update_stats(devfreq);
+	err = devfreq->profile->get_dev_status(devfreq->dev.parent, &stat);
 	if (err)
 		return err;
 
-	stat = &devfreq->last_status;
-
-	tegra = stat->private_data;
+	tegra = stat.private_data;
 
 	for (i = 0; i < ARRAY_SIZE(tegra->devices); i++) {
 		dev = &tegra->devices[i];

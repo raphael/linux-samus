@@ -241,37 +241,22 @@ int mdp4_enable(struct mdp4_kms *mdp4_kms)
 }
 
 #ifdef CONFIG_OF
-static struct drm_panel *detect_panel(struct drm_device *dev)
+static struct drm_panel *detect_panel(struct drm_device *dev, const char *name)
 {
-	struct device_node *endpoint, *panel_node;
-	struct device_node *np = dev->dev->of_node;
+	struct device_node *n;
 	struct drm_panel *panel = NULL;
 
-	endpoint = of_graph_get_next_endpoint(np, NULL);
-	if (!endpoint) {
-		dev_err(dev->dev, "no valid endpoint\n");
-		return ERR_PTR(-ENODEV);
-	}
-
-	panel_node = of_graph_get_remote_port_parent(endpoint);
-	if (!panel_node) {
-		dev_err(dev->dev, "no valid panel node\n");
-		of_node_put(endpoint);
-		return ERR_PTR(-ENODEV);
-	}
-
-	of_node_put(endpoint);
-
-	panel = of_drm_find_panel(panel_node);
-	if (!panel) {
-		of_node_put(panel_node);
-		return ERR_PTR(-EPROBE_DEFER);
+	n = of_parse_phandle(dev->dev->of_node, name, 0);
+	if (n) {
+		panel = of_drm_find_panel(n);
+		if (!panel)
+			panel = ERR_PTR(-EPROBE_DEFER);
 	}
 
 	return panel;
 }
 #else
-static struct drm_panel *detect_panel(struct drm_device *dev)
+static struct drm_panel *detect_panel(struct drm_device *dev, const char *name)
 {
 	// ??? maybe use a module param to specify which panel is attached?
 }
@@ -309,7 +294,7 @@ static int modeset_init(struct mdp4_kms *mdp4_kms)
 	 * Setup the LCDC/LVDS path: RGB2 -> DMA_P -> LCDC -> LVDS:
 	 */
 
-	panel = detect_panel(dev);
+	panel = detect_panel(dev, "qcom,lvds-panel");
 	if (IS_ERR(panel)) {
 		ret = PTR_ERR(panel);
 		dev_err(dev->dev, "failed to detect LVDS panel: %d\n", ret);
@@ -541,11 +526,6 @@ struct msm_kms *mdp4_kms_init(struct drm_device *dev)
 		dev_err(dev->dev, "could not pin blank-cursor bo: %d\n", ret);
 		goto fail;
 	}
-
-	dev->mode_config.min_width = 0;
-	dev->mode_config.min_height = 0;
-	dev->mode_config.max_width = 2048;
-	dev->mode_config.max_height = 2048;
 
 	return kms;
 

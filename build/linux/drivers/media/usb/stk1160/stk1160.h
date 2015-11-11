@@ -58,6 +58,7 @@
  * new drivers should use.
  *
  */
+#define DEBUG
 #ifdef DEBUG
 #define stk1160_dbg(fmt, args...) \
 	printk(KERN_DEBUG "stk1160: " fmt,  ## args)
@@ -150,7 +151,8 @@ struct stk1160 {
 	v4l2_std_id norm;	  /* current norm */
 	struct stk1160_fmt *fmt;  /* selected format */
 
-	unsigned int sequence;
+	unsigned int field_count; /* not sure ??? */
+	enum v4l2_field field;    /* also not sure :/ */
 
 	/* i2c i/o */
 	struct i2c_adapter i2c_adap;

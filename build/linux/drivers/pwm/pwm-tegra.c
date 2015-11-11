@@ -112,7 +112,7 @@ static int tegra_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	 * If the PWM channel is disabled, make sure to turn on the clock
 	 * before writing the register. Otherwise, keep it enabled.
 	 */
-	if (!pwm_is_enabled(pwm)) {
+	if (!test_bit(PWMF_ENABLED, &pwm->flags)) {
 		err = clk_prepare_enable(pc->clk);
 		if (err < 0)
 			return err;
@@ -124,7 +124,7 @@ static int tegra_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	/*
 	 * If the PWM is not enabled, turn the clock off again to save power.
 	 */
-	if (!pwm_is_enabled(pwm))
+	if (!test_bit(PWMF_ENABLED, &pwm->flags))
 		clk_disable_unprepare(pc->clk);
 
 	return 0;
@@ -214,7 +214,7 @@ static int tegra_pwm_remove(struct platform_device *pdev)
 	for (i = 0; i < NUM_PWM; i++) {
 		struct pwm_device *pwm = &pc->chip.pwms[i];
 
-		if (!pwm_is_enabled(pwm))
+		if (!test_bit(PWMF_ENABLED, &pwm->flags))
 			if (clk_prepare_enable(pc->clk) < 0)
 				continue;
 

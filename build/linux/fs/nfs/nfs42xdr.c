@@ -238,7 +238,8 @@ out_overflow:
 	return -EIO;
 }
 
-static int decode_layoutstats(struct xdr_stream *xdr)
+static int decode_layoutstats(struct xdr_stream *xdr,
+			      struct nfs42_layoutstat_res *res)
 {
 	return decode_op_hdr(xdr, OP_LAYOUTSTATS);
 }
@@ -342,7 +343,7 @@ static int nfs4_xdr_dec_layoutstats(struct rpc_rqst *rqstp,
 		goto out;
 	WARN_ON(res->num_dev > PNFS_LAYOUTSTATS_MAXDEV);
 	for (i = 0; i < res->num_dev; i++) {
-		status = decode_layoutstats(xdr);
+		status = decode_layoutstats(xdr, res);
 		if (status)
 			goto out;
 	}

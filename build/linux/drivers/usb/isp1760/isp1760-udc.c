@@ -1382,25 +1382,14 @@ static void isp1760_udc_init_eps(struct isp1760_udc *udc)
 		 * This fits in the 8kB FIFO without double-buffering.
 		 */
 		if (ep_num == 0) {
-			usb_ep_set_maxpacket_limit(&ep->ep, 64);
-			ep->ep.caps.type_control = true;
-			ep->ep.caps.dir_in = true;
-			ep->ep.caps.dir_out = true;
+			ep->ep.maxpacket = 64;
 			ep->maxpacket = 64;
 			udc->gadget.ep0 = &ep->ep;
 		} else {
-			usb_ep_set_maxpacket_limit(&ep->ep, 512);
-			ep->ep.caps.type_iso = true;
-			ep->ep.caps.type_bulk = true;
-			ep->ep.caps.type_int = true;
+			ep->ep.maxpacket = 512;
 			ep->maxpacket = 0;
 			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
 		}
-
-		if (is_in)
-			ep->ep.caps.dir_in = true;
-		else
-			ep->ep.caps.dir_out = true;
 	}
 }
 

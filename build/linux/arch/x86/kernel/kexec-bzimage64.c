@@ -223,6 +223,9 @@ setup_boot_parameters(struct kimage *image, struct boot_params *params,
 	memset(&params->hd0_info, 0, sizeof(params->hd0_info));
 	memset(&params->hd1_info, 0, sizeof(params->hd1_info));
 
+	/* Default sysdesc table */
+	params->sys_desc_table.length = 0;
+
 	if (image->type == KEXEC_TYPE_CRASH) {
 		ret = crash_setup_memmap_entries(image, params);
 		if (ret)
@@ -533,9 +536,7 @@ static int bzImage64_verify_sig(const char *kernel, unsigned long kernel_len)
 	int ret;
 
 	ret = verify_pefile_signature(kernel, kernel_len,
-				      system_trusted_keyring,
-				      VERIFYING_KEXEC_PE_SIGNATURE,
-				      &trusted);
+				      system_trusted_keyring, &trusted);
 	if (ret < 0)
 		return ret;
 	if (!trusted)

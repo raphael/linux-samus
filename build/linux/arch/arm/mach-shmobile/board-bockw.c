@@ -723,7 +723,7 @@ static void __init bockw_init_late(void)
 	ADD_USB_FUNC_DEVICE_IF_POSSIBLE();
 }
 
-static const char *const bockw_boards_compat_dt[] __initconst = {
+static const char *bockw_boards_compat_dt[] __initdata = {
 	"renesas,bockw",
 	NULL,
 };

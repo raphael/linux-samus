@@ -103,7 +103,7 @@ static unsigned long emc_recalc_rate(struct clk_hw *hw,
 	 * CCF wrongly assumes that the parent won't change during set_rate,
 	 * so get the parent rate explicitly.
 	 */
-	parent_rate = clk_hw_get_rate(clk_hw_get_parent(hw));
+	parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
 
 	val = readl(tegra->clk_regs + CLK_SOURCE_EMC);
 	div = val & CLK_SOURCE_EMC_EMC_2X_CLK_DIVISOR_MASK;
@@ -116,7 +116,11 @@ static unsigned long emc_recalc_rate(struct clk_hw *hw,
  * safer since things have EMC rate floors. Also don't touch parent_rate
  * since we don't want the CCF to play with our parent clocks.
  */
-static int emc_determine_rate(struct clk_hw *hw, struct clk_rate_request *req)
+static long emc_determine_rate(struct clk_hw *hw, unsigned long rate,
+			       unsigned long min_rate,
+			       unsigned long max_rate,
+			       unsigned long *best_parent_rate,
+			       struct clk_hw **best_parent_hw)
 {
 	struct tegra_clk_emc *tegra;
 	u8 ram_code = tegra_read_ram_code();
@@ -131,28 +135,22 @@ static int emc_determine_rate(struct clk_hw *hw, struct clk_rate_request *req)
 
 		timing = tegra->timings + i;
 
-		if (timing->rate > req->max_rate) {
+		if (timing->rate > max_rate) {
 			i = min(i, 1);
-			req->rate = tegra->timings[i - 1].rate;
-			return 0;
+			return tegra->timings[i - 1].rate;
 		}
 
-		if (timing->rate < req->min_rate)
+		if (timing->rate < min_rate)
 			continue;
 
-		if (timing->rate >= req->rate) {
-			req->rate = timing->rate;
-			return 0;
-		}
+		if (timing->rate >= rate)
+			return timing->rate;
 	}
 
-	if (timing) {
-		req->rate = timing->rate;
-		return 0;
-	}
+	if (timing)
+		return timing->rate;
 
-	req->rate = clk_hw_get_rate(hw);
-	return 0;
+	return __clk_get_rate(hw->clk);
 }
 
 static u8 emc_get_parent(struct clk_hw *hw)
@@ -314,7 +312,7 @@ static int emc_set_rate(struct clk_hw *hw, unsigned long rate,
 
 	tegra = container_of(hw, struct tegra_clk_emc, hw);
 
-	if (clk_hw_get_rate(hw) == rate)
+	if (__clk_get_rate(hw->clk) == rate)
 		return 0;
 
 	/*
@@ -527,8 +525,8 @@ struct clk *tegra_clk_register_emc(void __iomem *base, struct device_node *np,
 	if (IS_ERR(clk))
 		return clk;
 
-	tegra->prev_parent = clk_hw_get_parent_by_index(
-		&tegra->hw, emc_get_parent(&tegra->hw))->clk;
+	tegra->prev_parent = clk_get_parent_by_index(
+		tegra->hw.clk, emc_get_parent(&tegra->hw));
 	tegra->changing_timing = false;
 
 	/* Allow debugging tools to see the EMC clock */

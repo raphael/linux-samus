@@ -20,12 +20,12 @@
 
 extern void __init mmp_dt_init_timer(void);
 
-static const char *const pxa168_dt_board_compat[] __initconst = {
+static const char *pxa168_dt_board_compat[] __initdata = {
 	"mrvl,pxa168-aspenite",
 	NULL,
 };
 
-static const char *const pxa910_dt_board_compat[] __initconst = {
+static const char *pxa910_dt_board_compat[] __initdata = {
 	"mrvl,pxa910-dkb",
 	NULL,
 };

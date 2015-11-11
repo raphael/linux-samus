@@ -390,8 +390,10 @@ static int qeth_l2_vlan_rx_kill_vid(struct net_device *dev,
 	return rc;
 }
 
-static void qeth_l2_stop_card(struct qeth_card *card, int recovery_mode)
+static int qeth_l2_stop_card(struct qeth_card *card, int recovery_mode)
 {
+	int rc = 0;
+
 	QETH_DBF_TEXT(SETUP , 2, "stopcard");
 	QETH_DBF_HEX(SETUP, 2, &card, sizeof(void *));
 
@@ -425,6 +427,7 @@ static void qeth_l2_stop_card(struct qeth_card *card, int recovery_mode)
 		qeth_clear_cmd_buffers(&card->read);
 		qeth_clear_cmd_buffers(&card->write);
 	}
+	return rc;
 }
 
 static int qeth_l2_process_inbound_buffer(struct qeth_card *card,

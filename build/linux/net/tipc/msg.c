@@ -121,7 +121,7 @@ int tipc_buf_append(struct sk_buff **headbuf, struct sk_buff **buf)
 {
 	struct sk_buff *head = *headbuf;
 	struct sk_buff *frag = *buf;
-	struct sk_buff *tail = NULL;
+	struct sk_buff *tail;
 	struct tipc_msg *msg;
 	u32 fragid;
 	int delta;
@@ -141,15 +141,9 @@ int tipc_buf_append(struct sk_buff **headbuf, struct sk_buff **buf)
 		if (unlikely(skb_unclone(frag, GFP_ATOMIC)))
 			goto err;
 		head = *headbuf = frag;
-		*buf = NULL;
+		skb_frag_list_init(head);
 		TIPC_SKB_CB(head)->tail = NULL;
-		if (skb_is_nonlinear(head)) {
-			skb_walk_frags(head, tail) {
-				TIPC_SKB_CB(head)->tail = tail;
-			}
-		} else {
-			skb_frag_list_init(head);
-		}
+		*buf = NULL;
 		return 0;
 	}
 
@@ -469,72 +463,60 @@ bool tipc_msg_make_bundle(struct sk_buff **skb,  struct tipc_msg *msg,
 
 /**
  * tipc_msg_reverse(): swap source and destination addresses and add error code
- * @own_node: originating node id for reversed message
- * @skb:  buffer containing message to be reversed; may be replaced.
- * @err:  error code to be set in message, if any
- * Consumes buffer at failure
+ * @buf:  buffer containing message to be reversed
+ * @dnode: return value: node where to send message after reversal
+ * @err:  error code to be set in message
+ * Consumes buffer if failure
  * Returns true if success, otherwise false
  */
-bool tipc_msg_reverse(u32 own_node,  struct sk_buff **skb, int err)
+bool tipc_msg_reverse(u32 own_addr,  struct sk_buff *buf, u32 *dnode,
+		      int err)
 {
-	struct sk_buff *_skb = *skb;
-	struct tipc_msg *hdr = buf_msg(_skb);
+	struct tipc_msg *msg = buf_msg(buf);
 	struct tipc_msg ohdr;
-	int dlen = min_t(uint, msg_data_sz(hdr), MAX_FORWARD_SIZE);
+	uint rdsz = min_t(uint, msg_data_sz(msg), MAX_FORWARD_SIZE);
 
-	if (skb_linearize(_skb))
+	if (skb_linearize(buf))
 		goto exit;
-	hdr = buf_msg(_skb);
-	if (msg_dest_droppable(hdr))
+	msg = buf_msg(buf);
+	if (msg_dest_droppable(msg))
 		goto exit;
-	if (msg_errcode(hdr))
+	if (msg_errcode(msg))
 		goto exit;
-
-	/* Take a copy of original header before altering message */
-	memcpy(&ohdr, hdr, msg_hdr_sz(hdr));
-
-	/* Never return SHORT header; expand by replacing buffer if necessary */
-	if (msg_short(hdr)) {
-		*skb = tipc_buf_acquire(BASIC_H_SIZE + dlen);
-		if (!*skb)
-			goto exit;
-		memcpy((*skb)->data + BASIC_H_SIZE, msg_data(hdr), dlen);
-		kfree_skb(_skb);
-		_skb = *skb;
-		hdr = buf_msg(_skb);
-		memcpy(hdr, &ohdr, BASIC_H_SIZE);
-		msg_set_hdr_sz(hdr, BASIC_H_SIZE);
+	memcpy(&ohdr, msg, msg_hdr_sz(msg));
+	msg_set_errcode(msg, err);
+	msg_set_origport(msg, msg_destport(&ohdr));
+	msg_set_destport(msg, msg_origport(&ohdr));
+	msg_set_prevnode(msg, own_addr);
+	if (!msg_short(msg)) {
+		msg_set_orignode(msg, msg_destnode(&ohdr));
+		msg_set_destnode(msg, msg_orignode(&ohdr));
 	}
-
-	/* Now reverse the concerned fields */
-	msg_set_errcode(hdr, err);
-	msg_set_origport(hdr, msg_destport(&ohdr));
-	msg_set_destport(hdr, msg_origport(&ohdr));
-	msg_set_destnode(hdr, msg_prevnode(&ohdr));
-	msg_set_prevnode(hdr, own_node);
-	msg_set_orignode(hdr, own_node);
-	msg_set_size(hdr, msg_hdr_sz(hdr) + dlen);
-	skb_trim(_skb, msg_size(hdr));
-	skb_orphan(_skb);
+	msg_set_size(msg, msg_hdr_sz(msg) + rdsz);
+	skb_trim(buf, msg_size(msg));
+	skb_orphan(buf);
+	*dnode = msg_orignode(&ohdr);
 	return true;
 exit:
-	kfree_skb(_skb);
-	*skb = NULL;
+	kfree_skb(buf);
+	*dnode = 0;
 	return false;
 }
 
 /**
  * tipc_msg_lookup_dest(): try to find new destination for named message
  * @skb: the buffer containing the message.
- * @err: error code to be used by caller if lookup fails
+ * @dnode: return value: next-hop node, if destination found
+ * @err: return value: error code to use, if message to be rejected
  * Does not consume buffer
  * Returns true if a destination is found, false otherwise
  */
-bool tipc_msg_lookup_dest(struct net *net, struct sk_buff *skb, int *err)
+bool tipc_msg_lookup_dest(struct net *net, struct sk_buff *skb,
+			  u32 *dnode, int *err)
 {
 	struct tipc_msg *msg = buf_msg(skb);
-	u32 dport, dnode;
-	u32 onode = tipc_own_addr(net);
+	u32 dport;
+	u32 own_addr = tipc_own_addr(net);
 
 	if (!msg_isdata(msg))
 		return false;
@@ -545,18 +527,17 @@ bool tipc_msg_lookup_dest(struct net *net, struct sk_buff *skb, int *err)
 	*err = -TIPC_ERR_NO_NAME;
 	if (skb_linearize(skb))
 		return false;
-	msg = buf_msg(skb);
 	if (msg_reroute_cnt(msg))
 		return false;
-	dnode = addr_domain(net, msg_lookup_scope(msg));
+	*dnode = addr_domain(net, msg_lookup_scope(msg));
 	dport = tipc_nametbl_translate(net, msg_nametype(msg),
-				       msg_nameinst(msg), &dnode);
+				       msg_nameinst(msg), dnode);
 	if (!dport)
 		return false;
 	msg_incr_reroute_cnt(msg);
-	if (dnode != onode)
-		msg_set_prevnode(msg, onode);
-	msg_set_destnode(msg, dnode);
+	if (*dnode != own_addr)
+		msg_set_prevnode(msg, own_addr);
+	msg_set_destnode(msg, *dnode);
 	msg_set_destport(msg, dport);
 	*err = TIPC_OK;
 	return true;

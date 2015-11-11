@@ -56,7 +56,6 @@ intel_create_plane_state(struct drm_plane *plane)
 
 	state->base.plane = plane;
 	state->base.rotation = BIT(DRM_ROTATE_0);
-	state->ckey.flags = I915_SET_COLORKEY_NONE;
 
 	return state;
 }
@@ -115,10 +114,8 @@ static int intel_plane_atomic_check(struct drm_plane *plane,
 	struct intel_crtc_state *crtc_state;
 	struct intel_plane *intel_plane = to_intel_plane(plane);
 	struct intel_plane_state *intel_state = to_intel_plane_state(state);
-	struct drm_crtc_state *drm_crtc_state;
-	int ret;
 
-	crtc = crtc ? crtc : plane->state->crtc;
+	crtc = crtc ? crtc : plane->crtc;
 	intel_crtc = to_intel_crtc(crtc);
 
 	/*
@@ -130,11 +127,16 @@ static int intel_plane_atomic_check(struct drm_plane *plane,
 	if (!crtc)
 		return 0;
 
-	drm_crtc_state = drm_atomic_get_existing_crtc_state(state->state, crtc);
-	if (WARN_ON(!drm_crtc_state))
-		return -EINVAL;
-
-	crtc_state = to_intel_crtc_state(drm_crtc_state);
+	/* FIXME: temporary hack necessary while we still use the plane update
+	 * helper. */
+	if (state->state) {
+		crtc_state =
+			intel_atomic_get_crtc_state(state->state, intel_crtc);
+		if (IS_ERR(crtc_state))
+			return PTR_ERR(crtc_state);
+	} else {
+		crtc_state = intel_crtc->config;
+	}
 
 	/*
 	 * The original src/dest coordinates are stored in state->base, but
@@ -157,6 +159,20 @@ static int intel_plane_atomic_check(struct drm_plane *plane,
 		crtc_state->base.active ? crtc_state->pipe_src_w : 0;
 	intel_state->clip.y2 =
 		crtc_state->base.active ? crtc_state->pipe_src_h : 0;
+
+	/*
+	 * Disabling a plane is always okay; we just need to update
+	 * fb tracking in a special way since cleanup_fb() won't
+	 * get called by the plane helpers.
+	 */
+	if (state->fb == NULL && plane->state->fb != NULL) {
+		/*
+		 * 'prepare' is never called when plane is being disabled, so
+		 * we need to handle frontbuffer tracking as a special case
+		 */
+		intel_crtc->atomic.disabled_planes |=
+			(1 << drm_plane_index(plane));
+	}
 
 	if (state->fb && intel_rotation_90_or_270(state->rotation)) {
 		if (!(state->fb->modifier[0] == I915_FORMAT_MOD_Y_TILED ||
@@ -182,12 +198,7 @@ static int intel_plane_atomic_check(struct drm_plane *plane,
 		}
 	}
 
-	intel_state->visible = false;
-	ret = intel_plane->check_plane(plane, crtc_state, intel_state);
-	if (ret)
-		return ret;
-
-	return intel_plane_atomic_calc_changes(&crtc_state->base, state);
+	return intel_plane->check_plane(plane, intel_state);
 }
 
 static void intel_plane_atomic_update(struct drm_plane *plane,

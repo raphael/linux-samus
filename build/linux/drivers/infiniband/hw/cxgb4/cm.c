@@ -50,7 +50,6 @@
 #include <rdma/ib_addr.h>
 
 #include "iw_cxgb4.h"
-#include "clip_tbl.h"
 
 static char *states[] = {
 	"idle",
@@ -116,11 +115,11 @@ module_param(ep_timeout_secs, int, 0644);
 MODULE_PARM_DESC(ep_timeout_secs, "CM Endpoint operation timeout "
 				   "in seconds (default=60)");
 
-static int mpa_rev = 2;
+static int mpa_rev = 1;
 module_param(mpa_rev, int, 0644);
 MODULE_PARM_DESC(mpa_rev, "MPA Revision, 0 supports amso1100, "
 		"1 is RFC0544 spec compliant, 2 is IETF MPA Peer Connect Draft"
-		" compliant (default=2)");
+		" compliant (default=1)");
 
 static int markers_enabled;
 module_param(markers_enabled, int, 0644);
@@ -299,16 +298,6 @@ void _c4iw_free_ep(struct kref *kref)
 	if (test_bit(QP_REFERENCED, &ep->com.flags))
 		deref_qp(ep);
 	if (test_bit(RELEASE_RESOURCES, &ep->com.flags)) {
-		if (ep->com.remote_addr.ss_family == AF_INET6) {
-			struct sockaddr_in6 *sin6 =
-					(struct sockaddr_in6 *)
-					&ep->com.mapped_local_addr;
-
-			cxgb4_clip_release(
-					ep->com.dev->rdev.lldi.ports[0],
-					(const u32 *)&sin6->sin6_addr.s6_addr,
-					1);
-		}
 		remove_handle(ep->com.dev, &ep->com.dev->hwtid_idr, ep->hwtid);
 		cxgb4_remove_tid(ep->com.dev->rdev.lldi.tids, 0, ep->hwtid);
 		dst_release(ep->dst);
@@ -453,12 +442,6 @@ static void act_open_req_arp_failure(void *handle, struct sk_buff *skb)
 	kfree_skb(skb);
 	connect_reply_upcall(ep, -EHOSTUNREACH);
 	state_set(&ep->com, DEAD);
-	if (ep->com.remote_addr.ss_family == AF_INET6) {
-		struct sockaddr_in6 *sin6 =
-			(struct sockaddr_in6 *)&ep->com.mapped_local_addr;
-		cxgb4_clip_release(ep->com.dev->rdev.lldi.ports[0],
-				   (const u32 *)&sin6->sin6_addr.s6_addr, 1);
-	}
 	remove_handle(ep->com.dev, &ep->com.dev->atid_idr, ep->atid);
 	cxgb4_free_atid(ep->com.dev->rdev.lldi.tids, ep->atid);
 	dst_release(ep->dst);
@@ -657,7 +640,6 @@ static int send_connect(struct c4iw_ep *ep)
 	struct sockaddr_in6 *ra6 = (struct sockaddr_in6 *)
 				   &ep->com.mapped_remote_addr;
 	int win;
-	int ret;
 
 	wrlen = (ep->com.remote_addr.ss_family == AF_INET) ?
 			roundup(sizev4, 16) :
@@ -711,11 +693,6 @@ static int send_connect(struct c4iw_ep *ep)
 		opt2 |= CONG_CNTRL_V(CONG_ALG_TAHOE);
 		opt2 |= T5_ISS_F;
 	}
-
-	if (ep->com.remote_addr.ss_family == AF_INET6)
-		cxgb4_clip_get(ep->com.dev->rdev.lldi.ports[0],
-			       (const u32 *)&la6->sin6_addr.s6_addr, 1);
-
 	t4_set_arp_err_handler(skb, ep, act_open_req_arp_failure);
 
 	if (is_t4(ep->com.dev->rdev.lldi.adapter_type)) {
@@ -813,11 +790,7 @@ static int send_connect(struct c4iw_ep *ep)
 	}
 
 	set_bit(ACT_OPEN_REQ, &ep->com.history);
-	ret = c4iw_l2t_send(&ep->com.dev->rdev, skb, ep->l2t);
-	if (ret && ep->com.remote_addr.ss_family == AF_INET6)
-		cxgb4_clip_release(ep->com.dev->rdev.lldi.ports[0],
-				   (const u32 *)&la6->sin6_addr.s6_addr, 1);
-	return ret;
+	return c4iw_l2t_send(&ep->com.dev->rdev, skb, ep->l2t);
 }
 
 static void send_mpa_req(struct c4iw_ep *ep, struct sk_buff *skb,
@@ -2118,15 +2091,6 @@ static int act_open_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
 	case CPL_ERR_CONN_EXIST:
 		if (ep->retry_count++ < ACT_OPEN_RETRY_COUNT) {
 			set_bit(ACT_RETRY_INUSE, &ep->com.history);
-			if (ep->com.remote_addr.ss_family == AF_INET6) {
-				struct sockaddr_in6 *sin6 =
-						(struct sockaddr_in6 *)
-						&ep->com.mapped_local_addr;
-				cxgb4_clip_release(
-						ep->com.dev->rdev.lldi.ports[0],
-						(const u32 *)
-						&sin6->sin6_addr.s6_addr, 1);
-			}
 			remove_handle(ep->com.dev, &ep->com.dev->atid_idr,
 					atid);
 			cxgb4_free_atid(t, atid);
@@ -2154,12 +2118,6 @@ static int act_open_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
 	connect_reply_upcall(ep, status2errno(status));
 	state_set(&ep->com, DEAD);
 
-	if (ep->com.remote_addr.ss_family == AF_INET6) {
-		struct sockaddr_in6 *sin6 =
-			(struct sockaddr_in6 *)&ep->com.mapped_local_addr;
-		cxgb4_clip_release(ep->com.dev->rdev.lldi.ports[0],
-				   (const u32 *)&sin6->sin6_addr.s6_addr, 1);
-	}
 	if (status && act_open_has_tid(status))
 		cxgb4_remove_tid(ep->com.dev->rdev.lldi.tids, 0, GET_TID(rpl));
 
@@ -2344,7 +2302,6 @@ static int pass_accept_req(struct c4iw_dev *dev, struct sk_buff *skb)
 	struct dst_entry *dst;
 	__u8 local_ip[16], peer_ip[16];
 	__be16 local_port, peer_port;
-	struct sockaddr_in6 *sin6;
 	int err;
 	u16 peer_mss = ntohs(req->tcpopt.mss);
 	int iptype;
@@ -2443,7 +2400,9 @@ static int pass_accept_req(struct c4iw_dev *dev, struct sk_buff *skb)
 		sin->sin_port = peer_port;
 		sin->sin_addr.s_addr = *(__be32 *)peer_ip;
 	} else {
-		sin6 = (struct sockaddr_in6 *)&child_ep->com.mapped_local_addr;
+		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)
+			&child_ep->com.mapped_local_addr;
+
 		sin6->sin6_family = PF_INET6;
 		sin6->sin6_port = local_port;
 		memcpy(sin6->sin6_addr.s6_addr, local_ip, 16);
@@ -2477,11 +2436,6 @@ static int pass_accept_req(struct c4iw_dev *dev, struct sk_buff *skb)
 	insert_handle(dev, &dev->hwtid_idr, child_ep, child_ep->hwtid);
 	accept_cr(child_ep, skb, req);
 	set_bit(PASS_ACCEPT_REQ, &child_ep->com.history);
-	if (iptype == 6) {
-		sin6 = (struct sockaddr_in6 *)&child_ep->com.mapped_local_addr;
-		cxgb4_clip_get(child_ep->com.dev->rdev.lldi.ports[0],
-			       (const u32 *)&sin6->sin6_addr.s6_addr, 1);
-	}
 	goto out;
 reject:
 	reject_cr(dev, hwtid, skb);
@@ -2718,15 +2672,6 @@ out:
 	if (release)
 		release_ep_resources(ep);
 	else if (ep->retry_with_mpa_v1) {
-		if (ep->com.remote_addr.ss_family == AF_INET6) {
-			struct sockaddr_in6 *sin6 =
-					(struct sockaddr_in6 *)
-					&ep->com.mapped_local_addr;
-			cxgb4_clip_release(
-					ep->com.dev->rdev.lldi.ports[0],
-					(const u32 *)&sin6->sin6_addr.s6_addr,
-					1);
-		}
 		remove_handle(ep->com.dev, &ep->com.dev->hwtid_idr, ep->hwtid);
 		cxgb4_remove_tid(ep->com.dev->rdev.lldi.tids, 0, ep->hwtid);
 		dst_release(ep->dst);
@@ -3031,7 +2976,7 @@ static int pick_local_ip6addrs(struct c4iw_dev *dev, struct iw_cm_id *cm_id)
 	struct sockaddr_in6 *la6 = (struct sockaddr_in6 *)&cm_id->local_addr;
 	struct sockaddr_in6 *ra6 = (struct sockaddr_in6 *)&cm_id->remote_addr;
 
-	if (!get_lladdr(dev->rdev.lldi.ports[0], &addr, IFA_F_TENTATIVE)) {
+	if (get_lladdr(dev->rdev.lldi.ports[0], &addr, IFA_F_TENTATIVE)) {
 		memcpy(la6->sin6_addr.s6_addr, &addr, 16);
 		memcpy(ra6->sin6_addr.s6_addr, &addr, 16);
 		return 0;
@@ -3241,9 +3186,6 @@ static int create_server6(struct c4iw_dev *dev, struct c4iw_listen_ep *ep)
 		pr_err("cxgb4_create_server6/filter failed err %d stid %d laddr %pI6 lport %d\n",
 		       err, ep->stid,
 		       sin6->sin6_addr.s6_addr, ntohs(sin6->sin6_port));
-	else
-		cxgb4_clip_get(ep->com.dev->rdev.lldi.ports[0],
-			       (const u32 *)&sin6->sin6_addr.s6_addr, 1);
 	return err;
 }
 
@@ -3392,7 +3334,6 @@ int c4iw_destroy_listen(struct iw_cm_id *cm_id)
 			ep->com.dev->rdev.lldi.ports[0], ep->stid,
 			ep->com.dev->rdev.lldi.rxq_ids[0], 0);
 	} else {
-		struct sockaddr_in6 *sin6;
 		c4iw_init_wr_wait(&ep->com.wr_wait);
 		err = cxgb4_remove_server(
 				ep->com.dev->rdev.lldi.ports[0], ep->stid,
@@ -3401,9 +3342,6 @@ int c4iw_destroy_listen(struct iw_cm_id *cm_id)
 			goto done;
 		err = c4iw_wait_for_reply(&ep->com.dev->rdev, &ep->com.wr_wait,
 					  0, 0, __func__);
-		sin6 = (struct sockaddr_in6 *)&ep->com.mapped_local_addr;
-		cxgb4_clip_release(ep->com.dev->rdev.lldi.ports[0],
-				   (const u32 *)&sin6->sin6_addr.s6_addr, 1);
 	}
 	remove_handle(ep->com.dev, &ep->com.dev->stid_idr, ep->stid);
 	cxgb4_free_stid(ep->com.dev->rdev.lldi.tids, ep->stid,
@@ -3523,12 +3461,6 @@ static void active_ofld_conn_reply(struct c4iw_dev *dev, struct sk_buff *skb,
 	mutex_unlock(&dev->rdev.stats.lock);
 	connect_reply_upcall(ep, status2errno(req->retval));
 	state_set(&ep->com, DEAD);
-	if (ep->com.remote_addr.ss_family == AF_INET6) {
-		struct sockaddr_in6 *sin6 =
-			(struct sockaddr_in6 *)&ep->com.mapped_local_addr;
-		cxgb4_clip_release(ep->com.dev->rdev.lldi.ports[0],
-				   (const u32 *)&sin6->sin6_addr.s6_addr, 1);
-	}
 	remove_handle(dev, &dev->atid_idr, atid);
 	cxgb4_free_atid(dev->rdev.lldi.tids, atid);
 	dst_release(ep->dst);

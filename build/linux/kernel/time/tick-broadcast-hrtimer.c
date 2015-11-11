@@ -18,23 +18,30 @@
 
 static struct hrtimer bctimer;
 
-static int bc_shutdown(struct clock_event_device *evt)
+static void bc_set_mode(enum clock_event_mode mode,
+			struct clock_event_device *bc)
 {
-	/*
-	 * Note, we cannot cancel the timer here as we might
-	 * run into the following live lock scenario:
-	 *
-	 * cpu 0		cpu1
-	 * lock(broadcast_lock);
-	 *			hrtimer_interrupt()
-	 *			bc_handler()
-	 *			   tick_handle_oneshot_broadcast();
-	 *			    lock(broadcast_lock);
-	 * hrtimer_cancel()
-	 *  wait_for_callback()
-	 */
-	hrtimer_try_to_cancel(&bctimer);
-	return 0;
+	switch (mode) {
+	case CLOCK_EVT_MODE_UNUSED:
+	case CLOCK_EVT_MODE_SHUTDOWN:
+		/*
+		 * Note, we cannot cancel the timer here as we might
+		 * run into the following live lock scenario:
+		 *
+		 * cpu 0		cpu1
+		 * lock(broadcast_lock);
+		 *			hrtimer_interrupt()
+		 *			bc_handler()
+		 *			   tick_handle_oneshot_broadcast();
+		 *			    lock(broadcast_lock);
+		 * hrtimer_cancel()
+		 *  wait_for_callback()
+		 */
+		hrtimer_try_to_cancel(&bctimer);
+		break;
+	default:
+		break;
+	}
 }
 
 /*
@@ -75,7 +82,7 @@ static int bc_set_next(ktime_t expires, struct clock_event_device *bc)
 }
 
 static struct clock_event_device ce_broadcast_hrtimer = {
-	.set_state_shutdown	= bc_shutdown,
+	.set_mode		= bc_set_mode,
 	.set_next_ktime		= bc_set_next,
 	.features		= CLOCK_EVT_FEAT_ONESHOT |
 				  CLOCK_EVT_FEAT_KTIME |
@@ -95,11 +102,13 @@ static enum hrtimer_restart bc_handler(struct hrtimer *t)
 {
 	ce_broadcast_hrtimer.event_handler(&ce_broadcast_hrtimer);
 
-	if (clockevent_state_oneshot(&ce_broadcast_hrtimer))
+	switch (ce_broadcast_hrtimer.mode) {
+	case CLOCK_EVT_MODE_ONESHOT:
 		if (ce_broadcast_hrtimer.next_event.tv64 != KTIME_MAX)
 			return HRTIMER_RESTART;
-
-	return HRTIMER_NORESTART;
+	default:
+		return HRTIMER_NORESTART;
+	}
 }
 
 void tick_setup_hrtimer_broadcast(void)

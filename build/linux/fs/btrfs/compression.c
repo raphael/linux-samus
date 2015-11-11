@@ -97,7 +97,10 @@ static inline int compressed_bio_size(struct btrfs_root *root,
 static struct bio *compressed_bio_alloc(struct block_device *bdev,
 					u64 first_byte, gfp_t gfp_flags)
 {
-	return btrfs_bio_alloc(bdev, first_byte >> 9, BIO_MAX_PAGES, gfp_flags);
+	int nr_vecs;
+
+	nr_vecs = bio_get_nr_vecs(bdev);
+	return btrfs_bio_alloc(bdev, first_byte >> 9, nr_vecs, gfp_flags);
 }
 
 static int check_compressed_csum(struct inode *inode,
@@ -149,7 +152,7 @@ fail:
  * The compressed pages are freed here, and it must be run
  * in process context
  */
-static void end_compressed_bio_read(struct bio *bio)
+static void end_compressed_bio_read(struct bio *bio, int err)
 {
 	struct compressed_bio *cb = bio->bi_private;
 	struct inode *inode;
@@ -157,7 +160,7 @@ static void end_compressed_bio_read(struct bio *bio)
 	unsigned long index;
 	int ret;
 
-	if (bio->bi_error)
+	if (err)
 		cb->errors = 1;
 
 	/* if there are more bios still pending for this compressed
@@ -207,7 +210,7 @@ csum_failed:
 		bio_for_each_segment_all(bvec, cb->orig_bio, i)
 			SetPageChecked(bvec->bv_page);
 
-		bio_endio(cb->orig_bio);
+		bio_endio(cb->orig_bio, 0);
 	}
 
 	/* finally free the cb struct */
@@ -263,7 +266,7 @@ static noinline void end_compressed_writeback(struct inode *inode,
  * This also calls the writeback end hooks for the file pages so that
  * metadata and checksums can be updated in the file.
  */
-static void end_compressed_bio_write(struct bio *bio)
+static void end_compressed_bio_write(struct bio *bio, int err)
 {
 	struct extent_io_tree *tree;
 	struct compressed_bio *cb = bio->bi_private;
@@ -271,7 +274,7 @@ static void end_compressed_bio_write(struct bio *bio)
 	struct page *page;
 	unsigned long index;
 
-	if (bio->bi_error)
+	if (err)
 		cb->errors = 1;
 
 	/* if there are more bios still pending for this compressed
@@ -290,7 +293,7 @@ static void end_compressed_bio_write(struct bio *bio)
 					 cb->start,
 					 cb->start + cb->len - 1,
 					 NULL,
-					 bio->bi_error ? 0 : 1);
+					 err ? 0 : 1);
 	cb->compressed_pages[0]->mapping = NULL;
 
 	end_compressed_writeback(inode, cb);
@@ -694,10 +697,8 @@ int btrfs_submit_compressed_read(struct inode *inode, struct bio *bio,
 
 			ret = btrfs_map_bio(root, READ, comp_bio,
 					    mirror_num, 0);
-			if (ret) {
-				bio->bi_error = ret;
-				bio_endio(comp_bio);
-			}
+			if (ret)
+				bio_endio(comp_bio, ret);
 
 			bio_put(comp_bio);
 
@@ -723,10 +724,8 @@ int btrfs_submit_compressed_read(struct inode *inode, struct bio *bio,
 	}
 
 	ret = btrfs_map_bio(root, READ, comp_bio, mirror_num, 0);
-	if (ret) {
-		bio->bi_error = ret;
-		bio_endio(comp_bio);
-	}
+	if (ret)
+		bio_endio(comp_bio, ret);
 
 	bio_put(comp_bio);
 	return 0;

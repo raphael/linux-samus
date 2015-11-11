@@ -845,8 +845,7 @@ static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type)
 		hdr = (const union radeon_firmware_header *) rdev->rlc_fw->data;
 		break;
 
-	case KGD_ENGINE_SDMA1:
-	case KGD_ENGINE_SDMA2:
+	case KGD_ENGINE_SDMA:
 		hdr = (const union radeon_firmware_header *)
 							rdev->sdma_fw->data;
 		break;

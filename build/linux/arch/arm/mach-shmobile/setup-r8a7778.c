@@ -615,7 +615,7 @@ void __init r8a7778_init_irq_dt(void)
 	iounmap(base);
 }
 
-static const char *const r8a7778_compat_dt[] __initconst = {
+static const char *r8a7778_compat_dt[] __initdata = {
 	"renesas,r8a7778",
 	NULL,
 };

@@ -971,7 +971,7 @@ int ptlrpc_set_add_cb(struct ptlrpc_request_set *set,
 	struct ptlrpc_set_cbdata *cbdata;
 
 	cbdata = kzalloc(sizeof(*cbdata), GFP_NOFS);
-	if (!cbdata)
+	if (cbdata == NULL)
 		return -ENOMEM;
 
 	cbdata->psc_interpret = fn;

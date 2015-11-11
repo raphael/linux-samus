@@ -100,6 +100,7 @@ int mlx4_en_activate_cq(struct mlx4_en_priv *priv, struct mlx4_en_cq *cq,
 {
 	struct mlx4_en_dev *mdev = priv->mdev;
 	int err = 0;
+	char name[25];
 	int timestamp_en = 0;
 	bool assigned_eq = false;
 
@@ -118,8 +119,8 @@ int mlx4_en_activate_cq(struct mlx4_en_priv *priv, struct mlx4_en_cq *cq,
 			err = mlx4_assign_eq(mdev->dev, priv->port,
 					     &cq->vector);
 			if (err) {
-				mlx4_err(mdev, "Failed assigning an EQ to CQ vector %d\n",
-					 cq->vector);
+				mlx4_err(mdev, "Failed assigning an EQ to %s\n",
+					 name);
 				goto free_eq;
 			}
 

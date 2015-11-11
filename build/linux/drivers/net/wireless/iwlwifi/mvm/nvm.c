@@ -139,6 +139,12 @@ static int iwl_nvm_read_chunk(struct iwl_mvm *mvm, u16 section,
 		return ret;
 
 	pkt = cmd.resp_pkt;
+	if (pkt->hdr.flags & IWL_CMD_FAILED_MSK) {
+		IWL_ERR(mvm, "Bad return from NVM_ACCES_COMMAND (0x%08X)\n",
+			pkt->hdr.flags);
+		ret = -EIO;
+		goto exit;
+	}
 
 	/* Extract NVM response */
 	nvm_resp = (void *)pkt->data;
@@ -646,6 +652,12 @@ iwl_mvm_update_mcc(struct iwl_mvm *mvm, const char *alpha2,
 		return ERR_PTR(ret);
 
 	pkt = cmd.resp_pkt;
+	if (pkt->hdr.flags & IWL_CMD_FAILED_MSK) {
+		IWL_ERR(mvm, "Bad return from MCC_UPDATE_COMMAND (0x%08X)\n",
+			pkt->hdr.flags);
+		ret = -EIO;
+		goto exit;
+	}
 
 	/* Extract MCC response */
 	mcc_resp = (void *)pkt->data;
@@ -827,8 +839,9 @@ int iwl_mvm_init_mcc(struct iwl_mvm *mvm)
 	return retval;
 }
 
-void iwl_mvm_rx_chub_update_mcc(struct iwl_mvm *mvm,
-				struct iwl_rx_cmd_buffer *rxb)
+int iwl_mvm_rx_chub_update_mcc(struct iwl_mvm *mvm,
+			       struct iwl_rx_cmd_buffer *rxb,
+			       struct iwl_device_cmd *cmd)
 {
 	struct iwl_rx_packet *pkt = rxb_addr(rxb);
 	struct iwl_mcc_chub_notif *notif = (void *)pkt->data;
@@ -839,7 +852,7 @@ void iwl_mvm_rx_chub_update_mcc(struct iwl_mvm *mvm,
 	lockdep_assert_held(&mvm->mutex);
 
 	if (WARN_ON_ONCE(!iwl_mvm_is_lar_supported(mvm)))
-		return;
+		return 0;
 
 	mcc[0] = notif->mcc >> 8;
 	mcc[1] = notif->mcc & 0xff;
@@ -851,8 +864,10 @@ void iwl_mvm_rx_chub_update_mcc(struct iwl_mvm *mvm,
 		      mcc, src);
 	regd = iwl_mvm_get_regdomain(mvm->hw->wiphy, mcc, src, NULL);
 	if (IS_ERR_OR_NULL(regd))
-		return;
+		return 0;
 
 	regulatory_set_wiphy_regd(mvm->hw->wiphy, regd);
 	kfree(regd);
+
+	return 0;
 }

@@ -708,7 +708,6 @@ static void ceph_umount_begin(struct super_block *sb)
 	if (!fsc)
 		return;
 	fsc->mount_state = CEPH_MOUNT_SHUTDOWN;
-	ceph_mdsc_force_umount(fsc->mdsc);
 	return;
 }
 

@@ -18,10 +18,7 @@
 #include <linux/cpu.h>
 #include <linux/smp.h>
 #include <linux/mm.h>
-#include <linux/nodemask.h>
-#include <linux/node.h>
 #include <asm/sysinfo.h>
-#include <asm/numa.h>
 
 #define PTF_HORIZONTAL	(0UL)
 #define PTF_VERTICAL	(1UL)
@@ -40,10 +37,8 @@ static struct sysinfo_15_1_x *tl_info;
 static int topology_enabled = 1;
 static DECLARE_WORK(topology_work, topology_work_fn);
 
-/*
- * Socket/Book linked lists and per_cpu(cpu_topology) updates are
- * protected by "sched_domains_mutex".
- */
+/* topology_lock protects the socket and book linked lists */
+static DEFINE_SPINLOCK(topology_lock);
 static struct mask_info socket_info;
 static struct mask_info book_info;
 
@@ -193,6 +188,7 @@ static void tl_to_masks(struct sysinfo_15_1_x *info)
 {
 	struct cpuid cpu_id;
 
+	spin_lock_irq(&topology_lock);
 	get_cpu_id(&cpu_id);
 	clear_masks();
 	switch (cpu_id.machine) {
@@ -203,6 +199,7 @@ static void tl_to_masks(struct sysinfo_15_1_x *info)
 	default:
 		__tl_to_masks_generic(info);
 	}
+	spin_unlock_irq(&topology_lock);
 }
 
 static void topology_update_polarization_simple(void)
@@ -247,8 +244,10 @@ int topology_set_cpu_management(int fc)
 
 static void update_cpu_masks(void)
 {
+	unsigned long flags;
 	int cpu;
 
+	spin_lock_irqsave(&topology_lock, flags);
 	for_each_possible_cpu(cpu) {
 		per_cpu(cpu_topology, cpu).thread_mask = cpu_thread_map(cpu);
 		per_cpu(cpu_topology, cpu).core_mask = cpu_group_map(&socket_info, cpu);
@@ -260,7 +259,7 @@ static void update_cpu_masks(void)
 			per_cpu(cpu_topology, cpu).book_id = cpu;
 		}
 	}
-	numa_update_cpu_topology();
+	spin_unlock_irqrestore(&topology_lock, flags);
 }
 
 void store_topology(struct sysinfo_15_1_x *info)
@@ -275,21 +274,21 @@ int arch_update_cpu_topology(void)
 {
 	struct sysinfo_15_1_x *info = tl_info;
 	struct device *dev;
-	int cpu, rc = 0;
+	int cpu;
 
-	if (MACHINE_HAS_TOPOLOGY) {
-		rc = 1;
-		store_topology(info);
-		tl_to_masks(info);
-	}
-	update_cpu_masks();
-	if (!MACHINE_HAS_TOPOLOGY)
+	if (!MACHINE_HAS_TOPOLOGY) {
+		update_cpu_masks();
 		topology_update_polarization_simple();
+		return 0;
+	}
+	store_topology(info);
+	tl_to_masks(info);
+	update_cpu_masks();
 	for_each_online_cpu(cpu) {
 		dev = get_cpu_device(cpu);
 		kobject_uevent(&dev->kobj, KOBJ_CHANGE);
 	}
-	return rc;
+	return 1;
 }
 
 static void topology_work_fn(struct work_struct *work)

@@ -186,7 +186,7 @@ static int soc_dts_disable(struct thermal_zone_device *tzd)
 	return ret;
 }
 
-static int _get_trip_temp(int trip, int *temp)
+static int _get_trip_temp(int trip, unsigned long *temp)
 {
 	int status;
 	u32 out;
@@ -212,18 +212,19 @@ static int _get_trip_temp(int trip, int *temp)
 }
 
 static inline int sys_get_trip_temp(struct thermal_zone_device *tzd,
-				int trip, int *temp)
+				int trip, unsigned long *temp)
 {
 	return _get_trip_temp(trip, temp);
 }
 
-static inline int sys_get_crit_temp(struct thermal_zone_device *tzd, int *temp)
+static inline int sys_get_crit_temp(struct thermal_zone_device *tzd,
+				unsigned long *temp)
 {
 	return _get_trip_temp(QRK_DTS_ID_TP_CRITICAL, temp);
 }
 
 static int update_trip_temp(struct soc_sensor_entry *aux_entry,
-				int trip, int temp)
+				int trip, unsigned long temp)
 {
 	u32 out;
 	u32 temp_out;
@@ -271,7 +272,7 @@ failed:
 }
 
 static inline int sys_set_trip_temp(struct thermal_zone_device *tzd, int trip,
-				int temp)
+				unsigned long temp)
 {
 	return update_trip_temp(tzd->devdata, trip, temp);
 }
@@ -288,7 +289,7 @@ static int sys_get_trip_type(struct thermal_zone_device *thermal,
 }
 
 static int sys_get_curr_temp(struct thermal_zone_device *tzd,
-				int *temp)
+				unsigned long *temp)
 {
 	u32 out;
 	int ret;

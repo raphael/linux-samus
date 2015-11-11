@@ -52,11 +52,11 @@
 
 static DEFINE_MUTEX(mce_chrdev_read_mutex);
 
-#define mce_log_get_idx_check(p) \
+#define rcu_dereference_check_mce(p) \
 ({ \
-	RCU_LOCKDEP_WARN(!rcu_read_lock_sched_held() && \
-			 !lockdep_is_held(&mce_chrdev_read_mutex), \
-			 "suspicious mce_log_get_idx_check() usage"); \
+	rcu_lockdep_assert(rcu_read_lock_sched_held() || \
+			   lockdep_is_held(&mce_chrdev_read_mutex), \
+			   "suspicious rcu_dereference_check_mce() usage"); \
 	smp_load_acquire(&(p)); \
 })
 
@@ -110,24 +110,22 @@ DEFINE_PER_CPU(mce_banks_t, mce_poll_banks) = {
  */
 mce_banks_t mce_banks_ce_disabled;
 
-static struct work_struct mce_work;
-static struct irq_work mce_irq_work;
+static DEFINE_PER_CPU(struct work_struct, mce_work);
 
 static void (*quirk_no_way_out)(int bank, struct mce *m, struct pt_regs *regs);
-static int mce_usable_address(struct mce *m);
 
 /*
  * CPU/chipset specific EDAC code can register a notifier call here to print
  * MCE errors in a human-readable form.
  */
-ATOMIC_NOTIFIER_HEAD(x86_mce_decoder_chain);
+static ATOMIC_NOTIFIER_HEAD(x86_mce_decoder_chain);
 
 /* Do initial initialization of a struct mce */
 void mce_setup(struct mce *m)
 {
 	memset(m, 0, sizeof(struct mce));
 	m->cpu = m->extcpu = smp_processor_id();
-	m->tsc = rdtsc();
+	rdtscll(m->tsc);
 	/* We hope get_seconds stays lockless */
 	m->time = get_seconds();
 	m->cpuvendor = boot_cpu_data.x86_vendor;
@@ -159,13 +157,12 @@ void mce_log(struct mce *mce)
 	/* Emit the trace record: */
 	trace_mce_record(mce);
 
-	if (!mce_gen_pool_add(mce))
-		irq_work_queue(&mce_irq_work);
+	atomic_notifier_call_chain(&x86_mce_decoder_chain, 0, mce);
 
 	mce->finished = 0;
 	wmb();
 	for (;;) {
-		entry = mce_log_get_idx_check(mcelog.next);
+		entry = rcu_dereference_check_mce(mcelog.next);
 		for (;;) {
 
 			/*
@@ -199,23 +196,48 @@ void mce_log(struct mce *mce)
 	set_bit(0, &mce_need_notify);
 }
 
-void mce_inject_log(struct mce *m)
+static void drain_mcelog_buffer(void)
 {
-	mutex_lock(&mce_chrdev_read_mutex);
-	mce_log(m);
-	mutex_unlock(&mce_chrdev_read_mutex);
-}
-EXPORT_SYMBOL_GPL(mce_inject_log);
+	unsigned int next, i, prev = 0;
 
-static struct notifier_block mce_srao_nb;
+	next = ACCESS_ONCE(mcelog.next);
+
+	do {
+		struct mce *m;
+
+		/* drain what was logged during boot */
+		for (i = prev; i < next; i++) {
+			unsigned long start = jiffies;
+			unsigned retries = 1;
+
+			m = &mcelog.entry[i];
+
+			while (!m->finished) {
+				if (time_after_eq(jiffies, start + 2*retries))
+					retries++;
+
+				cpu_relax();
+
+				if (!m->finished && retries >= 4) {
+					pr_err("skipping error being logged currently!\n");
+					break;
+				}
+			}
+			smp_rmb();
+			atomic_notifier_call_chain(&x86_mce_decoder_chain, 0, m);
+		}
+
+		memset(mcelog.entry + prev, 0, (next - prev) * sizeof(*m));
+		prev = next;
+		next = cmpxchg(&mcelog.next, prev, 0);
+	} while (next != prev);
+}
+
 
 void mce_register_decode_chain(struct notifier_block *nb)
 {
-	/* Ensure SRAO notifier has the highest priority in the decode chain. */
-	if (nb != &mce_srao_nb && nb->priority == INT_MAX)
-		nb->priority -= 1;
-
 	atomic_notifier_chain_register(&x86_mce_decoder_chain, nb);
+	drain_mcelog_buffer();
 }
 EXPORT_SYMBOL_GPL(mce_register_decode_chain);
 
@@ -439,6 +461,61 @@ static inline void mce_gather_info(struct mce *m, struct pt_regs *regs)
 	}
 }
 
+/*
+ * Simple lockless ring to communicate PFNs from the exception handler with the
+ * process context work function. This is vastly simplified because there's
+ * only a single reader and a single writer.
+ */
+#define MCE_RING_SIZE 16	/* we use one entry less */
+
+struct mce_ring {
+	unsigned short start;
+	unsigned short end;
+	unsigned long ring[MCE_RING_SIZE];
+};
+static DEFINE_PER_CPU(struct mce_ring, mce_ring);
+
+/* Runs with CPU affinity in workqueue */
+static int mce_ring_empty(void)
+{
+	struct mce_ring *r = this_cpu_ptr(&mce_ring);
+
+	return r->start == r->end;
+}
+
+static int mce_ring_get(unsigned long *pfn)
+{
+	struct mce_ring *r;
+	int ret = 0;
+
+	*pfn = 0;
+	get_cpu();
+	r = this_cpu_ptr(&mce_ring);
+	if (r->start == r->end)
+		goto out;
+	*pfn = r->ring[r->start];
+	r->start = (r->start + 1) % MCE_RING_SIZE;
+	ret = 1;
+out:
+	put_cpu();
+	return ret;
+}
+
+/* Always runs in MCE context with preempt off */
+static int mce_ring_add(unsigned long pfn)
+{
+	struct mce_ring *r = this_cpu_ptr(&mce_ring);
+	unsigned next;
+
+	next = (r->end + 1) % MCE_RING_SIZE;
+	if (next == r->start)
+		return -1;
+	r->ring[r->end] = pfn;
+	wmb();
+	r->end = next;
+	return 0;
+}
+
 int mce_available(struct cpuinfo_x86 *c)
 {
 	if (mca_cfg.disabled)
@@ -448,9 +525,11 @@ int mce_available(struct cpuinfo_x86 *c)
 
 static void mce_schedule_work(void)
 {
-	if (!mce_gen_pool_empty() && keventd_up())
-		schedule_work(&mce_work);
+	if (!mce_ring_empty())
+		schedule_work(this_cpu_ptr(&mce_work));
 }
+
+static DEFINE_PER_CPU(struct irq_work, mce_irq_work);
 
 static void mce_irq_work_cb(struct irq_work *entry)
 {
@@ -472,29 +551,8 @@ static void mce_report_event(struct pt_regs *regs)
 		return;
 	}
 
-	irq_work_queue(&mce_irq_work);
+	irq_work_queue(this_cpu_ptr(&mce_irq_work));
 }
-
-static int srao_decode_notifier(struct notifier_block *nb, unsigned long val,
-				void *data)
-{
-	struct mce *mce = (struct mce *)data;
-	unsigned long pfn;
-
-	if (!mce)
-		return NOTIFY_DONE;
-
-	if (mce->usable_addr && (mce->severity == MCE_AO_SEVERITY)) {
-		pfn = mce->addr >> PAGE_SHIFT;
-		memory_failure(pfn, MCE_VECTOR, 0);
-	}
-
-	return NOTIFY_OK;
-}
-static struct notifier_block mce_srao_nb = {
-	.notifier_call	= srao_decode_notifier,
-	.priority = INT_MAX,
-};
 
 /*
  * Read ADDR and MISC registers.
@@ -614,11 +672,8 @@ bool machine_check_poll(enum mcp_flags flags, mce_banks_t *b)
 		 */
 		if (severity == MCE_DEFERRED_SEVERITY && memory_error(&m)) {
 			if (m.status & MCI_STATUS_ADDRV) {
-				m.severity = severity;
-				m.usable_addr = mce_usable_address(&m);
-
-				if (!mce_gen_pool_add(&m))
-					mce_schedule_work();
+				mce_ring_add(m.addr >> PAGE_SHIFT);
+				mce_schedule_work();
 			}
 		}
 
@@ -974,6 +1029,7 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 {
 	struct mca_config *cfg = &mca_cfg;
 	struct mce m, *final;
+	enum ctx_state prev_state;
 	int i;
 	int worst = 0;
 	int severity;
@@ -999,7 +1055,7 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 	int flags = MF_ACTION_REQUIRED;
 	int lmce = 0;
 
-	ist_enter(regs);
+	prev_state = ist_enter(regs);
 
 	this_cpu_inc(mce_exception_count);
 
@@ -1087,9 +1143,15 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 
 		mce_read_aux(&m, i);
 
-		/* assuming valid severity level != 0 */
-		m.severity = severity;
-		m.usable_addr = mce_usable_address(&m);
+		/*
+		 * Action optional error. Queue address for later processing.
+		 * When the ring overflows we just ignore the AO error.
+		 * RED-PEN add some logging mechanism when
+		 * usable_address or mce_add_ring fails.
+		 * RED-PEN don't ignore overflow for mca_cfg.tolerant == 0
+		 */
+		if (severity == MCE_AO_SEVERITY && mce_usable_address(&m))
+			mce_ring_add(m.addr >> PAGE_SHIFT);
 
 		mce_log(&m);
 
@@ -1165,7 +1227,7 @@ out:
 	local_irq_disable();
 	ist_end_non_atomic();
 done:
-	ist_exit(regs);
+	ist_exit(regs, prev_state);
 }
 EXPORT_SYMBOL_GPL(do_machine_check);
 
@@ -1185,11 +1247,14 @@ int memory_failure(unsigned long pfn, int vector, int flags)
 /*
  * Action optional processing happens here (picking up
  * from the list of faulting pages that do_machine_check()
- * placed into the genpool).
+ * placed into the "ring").
  */
 static void mce_process_work(struct work_struct *dummy)
 {
-	mce_gen_pool_process();
+	unsigned long pfn;
+
+	while (mce_ring_get(&pfn))
+		memory_failure(pfn, MCE_VECTOR, 0);
 }
 
 #ifdef CONFIG_X86_MCE_INTEL
@@ -1613,17 +1678,6 @@ static void __mcheck_cpu_init_vendor(struct cpuinfo_x86 *c)
 	}
 }
 
-static void __mcheck_cpu_clear_vendor(struct cpuinfo_x86 *c)
-{
-	switch (c->x86_vendor) {
-	case X86_VENDOR_INTEL:
-		mce_intel_feature_clear(c);
-		break;
-	default:
-		break;
-	}
-}
-
 static void mce_start_timer(unsigned int cpu, struct timer_list *t)
 {
 	unsigned long iv = check_interval * HZ;
@@ -1677,36 +1731,13 @@ void mcheck_cpu_init(struct cpuinfo_x86 *c)
 		return;
 	}
 
-	if (mce_gen_pool_init()) {
-		mca_cfg.disabled = true;
-		pr_emerg("Couldn't allocate MCE records pool!\n");
-		return;
-	}
-
 	machine_check_vector = do_machine_check;
 
 	__mcheck_cpu_init_generic();
 	__mcheck_cpu_init_vendor(c);
 	__mcheck_cpu_init_timer();
-}
-
-/*
- * Called for each booted CPU to clear some machine checks opt-ins
- */
-void mcheck_cpu_clear(struct cpuinfo_x86 *c)
-{
-	if (mca_cfg.disabled)
-		return;
-
-	if (!mce_available(c))
-		return;
-
-	/*
-	 * Possibly to clear general settings generic to x86
-	 * __mcheck_cpu_clear_generic(c);
-	 */
-	__mcheck_cpu_clear_vendor(c);
-
+	INIT_WORK(this_cpu_ptr(&mce_work), mce_process_work);
+	init_irq_work(this_cpu_ptr(&mce_irq_work), &mce_irq_work_cb);
 }
 
 /*
@@ -1753,7 +1784,7 @@ static void collect_tscs(void *data)
 {
 	unsigned long *cpu_tsc = (unsigned long *)data;
 
-	cpu_tsc[smp_processor_id()] = rdtsc();
+	rdtscll(cpu_tsc[smp_processor_id()]);
 }
 
 static int mce_apei_read_done;
@@ -1819,7 +1850,7 @@ static ssize_t mce_chrdev_read(struct file *filp, char __user *ubuf,
 			goto out;
 	}
 
-	next = mce_log_get_idx_check(mcelog.next);
+	next = rcu_dereference_check_mce(mcelog.next);
 
 	/* Only supports full reads right now */
 	err = -EINVAL;
@@ -2025,11 +2056,7 @@ __setup("mce", mcheck_enable);
 int __init mcheck_init(void)
 {
 	mcheck_intel_therm_init();
-	mce_register_decode_chain(&mce_srao_nb);
 	mcheck_vendor_init_severity();
-
-	INIT_WORK(&mce_work, mce_process_work);
-	init_irq_work(&mce_irq_work, mce_irq_work_cb);
 
 	return 0;
 }
@@ -2564,20 +2591,5 @@ static int __init mcheck_debugfs_init(void)
 
 	return 0;
 }
-#else
-static int __init mcheck_debugfs_init(void) { return -EINVAL; }
+late_initcall(mcheck_debugfs_init);
 #endif
-
-static int __init mcheck_late_init(void)
-{
-	mcheck_debugfs_init();
-
-	/*
-	 * Flush out everything that has been logged during early boot, now that
-	 * everything has been initialized (workqueues, decoders, ...).
-	 */
-	mce_schedule_work();
-
-	return 0;
-}
-late_initcall(mcheck_late_init);

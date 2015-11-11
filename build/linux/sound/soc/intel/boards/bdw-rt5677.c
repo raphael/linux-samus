@@ -191,7 +191,7 @@ static int bdw_rt5677_init(struct snd_soc_pcm_runtime *rtd)
 
 	/* Request rt5677 GPIO for headphone amp control */
 	bdw_rt5677->gpio_hp_en = devm_gpiod_get_index(codec->dev,
-		"RT5677_GPIO_HP_AMP_SHDN_L", RT5677_GPIO_HP_AMP_SHDN_L, GPIOD_ASIS);
+		"RT5677_GPIO_HP_AMP_SHDN_L", RT5677_GPIO_HP_AMP_SHDN_L);
 	if (IS_ERR(bdw_rt5677->gpio_hp_en)) {
 		dev_err(codec->dev, "Can't find HP_AMP_SHDN_L gpio\n");
 		return PTR_ERR(bdw_rt5677->gpio_hp_en);

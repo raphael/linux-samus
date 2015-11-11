@@ -10,7 +10,6 @@
 
 #include <linux/types.h>
 #include <linux/etherdevice.h>
-
 #include "qlcnic_hw.h"
 
 #define QLCNIC_83XX_BAR0_LENGTH 0x4000
@@ -627,7 +626,6 @@ int qlcnic_83xx_set_port_eswitch_status(struct qlcnic_adapter *, int, int *);
 
 void qlcnic_83xx_get_minidump_template(struct qlcnic_adapter *);
 void qlcnic_83xx_get_stats(struct qlcnic_adapter *adapter, u64 *data);
-int qlcnic_83xx_extend_md_capab(struct qlcnic_adapter *);
 int qlcnic_83xx_get_settings(struct qlcnic_adapter *, struct ethtool_cmd *);
 int qlcnic_83xx_set_settings(struct qlcnic_adapter *, struct ethtool_cmd *);
 void qlcnic_83xx_get_pauseparam(struct qlcnic_adapter *,

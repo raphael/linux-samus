@@ -61,13 +61,8 @@ struct machdep_calls {
 					       unsigned long addr,
 					       unsigned char *hpte_slot_array,
 					       int psize, int ssize, int local);
-	/*
-	 * Special for kexec.
-	 * To be called in real mode with interrupts disabled. No locks are
-	 * taken as such, concurrent access on pre POWER5 hardware could result
-	 * in a deadlock.
-	 * The linear mapping is destroyed as well.
-	 */
+	/* special for kexec, to be called in real mode, linear mapping is
+	 * destroyed as well */
 	void		(*hpte_clear_all)(void);
 
 	void __iomem *	(*ioremap)(phys_addr_t addr, unsigned long size,
@@ -254,7 +249,7 @@ struct machdep_calls {
 #endif
 
 #ifdef CONFIG_ARCH_RANDOM
-	int (*get_random_seed)(unsigned long *v);
+	int (*get_random_long)(unsigned long *v);
 #endif
 };
 

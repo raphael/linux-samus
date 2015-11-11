@@ -26,13 +26,8 @@
 #include <linux/mdio.h>
 #include <linux/usb/cdc.h>
 
-/* Information for net-next */
-#define NETNEXT_VERSION		"08"
-
-/* Information for net */
-#define NET_VERSION		"2"
-
-#define DRIVER_VERSION		"v1." NETNEXT_VERSION "." NET_VERSION
+/* Version Information */
+#define DRIVER_VERSION "v1.08.1 (2015/07/28)"
 #define DRIVER_AUTHOR "Realtek linux nic maintainers <nic_swsd@realtek.com>"
 #define DRIVER_DESC "Realtek RTL8152/RTL8153 Based USB Ethernet Adapters"
 #define MODULENAME "r8152"
@@ -148,7 +143,6 @@
 #define OCP_EEE_ABLE		0xa5c4
 #define OCP_EEE_ADV		0xa5d0
 #define OCP_EEE_LPABLE		0xa5d2
-#define OCP_PHY_STATE		0xa708		/* nway state for 8153 */
 #define OCP_ADC_CFG		0xbc06
 
 /* SRAM Register */
@@ -345,7 +339,6 @@
 
 /* USB_USB_CTRL */
 #define RX_AGG_DISABLE		0x0010
-#define RX_ZERO_EN		0x0080
 
 /* USB_U2P3_CTRL */
 #define U2P3_ENABLE		0x0001
@@ -432,10 +425,6 @@
 
 /* OCP_DOWN_SPEED */
 #define EN_10M_BGOFF		0x0080
-
-/* OCP_PHY_STATE */
-#define TXDIS_STATE		0x01
-#define ABD_STATE		0x02
 
 /* OCP_ADC_CFG */
 #define CKADSEL_L		0x0100
@@ -614,7 +603,6 @@ struct r8152 {
 		void (*unload)(struct r8152 *);
 		int (*eee_get)(struct r8152 *, struct ethtool_eee *);
 		int (*eee_set)(struct r8152 *, struct ethtool_eee *);
-		bool (*in_nway)(struct r8152 *);
 	} rtl_ops;
 
 	int intr_interval;
@@ -634,7 +622,6 @@ enum rtl_version {
 	RTL_VER_03,
 	RTL_VER_04,
 	RTL_VER_05,
-	RTL_VER_06,
 	RTL_VER_MAX
 };
 
@@ -2623,10 +2610,7 @@ static void r8153_hw_phy_cfg(struct r8152 *tp)
 	u32 ocp_data;
 	u16 data;
 
-	if (tp->version == RTL_VER_03 || tp->version == RTL_VER_04 ||
-	    tp->version == RTL_VER_05)
-		ocp_reg_write(tp, OCP_ADC_CFG, CKADSEL_L | ADC_EN | EN_EMI_L);
-
+	ocp_reg_write(tp, OCP_ADC_CFG, CKADSEL_L | ADC_EN | EN_EMI_L);
 	data = r8152_mdio_read(tp, MII_BMCR);
 	if (data & BMCR_PDOWN) {
 		data &= ~BMCR_PDOWN;
@@ -2727,7 +2711,7 @@ static void r8153_first_init(struct r8152 *tp)
 
 	/* rx aggregation */
 	ocp_data = ocp_read_word(tp, MCU_TYPE_USB, USB_USB_CTRL);
-	ocp_data &= ~(RX_AGG_DISABLE | RX_ZERO_EN);
+	ocp_data &= ~RX_AGG_DISABLE;
 	ocp_write_word(tp, MCU_TYPE_USB, USB_USB_CTRL, ocp_data);
 }
 
@@ -2950,32 +2934,6 @@ static void rtl8153_down(struct r8152 *tp)
 	r8153_disable_aldps(tp);
 	r8153_enter_oob(tp);
 	r8153_enable_aldps(tp);
-}
-
-static bool rtl8152_in_nway(struct r8152 *tp)
-{
-	u16 nway_state;
-
-	ocp_write_word(tp, MCU_TYPE_PLA, PLA_OCP_GPHY_BASE, 0x2000);
-	tp->ocp_base = 0x2000;
-	ocp_write_byte(tp, MCU_TYPE_PLA, 0xb014, 0x4c);		/* phy state */
-	nway_state = ocp_read_word(tp, MCU_TYPE_PLA, 0xb01a);
-
-	/* bit 15: TXDIS_STATE, bit 14: ABD_STATE */
-	if (nway_state & 0xc000)
-		return false;
-	else
-		return true;
-}
-
-static bool rtl8153_in_nway(struct r8152 *tp)
-{
-	u16 phy_state = ocp_reg_read(tp, OCP_PHY_STATE) & 0xff;
-
-	if (phy_state == TXDIS_STATE || phy_state == ABD_STATE)
-		return false;
-	else
-		return true;
 }
 
 static void set_carrier(struct r8152 *tp)
@@ -3283,7 +3241,7 @@ static void r8152b_init(struct r8152 *tp)
 
 	/* enable rx aggregation */
 	ocp_data = ocp_read_word(tp, MCU_TYPE_USB, USB_USB_CTRL);
-	ocp_data &= ~(RX_AGG_DISABLE | RX_ZERO_EN);
+	ocp_data &= ~RX_AGG_DISABLE;
 	ocp_write_word(tp, MCU_TYPE_USB, USB_USB_CTRL, ocp_data);
 }
 
@@ -3329,13 +3287,6 @@ static void r8153_init(struct r8152 *tp)
 		ocp_data &= ~ECM_ALDPS;
 		ocp_write_byte(tp, MCU_TYPE_PLA, PLA_DMY_REG0, ocp_data);
 
-		ocp_data = ocp_read_byte(tp, MCU_TYPE_USB, USB_CSR_DUMMY1);
-		if (ocp_read_word(tp, MCU_TYPE_USB, USB_BURST_SIZE) == 0)
-			ocp_data &= ~DYNAMIC_BURST;
-		else
-			ocp_data |= DYNAMIC_BURST;
-		ocp_write_byte(tp, MCU_TYPE_USB, USB_CSR_DUMMY1, ocp_data);
-	} else if (tp->version == RTL_VER_06) {
 		ocp_data = ocp_read_byte(tp, MCU_TYPE_USB, USB_CSR_DUMMY1);
 		if (ocp_read_word(tp, MCU_TYPE_USB, USB_BURST_SIZE) == 0)
 			ocp_data &= ~DYNAMIC_BURST;
@@ -3442,27 +3393,6 @@ static int rtl8152_post_reset(struct usb_interface *intf)
 	return 0;
 }
 
-static bool delay_autosuspend(struct r8152 *tp)
-{
-	bool sw_linking = !!netif_carrier_ok(tp->netdev);
-	bool hw_linking = !!(rtl8152_get_speed(tp) & LINK_STATUS);
-
-	/* This means a linking change occurs and the driver doesn't detect it,
-	 * yet. If the driver has disabled tx/rx and hw is linking on, the
-	 * device wouldn't wake up by receiving any packet.
-	 */
-	if (work_busy(&tp->schedule.work) || sw_linking != hw_linking)
-		return true;
-
-	/* If the linking down is occurred by nway, the device may miss the
-	 * linking change event. And it wouldn't wake when linking on.
-	 */
-	if (!sw_linking && tp->rtl_ops.in_nway(tp))
-		return true;
-	else
-		return false;
-}
-
 static int rtl8152_suspend(struct usb_interface *intf, pm_message_t message)
 {
 	struct r8152 *tp = usb_get_intfdata(intf);
@@ -3472,7 +3402,7 @@ static int rtl8152_suspend(struct usb_interface *intf, pm_message_t message)
 	mutex_lock(&tp->control);
 
 	if (PMSG_IS_AUTO(message)) {
-		if (netif_running(netdev) && delay_autosuspend(tp)) {
+		if (netif_running(netdev) && work_busy(&tp->schedule.work)) {
 			ret = -EBUSY;
 			goto out1;
 		}
@@ -4058,10 +3988,6 @@ static void r8152b_get_version(struct r8152 *tp)
 		tp->version = RTL_VER_05;
 		tp->mii.supports_gmii = 1;
 		break;
-	case 0x5c30:
-		tp->version = RTL_VER_06;
-		tp->mii.supports_gmii = 1;
-		break;
 	default:
 		netif_info(tp, probe, tp->netdev,
 			   "Unknown version 0x%04x\n", version);
@@ -4102,13 +4028,11 @@ static int rtl_ops_init(struct r8152 *tp)
 		ops->unload		= rtl8152_unload;
 		ops->eee_get		= r8152_get_eee;
 		ops->eee_set		= r8152_set_eee;
-		ops->in_nway		= rtl8152_in_nway;
 		break;
 
 	case RTL_VER_03:
 	case RTL_VER_04:
 	case RTL_VER_05:
-	case RTL_VER_06:
 		ops->init		= r8153_init;
 		ops->enable		= rtl8153_enable;
 		ops->disable		= rtl8153_disable;
@@ -4117,7 +4041,6 @@ static int rtl_ops_init(struct r8152 *tp)
 		ops->unload		= rtl8153_unload;
 		ops->eee_get		= r8153_get_eee;
 		ops->eee_set		= r8153_set_eee;
-		ops->in_nway		= rtl8153_in_nway;
 		break;
 
 	default:

@@ -2442,7 +2442,7 @@ done:
 
 /**
  * path_mountpoint - look up a path to be umounted
- * @nd:		lookup context
+ * @nameidata:	lookup context
  * @flags:	lookup flags
  * @path:	pointer to container for result
  *

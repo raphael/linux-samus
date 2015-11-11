@@ -127,87 +127,23 @@ static inline struct dummy_request *usb_request_to_dummy_request
 
 static const char ep0name[] = "ep0";
 
-static const struct {
-	const char *name;
-	const struct usb_ep_caps caps;
-} ep_info[] = {
-#define EP_INFO(_name, _caps) \
-	{ \
-		.name = _name, \
-		.caps = _caps, \
-	}
+static const char *const ep_name[] = {
+	ep0name,				/* everyone has ep0 */
 
-	/* everyone has ep0 */
-	EP_INFO(ep0name,
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_CONTROL, USB_EP_CAPS_DIR_ALL)),
 	/* act like a pxa250: fifteen fixed function endpoints */
-	EP_INFO("ep1in-bulk",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_IN)),
-	EP_INFO("ep2out-bulk",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_OUT)),
-	EP_INFO("ep3in-iso",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_IN)),
-	EP_INFO("ep4out-iso",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_OUT)),
-	EP_INFO("ep5in-int",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_INT, USB_EP_CAPS_DIR_IN)),
-	EP_INFO("ep6in-bulk",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_IN)),
-	EP_INFO("ep7out-bulk",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_OUT)),
-	EP_INFO("ep8in-iso",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_IN)),
-	EP_INFO("ep9out-iso",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_OUT)),
-	EP_INFO("ep10in-int",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_INT, USB_EP_CAPS_DIR_IN)),
-	EP_INFO("ep11in-bulk",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_IN)),
-	EP_INFO("ep12out-bulk",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_OUT)),
-	EP_INFO("ep13in-iso",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_IN)),
-	EP_INFO("ep14out-iso",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_OUT)),
-	EP_INFO("ep15in-int",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_INT, USB_EP_CAPS_DIR_IN)),
+	"ep1in-bulk", "ep2out-bulk", "ep3in-iso", "ep4out-iso", "ep5in-int",
+	"ep6in-bulk", "ep7out-bulk", "ep8in-iso", "ep9out-iso", "ep10in-int",
+	"ep11in-bulk", "ep12out-bulk", "ep13in-iso", "ep14out-iso",
+		"ep15in-int",
+
 	/* or like sa1100: two fixed function endpoints */
-	EP_INFO("ep1out-bulk",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_OUT)),
-	EP_INFO("ep2in-bulk",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_IN)),
+	"ep1out-bulk", "ep2in-bulk",
+
 	/* and now some generic EPs so we have enough in multi config */
-	EP_INFO("ep3out",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ALL, USB_EP_CAPS_DIR_OUT)),
-	EP_INFO("ep4in",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ALL, USB_EP_CAPS_DIR_IN)),
-	EP_INFO("ep5out",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ALL, USB_EP_CAPS_DIR_OUT)),
-	EP_INFO("ep6out",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ALL, USB_EP_CAPS_DIR_OUT)),
-	EP_INFO("ep7in",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ALL, USB_EP_CAPS_DIR_IN)),
-	EP_INFO("ep8out",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ALL, USB_EP_CAPS_DIR_OUT)),
-	EP_INFO("ep9in",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ALL, USB_EP_CAPS_DIR_IN)),
-	EP_INFO("ep10out",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ALL, USB_EP_CAPS_DIR_OUT)),
-	EP_INFO("ep11out",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ALL, USB_EP_CAPS_DIR_OUT)),
-	EP_INFO("ep12in",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ALL, USB_EP_CAPS_DIR_IN)),
-	EP_INFO("ep13out",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ALL, USB_EP_CAPS_DIR_OUT)),
-	EP_INFO("ep14in",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ALL, USB_EP_CAPS_DIR_IN)),
-	EP_INFO("ep15out",
-		USB_EP_CAPS(USB_EP_CAPS_TYPE_ALL, USB_EP_CAPS_DIR_OUT)),
-
-#undef EP_INFO
+	"ep3out", "ep4in", "ep5out", "ep6out", "ep7in", "ep8out", "ep9in",
+	"ep10out", "ep11out", "ep12in", "ep13out", "ep14in", "ep15out",
 };
-
-#define DUMMY_ENDPOINTS	ARRAY_SIZE(ep_info)
+#define DUMMY_ENDPOINTS	ARRAY_SIZE(ep_name)
 
 /*-------------------------------------------------------------------------*/
 
@@ -1002,10 +938,9 @@ static void init_dummy_udc_hw(struct dummy *dum)
 	for (i = 0; i < DUMMY_ENDPOINTS; i++) {
 		struct dummy_ep	*ep = &dum->ep[i];
 
-		if (!ep_info[i].name)
+		if (!ep_name[i])
 			break;
-		ep->ep.name = ep_info[i].name;
-		ep->ep.caps = ep_info[i].caps;
+		ep->ep.name = ep_name[i];
 		ep->ep.ops = &dummy_ep_ops;
 		list_add_tail(&ep->ep.ep_list, &dum->gadget.ep_list);
 		ep->halted = ep->wedged = ep->already_seen =
@@ -1348,7 +1283,6 @@ static int transfer(struct dummy_hcd *dum_hcd, struct urb *urb,
 {
 	struct dummy		*dum = dum_hcd->dum;
 	struct dummy_request	*req;
-	int			sent = 0;
 
 top:
 	/* if there's no request queued, the device is NAKing; return */
@@ -1386,15 +1320,12 @@ top:
 			if (len == 0)
 				break;
 
-			/* send multiple of maxpacket first, then remainder */
-			if (len >= ep->ep.maxpacket) {
-				is_short = 0;
-				if (len % ep->ep.maxpacket)
-					rescan = 1;
-				len -= len % ep->ep.maxpacket;
-			} else {
-				is_short = 1;
+			/* use an extra pass for the final short packet */
+			if (len > ep->ep.maxpacket) {
+				rescan = 1;
+				len -= (len % ep->ep.maxpacket);
 			}
+			is_short = (len % ep->ep.maxpacket) != 0;
 
 			len = dummy_perform_transfer(urb, req, len);
 
@@ -1403,7 +1334,6 @@ top:
 				req->req.status = len;
 			} else {
 				limit -= len;
-				sent += len;
 				urb->actual_length += len;
 				req->req.actual += len;
 			}
@@ -1426,7 +1356,7 @@ top:
 					*status = -EOVERFLOW;
 				else
 					*status = 0;
-			} else {
+			} else if (!to_host) {
 				*status = 0;
 				if (host_len > dev_len)
 					req->req.status = -EOVERFLOW;
@@ -1434,24 +1364,15 @@ top:
 					req->req.status = 0;
 			}
 
-		/*
-		 * many requests terminate without a short packet.
-		 * send a zlp if demanded by flags.
-		 */
+		/* many requests terminate without a short packet */
 		} else {
-			if (req->req.length == req->req.actual) {
-				if (req->req.zero && to_host)
-					rescan = 1;
-				else
-					req->req.status = 0;
-			}
-			if (urb->transfer_buffer_length == urb->actual_length) {
-				if (urb->transfer_flags & URB_ZERO_PACKET &&
-				    !to_host)
-					rescan = 1;
-				else
-					*status = 0;
-			}
+			if (req->req.length == req->req.actual
+					&& !req->req.zero)
+				req->req.status = 0;
+			if (urb->transfer_buffer_length == urb->actual_length
+					&& !(urb->transfer_flags
+						& URB_ZERO_PACKET))
+				*status = 0;
 		}
 
 		/* device side completion --> continuable */
@@ -1474,7 +1395,7 @@ top:
 		if (rescan)
 			goto top;
 	}
-	return sent;
+	return limit;
 }
 
 static int periodic_bytes(struct dummy *dum, struct dummy_ep *ep)
@@ -1763,7 +1684,7 @@ static void dummy_timer(unsigned long _dum_hcd)
 	}
 
 	for (i = 0; i < DUMMY_ENDPOINTS; i++) {
-		if (!ep_info[i].name)
+		if (!ep_name[i])
 			break;
 		dum->ep[i].already_seen = 0;
 	}
@@ -1904,7 +1825,7 @@ restart:
 		default:
 treat_control_like_bulk:
 			ep->last_io = jiffies;
-			total -= transfer(dum_hcd, urb, ep, limit, &status);
+			total = transfer(dum_hcd, urb, ep, limit, &status);
 			break;
 		}
 

@@ -65,4 +65,4 @@ do {									\
 
 	return 0;
 }
-arch_initcall(debugfs_fpuemu);
+__initcall(debugfs_fpuemu);

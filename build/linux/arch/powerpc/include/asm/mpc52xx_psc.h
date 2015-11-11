@@ -150,10 +150,7 @@
 
 /* Structure of the hardware registers */
 struct mpc52xx_psc {
-	union {
-		u8	mode;		/* PSC + 0x00 */
-		u8	mr2;
-	};
+	u8		mode;		/* PSC + 0x00 */
 	u8		reserved0[3];
 	union {				/* PSC + 0x04 */
 		u16	status;

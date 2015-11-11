@@ -24,7 +24,6 @@ struct rsnd_dvc {
 	struct rsnd_kctrl_cfg_s rdown;	/* Ramp Rate Down */
 };
 
-#define rsnd_dvc_nr(priv) ((priv)->dvc_nr)
 #define rsnd_dvc_of_node(priv) \
 	of_get_child_by_name(rsnd_priv_to_dev(priv)->of_node, "rcar_sound,dvc")
 
@@ -63,19 +62,6 @@ static const char * const dvc_ramp_rate[] = {
 	"0.125 dB/4096 steps",	 /* 10110 */
 	"0.125 dB/8192 steps",	 /* 10111 */
 };
-
-static void rsnd_dvc_soft_reset(struct rsnd_mod *mod)
-{
-	rsnd_mod_write(mod, DVC_SWRSR, 0);
-	rsnd_mod_write(mod, DVC_SWRSR, 1);
-}
-
-#define rsnd_dvc_initialize_lock(mod)	__rsnd_dvc_initialize_lock(mod, 1)
-#define rsnd_dvc_initialize_unlock(mod)	__rsnd_dvc_initialize_lock(mod, 0)
-static void __rsnd_dvc_initialize_lock(struct rsnd_mod *mod, u32 enable)
-{
-	rsnd_mod_write(mod, DVC_DVUIR, enable);
-}
 
 static void rsnd_dvc_volume_update(struct rsnd_dai_stream *io,
 				   struct rsnd_mod *mod)
@@ -149,24 +135,49 @@ static int rsnd_dvc_remove_gen2(struct rsnd_mod *mod,
 	return 0;
 }
 
-static int rsnd_dvc_init(struct rsnd_mod *mod,
+static int rsnd_dvc_init(struct rsnd_mod *dvc_mod,
 			 struct rsnd_dai_stream *io,
 			 struct rsnd_priv *priv)
 {
-	rsnd_mod_hw_start(mod);
+	struct rsnd_mod *src_mod = rsnd_io_to_mod_src(io);
+	struct device *dev = rsnd_priv_to_dev(priv);
+	int dvc_id = rsnd_mod_id(dvc_mod);
+	int src_id = rsnd_mod_id(src_mod);
+	u32 route[] = {
+		[0] = 0x30000,
+		[1] = 0x30001,
+		[2] = 0x40000,
+		[3] = 0x10000,
+		[4] = 0x20000,
+		[5] = 0x40100
+	};
 
-	rsnd_dvc_soft_reset(mod);
+	if (src_id >= ARRAY_SIZE(route)) {
+		dev_err(dev, "DVC%d isn't connected to SRC%d\n", dvc_id, src_id);
+		return -EINVAL;
+	}
 
-	rsnd_dvc_initialize_lock(mod);
+	rsnd_mod_hw_start(dvc_mod);
 
-	rsnd_path_parse(priv, io);
+	/*
+	 * fixme
+	 * it doesn't support CTU/MIX
+	 */
+	rsnd_mod_write(dvc_mod, CMD_ROUTE_SLCT, route[src_id]);
 
-	rsnd_mod_write(mod, DVC_ADINR, rsnd_get_adinr_bit(mod, io));
+	rsnd_mod_write(dvc_mod, DVC_SWRSR, 0);
+	rsnd_mod_write(dvc_mod, DVC_SWRSR, 1);
+
+	rsnd_mod_write(dvc_mod, DVC_DVUIR, 1);
+
+	rsnd_mod_write(dvc_mod, DVC_ADINR, rsnd_get_adinr(dvc_mod, io));
 
 	/* ch0/ch1 Volume */
-	rsnd_dvc_volume_update(io, mod);
+	rsnd_dvc_volume_update(io, dvc_mod);
 
-	rsnd_adg_set_cmd_timsel_gen2(mod, io);
+	rsnd_mod_write(dvc_mod, DVC_DVUIR, 0);
+
+	rsnd_adg_set_cmd_timsel_gen2(dvc_mod, io);
 
 	return 0;
 }
@@ -184,8 +195,6 @@ static int rsnd_dvc_start(struct rsnd_mod *mod,
 			  struct rsnd_dai_stream *io,
 			  struct rsnd_priv *priv)
 {
-	rsnd_dvc_initialize_unlock(mod);
-
 	rsnd_mod_write(mod, CMD_CTRL, 0x10);
 
 	return 0;
@@ -332,21 +341,23 @@ int rsnd_dvc_probe(struct platform_device *pdev,
 	char name[RSND_DVC_NAME_SIZE];
 	int i, nr, ret;
 
-	/* This driver doesn't support Gen1 at this point */
-	if (rsnd_is_gen1(priv)) {
-		dev_warn(dev, "CMD is not supported on Gen1\n");
-		return -EINVAL;
-	}
-
 	rsnd_of_parse_dvc(pdev, of_data, priv);
 
 	nr = info->dvc_info_nr;
 	if (!nr)
 		return 0;
 
+	/* This driver doesn't support Gen1 at this point */
+	if (rsnd_is_gen1(priv)) {
+		dev_warn(dev, "CMD is not supported on Gen1\n");
+		return -EINVAL;
+	}
+
 	dvc	= devm_kzalloc(dev, sizeof(*dvc) * nr, GFP_KERNEL);
-	if (!dvc)
+	if (!dvc) {
+		dev_err(dev, "CMD allocate failed\n");
 		return -ENOMEM;
+	}
 
 	priv->dvc_nr	= nr;
 	priv->dvc	= dvc;

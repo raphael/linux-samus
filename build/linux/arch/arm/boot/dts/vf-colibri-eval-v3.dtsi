@@ -9,7 +9,7 @@
 
 / {
 	chosen {
-		stdout-path = "serial0:115200n8";
+		bootargs = "console=ttyLP0,115200";
 	};
 
 	clk16m: clk16m {

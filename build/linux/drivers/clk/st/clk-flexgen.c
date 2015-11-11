@@ -5,7 +5,6 @@
  * Author:  Maxime Coquelin <maxime.coquelin@st.com> for ST-Microelectronics.
  * License terms:  GNU General Public License (GPL), version 2  */
 
-#include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -45,7 +44,7 @@ static int flexgen_enable(struct clk_hw *hw)
 
 	clk_gate_ops.enable(fgate_hw);
 
-	pr_debug("%s: flexgen output enabled\n", clk_hw_get_name(hw));
+	pr_debug("%s: flexgen output enabled\n", __clk_get_name(hw->clk));
 	return 0;
 }
 
@@ -59,7 +58,7 @@ static void flexgen_disable(struct clk_hw *hw)
 
 	clk_gate_ops.disable(fgate_hw);
 
-	pr_debug("%s: flexgen output disabled\n", clk_hw_get_name(hw));
+	pr_debug("%s: flexgen output disabled\n", __clk_get_name(hw->clk));
 }
 
 static int flexgen_is_enabled(struct clk_hw *hw)
@@ -109,7 +108,7 @@ static long flexgen_round_rate(struct clk_hw *hw, unsigned long rate,
 	/* Round div according to exact prate and wished rate */
 	div = clk_best_div(*prate, rate);
 
-	if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
+	if (__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT) {
 		*prate = rate * div;
 		return rate;
 	}
@@ -244,7 +243,7 @@ static const char ** __init flexgen_get_parents(struct device_node *np,
 						       int *num_parents)
 {
 	const char **parents;
-	int nparents;
+	int nparents, i;
 
 	nparents = of_clk_get_parent_count(np);
 	if (WARN_ON(nparents <= 0))
@@ -254,8 +253,10 @@ static const char ** __init flexgen_get_parents(struct device_node *np,
 	if (!parents)
 		return NULL;
 
-	*num_parents = of_clk_parent_fill(np, parents, nparents);
+	for (i = 0; i < nparents; i++)
+		parents[i] = of_clk_get_parent_name(np, i);
 
+	*num_parents = nparents;
 	return parents;
 }
 

@@ -17,18 +17,7 @@ GZFLAGS		:=-9
 
 KBUILD_DEFCONFIG := defconfig
 
-# Check for binutils support for specific extensions
-lseinstr := $(call as-instr,.arch_extension lse,-DCONFIG_AS_LSE=1)
-
-ifeq ($(CONFIG_ARM64_LSE_ATOMICS), y)
-  ifeq ($(lseinstr),)
-$(warning LSE atomics not supported by binutils)
-  endif
-endif
-
-KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr)
-KBUILD_AFLAGS	+= $(lseinstr)
-
+KBUILD_CFLAGS	+= -mgeneral-regs-only
 ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
 KBUILD_CPPFLAGS	+= -mbig-endian
 AS		+= -EB
@@ -73,10 +62,7 @@ all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
 
 boot := arch/arm64/boot
 
-Image: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
-
-Image.%: vmlinux
+Image Image.gz: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 zinstall install: vmlinux

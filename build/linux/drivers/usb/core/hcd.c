@@ -2686,14 +2686,12 @@ int usb_add_hcd(struct usb_hcd *hcd,
 	 * bottom up so that hcds can customize the root hubs before hub_wq
 	 * starts talking to them.  (Note, bus id is assigned early too.)
 	 */
-	retval = hcd_buffer_create(hcd);
-	if (retval != 0) {
+	if ((retval = hcd_buffer_create(hcd)) != 0) {
 		dev_dbg(hcd->self.controller, "pool alloc failed\n");
 		goto err_create_buf;
 	}
 
-	retval = usb_register_bus(&hcd->self);
-	if (retval < 0)
+	if ((retval = usb_register_bus(&hcd->self)) < 0)
 		goto err_register_bus;
 
 	rhdev = usb_alloc_dev(NULL, &hcd->self, 0);
@@ -2739,13 +2737,9 @@ int usb_add_hcd(struct usb_hcd *hcd,
 	/* "reset" is misnamed; its role is now one-time init. the controller
 	 * should already have been reset (and boot firmware kicked off etc).
 	 */
-	if (hcd->driver->reset) {
-		retval = hcd->driver->reset(hcd);
-		if (retval < 0) {
-			dev_err(hcd->self.controller, "can't setup: %d\n",
-					retval);
-			goto err_hcd_driver_setup;
-		}
+	if (hcd->driver->reset && (retval = hcd->driver->reset(hcd)) < 0) {
+		dev_err(hcd->self.controller, "can't setup: %d\n", retval);
+		goto err_hcd_driver_setup;
 	}
 	hcd->rh_pollable = 1;
 
@@ -2775,8 +2769,7 @@ int usb_add_hcd(struct usb_hcd *hcd,
 	}
 
 	/* starting here, usbcore will pay attention to this root hub */
-	retval = register_root_hub(hcd);
-	if (retval != 0)
+	if ((retval = register_root_hub(hcd)) != 0)
 		goto err_register_root_hub;
 
 	retval = sysfs_create_group(&rhdev->dev.kobj, &usb_bus_attr_group);

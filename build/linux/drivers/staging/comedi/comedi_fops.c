@@ -215,6 +215,7 @@ static struct comedi_subdevice
 	struct comedi_subdevice *s;
 	unsigned int i = minor - COMEDI_NUM_BOARD_MINORS;
 
+	BUG_ON(i >= COMEDI_NUM_SUBDEVICE_MINORS);
 	mutex_lock(&comedi_subdevice_minor_table_lock);
 	s = comedi_subdevice_minor_table[i];
 	if (s && s->device != dev)
@@ -227,6 +228,7 @@ static struct comedi_device *comedi_dev_get_from_board_minor(unsigned minor)
 {
 	struct comedi_device *dev;
 
+	BUG_ON(minor >= COMEDI_NUM_BOARD_MINORS);
 	mutex_lock(&comedi_board_minor_table_lock);
 	dev = comedi_dev_get(comedi_board_minor_table[minor]);
 	mutex_unlock(&comedi_board_minor_table_lock);
@@ -239,6 +241,7 @@ static struct comedi_device *comedi_dev_get_from_subdevice_minor(unsigned minor)
 	struct comedi_subdevice *s;
 	unsigned int i = minor - COMEDI_NUM_BOARD_MINORS;
 
+	BUG_ON(i >= COMEDI_NUM_SUBDEVICE_MINORS);
 	mutex_lock(&comedi_subdevice_minor_table_lock);
 	s = comedi_subdevice_minor_table[i];
 	dev = comedi_dev_get(s ? s->device : NULL);
@@ -2156,7 +2159,7 @@ static void comedi_vm_close(struct vm_area_struct *area)
 	comedi_buf_map_put(bm);
 }
 
-static const struct vm_operations_struct comedi_vm_ops = {
+static struct vm_operations_struct comedi_vm_ops = {
 	.open = comedi_vm_open,
 	.close = comedi_vm_close,
 };
@@ -2596,14 +2599,14 @@ static int comedi_open(struct inode *inode, struct file *file)
 	cfp->dev = dev;
 
 	mutex_lock(&dev->mutex);
-	if (!dev->attached && !capable(CAP_SYS_ADMIN)) {
-		dev_dbg(dev->class_dev, "not attached and not CAP_SYS_ADMIN\n");
+	if (!dev->attached && !capable(CAP_NET_ADMIN)) {
+		dev_dbg(dev->class_dev, "not attached and not CAP_NET_ADMIN\n");
 		rc = -ENODEV;
 		goto out;
 	}
 	if (dev->attached && dev->use_count == 0) {
 		if (!try_module_get(dev->driver->module)) {
-			rc = -ENXIO;
+			rc = -ENOSYS;
 			goto out;
 		}
 		if (dev->open) {
@@ -2774,6 +2777,12 @@ struct comedi_device *comedi_alloc_board_minor(struct device *hardware_device)
 	return dev;
 }
 
+static void comedi_free_board_minor(unsigned minor)
+{
+	BUG_ON(minor >= COMEDI_NUM_BOARD_MINORS);
+	comedi_free_board_dev(comedi_clear_board_minor(minor));
+}
+
 void comedi_release_hardware_device(struct device *hardware_device)
 {
 	int minor;
@@ -2829,9 +2838,11 @@ void comedi_free_subdevice_minor(struct comedi_subdevice *s)
 
 	if (!s)
 		return;
-	if (s->minor < COMEDI_NUM_BOARD_MINORS ||
-	    s->minor >= COMEDI_NUM_MINORS)
+	if (s->minor < 0)
 		return;
+
+	BUG_ON(s->minor >= COMEDI_NUM_MINORS);
+	BUG_ON(s->minor < COMEDI_NUM_BOARD_MINORS);
 
 	i = s->minor - COMEDI_NUM_BOARD_MINORS;
 	mutex_lock(&comedi_subdevice_minor_table_lock);
@@ -2846,13 +2857,10 @@ void comedi_free_subdevice_minor(struct comedi_subdevice *s)
 
 static void comedi_cleanup_board_minors(void)
 {
-	struct comedi_device *dev;
 	unsigned i;
 
-	for (i = 0; i < COMEDI_NUM_BOARD_MINORS; i++) {
-		dev = comedi_clear_board_minor(i);
-		comedi_free_board_dev(dev);
-	}
+	for (i = 0; i < COMEDI_NUM_BOARD_MINORS; i++)
+		comedi_free_board_minor(i);
 }
 
 static int __init comedi_init(void)
@@ -2924,7 +2932,14 @@ module_init(comedi_init);
 
 static void __exit comedi_cleanup(void)
 {
+	int i;
+
 	comedi_cleanup_board_minors();
+	for (i = 0; i < COMEDI_NUM_BOARD_MINORS; ++i)
+		BUG_ON(comedi_board_minor_table[i]);
+	for (i = 0; i < COMEDI_NUM_SUBDEVICE_MINORS; ++i)
+		BUG_ON(comedi_subdevice_minor_table[i]);
+
 	class_destroy(comedi_class);
 	cdev_del(&comedi_cdev);
 	unregister_chrdev_region(MKDEV(COMEDI_MAJOR, 0), COMEDI_NUM_MINORS);

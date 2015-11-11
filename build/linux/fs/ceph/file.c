@@ -136,6 +136,7 @@ int ceph_open(struct inode *inode, struct file *file)
 	struct ceph_mds_client *mdsc = fsc->mdsc;
 	struct ceph_mds_request *req;
 	struct ceph_file_info *cf = file->private_data;
+	struct inode *parent_inode = NULL;
 	int err;
 	int flags, fmode, wanted;
 
@@ -209,7 +210,10 @@ int ceph_open(struct inode *inode, struct file *file)
 	ihold(inode);
 
 	req->r_num_caps = 1;
-	err = ceph_mdsc_do_request(mdsc, NULL, req);
+	if (flags & O_CREAT)
+		parent_inode = ceph_get_dentry_parent_inode(file->f_path.dentry);
+	err = ceph_mdsc_do_request(mdsc, parent_inode, req);
+	iput(parent_inode);
 	if (!err)
 		err = ceph_init_file(inode, file, req->r_fmode);
 	ceph_mdsc_put_request(req);
@@ -275,7 +279,7 @@ int ceph_atomic_open(struct inode *dir, struct dentry *dentry,
 	if (err)
 		goto out_req;
 
-	if ((flags & O_CREAT) && !req->r_reply_info.head->is_dentry)
+	if (err == 0 && (flags & O_CREAT) && !req->r_reply_info.head->is_dentry)
 		err = ceph_handle_notrace_create(dir, dentry);
 
 	if (d_unhashed(dentry)) {
@@ -951,12 +955,6 @@ static ssize_t ceph_write_iter(struct kiocb *iocb, struct iov_iter *from)
 
 	/* We can write back this queue in page reclaim */
 	current->backing_dev_info = inode_to_bdi(inode);
-
-	if (iocb->ki_flags & IOCB_APPEND) {
-		err = ceph_do_getattr(inode, CEPH_STAT_CAP_SIZE, false);
-		if (err < 0)
-			goto out;
-	}
 
 	err = generic_write_checks(iocb, from);
 	if (err <= 0)

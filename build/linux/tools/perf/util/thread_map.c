@@ -195,8 +195,7 @@ static struct thread_map *thread_map__new_by_pid_str(const char *pid_str)
 	pid_t pid, prev_pid = INT_MAX;
 	char *end_ptr;
 	struct str_node *pos;
-	struct strlist_config slist_config = { .dont_dupstr = true, };
-	struct strlist *slist = strlist__new(pid_str, &slist_config);
+	struct strlist *slist = strlist__new(false, pid_str);
 
 	if (!slist)
 		return NULL;
@@ -266,14 +265,13 @@ static struct thread_map *thread_map__new_by_tid_str(const char *tid_str)
 	pid_t tid, prev_tid = INT_MAX;
 	char *end_ptr;
 	struct str_node *pos;
-	struct strlist_config slist_config = { .dont_dupstr = true, };
 	struct strlist *slist;
 
 	/* perf-stat expects threads to be generated even if tid not given */
 	if (!tid_str)
 		return thread_map__new_dummy();
 
-	slist = strlist__new(tid_str, &slist_config);
+	slist = strlist__new(false, tid_str);
 	if (!slist)
 		return NULL;
 

@@ -57,7 +57,6 @@ struct mt6397_chip {
 	int irq;
 	struct irq_domain *irq_domain;
 	struct mutex irqlock;
-	u16 wake_mask[2];
 	u16 irq_masks_cur[2];
 	u16 irq_masks_cache[2];
 };

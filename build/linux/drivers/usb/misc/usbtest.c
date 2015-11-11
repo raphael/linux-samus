@@ -1925,11 +1925,10 @@ test_iso_queue(struct usbtest_dev *dev, struct usbtest_param *param,
 	memset(urbs, 0, sizeof(urbs));
 	udev = testdev_to_usbdev(dev);
 	dev_info(&dev->intf->dev,
-		"iso period %d %sframes, wMaxPacket %d, transactions: %d\n",
+		"... iso period %d %sframes, wMaxPacket %04x\n",
 		1 << (desc->bInterval - 1),
 		(udev->speed == USB_SPEED_HIGH) ? "micro" : "",
-		usb_endpoint_maxp(desc) & 0x7ff,
-		1 + (0x3 & (usb_endpoint_maxp(desc) >> 11)));
+		usb_endpoint_maxp(desc));
 
 	for (i = 0; i < param->sglen; i++) {
 		urbs[i] = iso_alloc_urb(udev, pipe, desc,
@@ -1943,7 +1942,7 @@ test_iso_queue(struct usbtest_dev *dev, struct usbtest_param *param,
 	}
 	packets *= param->iterations;
 	dev_info(&dev->intf->dev,
-		"total %lu msec (%lu packets)\n",
+		"... total %lu msec (%lu packets)\n",
 		(packets * (1 << (desc->bInterval - 1)))
 			/ ((udev->speed == USB_SPEED_HIGH) ? 8 : 1),
 		packets);

@@ -846,6 +846,7 @@ MODULE_DEVICE_TABLE(i2c, bma180_ids);
 static struct i2c_driver bma180_driver = {
 	.driver = {
 		.name	= "bma180",
+		.owner	= THIS_MODULE,
 		.pm	= BMA180_PM_OPS,
 	},
 	.probe		= bma180_probe,

@@ -119,7 +119,8 @@ xfs_setfilesize_trans_alloc(
 	 * We may pass freeze protection with a transaction.  So tell lockdep
 	 * we released it.
 	 */
-	__sb_writers_release(ioend->io_inode->i_sb, SB_FREEZE_FS);
+	rwsem_release(&ioend->io_inode->i_sb->s_writers.lock_map[SB_FREEZE_FS-1],
+		      1, _THIS_IP_);
 	/*
 	 * We hand off the transaction to the completion thread now, so
 	 * clear the flag here.
@@ -170,7 +171,8 @@ xfs_setfilesize_ioend(
 	 * Similarly for freeze protection.
 	 */
 	current_set_flags_nested(&tp->t_pflags, PF_FSTRANS);
-	__sb_writers_acquired(VFS_I(ip)->i_sb, SB_FREEZE_FS);
+	rwsem_acquire_read(&VFS_I(ip)->i_sb->s_writers.lock_map[SB_FREEZE_FS-1],
+			   0, 1, _THIS_IP_);
 
 	return xfs_setfilesize(ip, tp, ioend->io_offset, ioend->io_size);
 }
@@ -349,12 +351,13 @@ xfs_imap_valid(
  */
 STATIC void
 xfs_end_bio(
-	struct bio		*bio)
+	struct bio		*bio,
+	int			error)
 {
 	xfs_ioend_t		*ioend = bio->bi_private;
 
-	if (!ioend->io_error)
-		ioend->io_error = bio->bi_error;
+	if (!ioend->io_error && !test_bit(BIO_UPTODATE, &bio->bi_flags))
+		ioend->io_error = error;
 
 	/* Toss bio and pass work off to an xfsdatad thread */
 	bio->bi_private = NULL;
@@ -380,7 +383,8 @@ STATIC struct bio *
 xfs_alloc_ioend_bio(
 	struct buffer_head	*bh)
 {
-	struct bio		*bio = bio_alloc(GFP_NOIO, BIO_MAX_PAGES);
+	int			nvecs = bio_get_nr_vecs(bh->b_bdev);
+	struct bio		*bio = bio_alloc(GFP_NOIO, nvecs);
 
 	ASSERT(bio->bi_private == NULL);
 	bio->bi_iter.bi_sector = bh->b_blocknr * (bh->b_size >> 9);

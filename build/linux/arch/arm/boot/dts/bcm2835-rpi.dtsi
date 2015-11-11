@@ -14,13 +14,6 @@
 			linux,default-trigger = "heartbeat";
 		};
 	};
-
-	soc {
-		firmware: firmware {
-			compatible = "raspberrypi,bcm2835-firmware";
-			mboxes = <&mailbox>;
-		};
-	};
 };
 
 &gpio {

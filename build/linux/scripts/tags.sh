@@ -170,9 +170,7 @@ exuberant()
 	--regex-c='/^SYSCALL_DEFINE[[:digit:]]?\(([^,)]*).*/sys_\1/' \
 	--regex-c='/^COMPAT_SYSCALL_DEFINE[[:digit:]]?\(([^,)]*).*/compat_sys_\1/' \
 	--regex-c++='/^TRACE_EVENT\(([^,)]*).*/trace_\1/'		\
-	--regex-c++='/^TRACE_EVENT\(([^,)]*).*/trace_\1_rcuidle/'	\
 	--regex-c++='/^DEFINE_EVENT\([^,)]*, *([^,)]*).*/trace_\1/'	\
-	--regex-c++='/^DEFINE_EVENT\([^,)]*, *([^,)]*).*/trace_\1_rcuidle/' \
 	--regex-c++='/PAGEFLAG\(([^,)]*).*/Page\1/'			\
 	--regex-c++='/PAGEFLAG\(([^,)]*).*/SetPage\1/'			\
 	--regex-c++='/PAGEFLAG\(([^,)]*).*/ClearPage\1/'		\
@@ -235,9 +233,7 @@ emacs()
 	--regex='/^SYSCALL_DEFINE[0-9]?(\([^,)]*\).*/sys_\1/'   \
 	--regex='/^COMPAT_SYSCALL_DEFINE[0-9]?(\([^,)]*\).*/compat_sys_\1/' \
 	--regex='/^TRACE_EVENT(\([^,)]*\).*/trace_\1/'		\
-	--regex='/^TRACE_EVENT(\([^,)]*\).*/trace_\1_rcuidle/'	\
 	--regex='/^DEFINE_EVENT([^,)]*, *\([^,)]*\).*/trace_\1/' \
-	--regex='/^DEFINE_EVENT([^,)]*, *\([^,)]*\).*/trace_\1_rcuidle/' \
 	--regex='/PAGEFLAG(\([^,)]*\).*/Page\1/'			\
 	--regex='/PAGEFLAG(\([^,)]*\).*/SetPage\1/'		\
 	--regex='/PAGEFLAG(\([^,)]*\).*/ClearPage\1/'		\

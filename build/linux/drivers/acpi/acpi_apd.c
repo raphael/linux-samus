@@ -16,6 +16,7 @@
 #include <linux/clkdev.h>
 #include <linux/acpi.h>
 #include <linux/err.h>
+#include <linux/clk.h>
 #include <linux/pm.h>
 
 #include "internal.h"

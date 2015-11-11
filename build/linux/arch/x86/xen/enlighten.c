@@ -33,7 +33,7 @@
 #include <linux/memblock.h>
 #include <linux/edd.h>
 
-#ifdef CONFIG_KEXEC_CORE
+#ifdef CONFIG_KEXEC
 #include <linux/kexec.h>
 #endif
 
@@ -88,7 +88,6 @@
 #include "mmu.h"
 #include "smp.h"
 #include "multicalls.h"
-#include "pmu.h"
 
 EXPORT_SYMBOL_GPL(hypercall_page);
 
@@ -1015,7 +1014,8 @@ static void xen_write_cr0(unsigned long cr0)
 
 static void xen_write_cr4(unsigned long cr4)
 {
-	cr4 &= ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_PCE);
+	cr4 &= ~X86_CR4_PGE;
+	cr4 &= ~X86_CR4_PSE;
 
 	native_write_cr4(cr4);
 }
@@ -1033,9 +1033,6 @@ static inline void xen_write_cr8(unsigned long val)
 static u64 xen_read_msr_safe(unsigned int msr, int *err)
 {
 	u64 val;
-
-	if (pmu_msr_read(msr, &val, err))
-		return val;
 
 	val = native_read_msr_safe(msr, err);
 	switch (msr) {
@@ -1081,11 +1078,9 @@ static int xen_write_msr_safe(unsigned int msr, unsigned low, unsigned high)
 		/* Fast syscall setup is all done in hypercalls, so
 		   these are all ignored.  Stub them out here to stop
 		   Xen console noise. */
-		break;
 
 	default:
-		if (!pmu_msr_write(msr, low, high, &ret))
-			ret = native_write_msr_safe(msr, low, high);
+		ret = native_write_msr_safe(msr, low, high);
 	}
 
 	return ret;
@@ -1224,7 +1219,10 @@ static const struct pv_cpu_ops xen_cpu_ops __initconst = {
 	.read_msr = xen_read_msr_safe,
 	.write_msr = xen_write_msr_safe,
 
-	.read_pmc = xen_read_pmc,
+	.read_tsc = native_read_tsc,
+	.read_pmc = native_read_pmc,
+
+	.read_tscp = native_read_tscp,
 
 	.iret = xen_iret,
 #ifdef CONFIG_X86_64
@@ -1273,10 +1271,6 @@ static const struct pv_apic_ops xen_apic_ops __initconst = {
 static void xen_reboot(int reason)
 {
 	struct sched_shutdown r = { .reason = reason };
-	int cpu;
-
-	for_each_online_cpu(cpu)
-		xen_pmu_finish(cpu);
 
 	if (HYPERVISOR_sched_op(SCHEDOP_shutdown, &r))
 		BUG();
@@ -1620,9 +1614,7 @@ asmlinkage __visible void __init xen_start_kernel(void)
 	early_boot_irqs_disabled = true;
 
 	xen_raw_console_write("mapping kernel into physical memory\n");
-	xen_setup_kernel_pagetable((pgd_t *)xen_start_info->pt_base,
-				   xen_start_info->nr_pages);
-	xen_reserve_special_pages();
+	xen_setup_kernel_pagetable((pgd_t *)xen_start_info->pt_base, xen_start_info->nr_pages);
 
 	/*
 	 * Modify the cache mode translation tables to match Xen's PAT
@@ -1812,7 +1804,7 @@ static struct notifier_block xen_hvm_cpu_notifier = {
 	.notifier_call	= xen_hvm_cpu_notify,
 };
 
-#ifdef CONFIG_KEXEC_CORE
+#ifdef CONFIG_KEXEC
 static void xen_hvm_shutdown(void)
 {
 	native_machine_shutdown();
@@ -1846,7 +1838,7 @@ static void __init xen_hvm_guest_init(void)
 	x86_init.irqs.intr_init = xen_init_IRQ;
 	xen_hvm_init_time_ops();
 	xen_hvm_init_mmu_ops();
-#ifdef CONFIG_KEXEC_CORE
+#ifdef CONFIG_KEXEC
 	machine_ops.shutdown = xen_hvm_shutdown;
 	machine_ops.crash_shutdown = xen_hvm_crash_shutdown;
 #endif

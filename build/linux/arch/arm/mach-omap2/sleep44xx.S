@@ -333,12 +333,14 @@ ENDPROC(omap4_cpu_resume)
 
 #endif	/* defined(CONFIG_SMP) && defined(CONFIG_PM) */
 
+ENTRY(omap_bus_sync)
+	ret	lr
+ENDPROC(omap_bus_sync)
+
 ENTRY(omap_do_wfi)
 	stmfd	sp!, {lr}
-#ifdef CONFIG_OMAP_INTERCONNECT_BARRIER
 	/* Drain interconnect write buffers. */
-	bl	omap_interconnect_sync
-#endif
+	bl omap_bus_sync
 
 	/*
 	 * Execute an ISB instruction to ensure that all of the

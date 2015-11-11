@@ -63,7 +63,7 @@ static int clk_rcg2_is_enabled(struct clk_hw *hw)
 static u8 clk_rcg2_get_parent(struct clk_hw *hw)
 {
 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
-	int num_parents = clk_hw_get_num_parents(hw);
+	int num_parents = __clk_get_num_parents(hw->clk);
 	u32 cfg;
 	int i, ret;
 
@@ -80,7 +80,7 @@ static u8 clk_rcg2_get_parent(struct clk_hw *hw)
 
 err:
 	pr_debug("%s: Clock %s has invalid parent, using default.\n",
-		 __func__, clk_hw_get_name(hw));
+		 __func__, __clk_get_name(hw->clk));
 	return 0;
 }
 
@@ -89,7 +89,7 @@ static int update_config(struct clk_rcg2 *rcg)
 	int count, ret;
 	u32 cmd;
 	struct clk_hw *hw = &rcg->clkr.hw;
-	const char *name = clk_hw_get_name(hw);
+	const char *name = __clk_get_name(hw->clk);
 
 	ret = regmap_update_bits(rcg->clkr.regmap, rcg->cmd_rcgr + CMD_REG,
 				 CMD_UPDATE, CMD_UPDATE);
@@ -176,11 +176,12 @@ clk_rcg2_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 	return calc_rate(parent_rate, m, n, mode, hid_div);
 }
 
-static int _freq_tbl_determine_rate(struct clk_hw *hw,
-		const struct freq_tbl *f, struct clk_rate_request *req)
+static long _freq_tbl_determine_rate(struct clk_hw *hw,
+		const struct freq_tbl *f, unsigned long rate,
+		unsigned long *p_rate, struct clk_hw **p_hw)
 {
-	unsigned long clk_flags, rate = req->rate;
-	struct clk_hw *p;
+	unsigned long clk_flags;
+	struct clk *p;
 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
 	int index;
 
@@ -192,8 +193,8 @@ static int _freq_tbl_determine_rate(struct clk_hw *hw,
 	if (index < 0)
 		return index;
 
-	clk_flags = clk_hw_get_flags(hw);
-	p = clk_hw_get_parent_by_index(hw, index);
+	clk_flags = __clk_get_flags(hw->clk);
+	p = clk_get_parent_by_index(hw->clk, index);
 	if (clk_flags & CLK_SET_RATE_PARENT) {
 		if (f->pre_div) {
 			rate /= 2;
@@ -207,21 +208,21 @@ static int _freq_tbl_determine_rate(struct clk_hw *hw,
 			rate = tmp;
 		}
 	} else {
-		rate =  clk_hw_get_rate(p);
+		rate =  __clk_get_rate(p);
 	}
-	req->best_parent_hw = p;
-	req->best_parent_rate = rate;
-	req->rate = f->freq;
+	*p_hw = __clk_get_hw(p);
+	*p_rate = rate;
 
-	return 0;
+	return f->freq;
 }
 
-static int clk_rcg2_determine_rate(struct clk_hw *hw,
-				   struct clk_rate_request *req)
+static long clk_rcg2_determine_rate(struct clk_hw *hw, unsigned long rate,
+		unsigned long min_rate, unsigned long max_rate,
+		unsigned long *p_rate, struct clk_hw **p)
 {
 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
 
-	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, req);
+	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, p_rate, p);
 }
 
 static int clk_rcg2_configure(struct clk_rcg2 *rcg, const struct freq_tbl *f)
@@ -373,33 +374,35 @@ static int clk_edp_pixel_set_rate_and_parent(struct clk_hw *hw,
 	return clk_edp_pixel_set_rate(hw, rate, parent_rate);
 }
 
-static int clk_edp_pixel_determine_rate(struct clk_hw *hw,
-					struct clk_rate_request *req)
+static long clk_edp_pixel_determine_rate(struct clk_hw *hw, unsigned long rate,
+				 unsigned long min_rate,
+				 unsigned long max_rate,
+				 unsigned long *p_rate, struct clk_hw **p)
 {
 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
 	const struct freq_tbl *f = rcg->freq_tbl;
 	const struct frac_entry *frac;
 	int delta = 100000;
+	s64 src_rate = *p_rate;
 	s64 request;
 	u32 mask = BIT(rcg->hid_width) - 1;
 	u32 hid_div;
 	int index = qcom_find_src_index(hw, rcg->parent_map, f->src);
 
 	/* Force the correct parent */
-	req->best_parent_hw = clk_hw_get_parent_by_index(hw, index);
-	req->best_parent_rate = clk_hw_get_rate(req->best_parent_hw);
+	*p = __clk_get_hw(clk_get_parent_by_index(hw->clk, index));
 
-	if (req->best_parent_rate == 810000000)
+	if (src_rate == 810000000)
 		frac = frac_table_810m;
 	else
 		frac = frac_table_675m;
 
 	for (; frac->num; frac++) {
-		request = req->rate;
+		request = rate;
 		request *= frac->den;
 		request = div_s64(request, frac->num);
-		if ((req->best_parent_rate < (request - delta)) ||
-		    (req->best_parent_rate > (request + delta)))
+		if ((src_rate < (request - delta)) ||
+		    (src_rate > (request + delta)))
 			continue;
 
 		regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + CFG_REG,
@@ -407,10 +410,8 @@ static int clk_edp_pixel_determine_rate(struct clk_hw *hw,
 		hid_div >>= CFG_SRC_DIV_SHIFT;
 		hid_div &= mask;
 
-		req->rate = calc_rate(req->best_parent_rate,
-				      frac->num, frac->den,
-				      !!frac->den, hid_div);
-		return 0;
+		return calc_rate(src_rate, frac->num, frac->den, !!frac->den,
+				 hid_div);
 	}
 
 	return -EINVAL;
@@ -427,28 +428,28 @@ const struct clk_ops clk_edp_pixel_ops = {
 };
 EXPORT_SYMBOL_GPL(clk_edp_pixel_ops);
 
-static int clk_byte_determine_rate(struct clk_hw *hw,
-				   struct clk_rate_request *req)
+static long clk_byte_determine_rate(struct clk_hw *hw, unsigned long rate,
+			 unsigned long min_rate, unsigned long max_rate,
+			 unsigned long *p_rate, struct clk_hw **p_hw)
 {
 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
 	const struct freq_tbl *f = rcg->freq_tbl;
 	int index = qcom_find_src_index(hw, rcg->parent_map, f->src);
 	unsigned long parent_rate, div;
 	u32 mask = BIT(rcg->hid_width) - 1;
-	struct clk_hw *p;
+	struct clk *p;
 
-	if (req->rate == 0)
+	if (rate == 0)
 		return -EINVAL;
 
-	req->best_parent_hw = p = clk_hw_get_parent_by_index(hw, index);
-	req->best_parent_rate = parent_rate = clk_hw_round_rate(p, req->rate);
+	p = clk_get_parent_by_index(hw->clk, index);
+	*p_hw = __clk_get_hw(p);
+	*p_rate = parent_rate = __clk_round_rate(p, rate);
 
-	div = DIV_ROUND_UP((2 * parent_rate), req->rate) - 1;
+	div = DIV_ROUND_UP((2 * parent_rate), rate) - 1;
 	div = min_t(u32, div, mask);
 
-	req->rate = calc_rate(parent_rate, 0, 0, 0, div);
-
-	return 0;
+	return calc_rate(parent_rate, 0, 0, 0, div);
 }
 
 static int clk_byte_set_rate(struct clk_hw *hw, unsigned long rate,
@@ -493,8 +494,10 @@ static const struct frac_entry frac_table_pixel[] = {
 	{ }
 };
 
-static int clk_pixel_determine_rate(struct clk_hw *hw,
-				    struct clk_rate_request *req)
+static long clk_pixel_determine_rate(struct clk_hw *hw, unsigned long rate,
+				 unsigned long min_rate,
+				 unsigned long max_rate,
+				 unsigned long *p_rate, struct clk_hw **p)
 {
 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
 	unsigned long request, src_rate;
@@ -502,20 +505,20 @@ static int clk_pixel_determine_rate(struct clk_hw *hw,
 	const struct freq_tbl *f = rcg->freq_tbl;
 	const struct frac_entry *frac = frac_table_pixel;
 	int index = qcom_find_src_index(hw, rcg->parent_map, f->src);
+	struct clk *parent = clk_get_parent_by_index(hw->clk, index);
 
-	req->best_parent_hw = clk_hw_get_parent_by_index(hw, index);
+	*p = __clk_get_hw(parent);
 
 	for (; frac->num; frac++) {
-		request = (req->rate * frac->den) / frac->num;
+		request = (rate * frac->den) / frac->num;
 
-		src_rate = clk_hw_round_rate(req->best_parent_hw, request);
+		src_rate = __clk_round_rate(parent, request);
 		if ((src_rate < (request - delta)) ||
 			(src_rate > (request + delta)))
 			continue;
 
-		req->best_parent_rate = src_rate;
-		req->rate = (src_rate * frac->num) / frac->den;
-		return 0;
+		*p_rate = src_rate;
+		return (src_rate * frac->num) / frac->den;
 	}
 
 	return -EINVAL;

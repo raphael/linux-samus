@@ -1,22 +1,17 @@
 # Makefile for vm selftests
 
-CFLAGS = -Wall -I ../../../../usr/include $(EXTRA_CFLAGS)
+CFLAGS = -Wall
 BINARIES = compaction_test
 BINARIES += hugepage-mmap
 BINARIES += hugepage-shm
+BINARIES += hugetlbfstest
 BINARIES += map_hugetlb
 BINARIES += thuge-gen
 BINARIES += transhuge-stress
-BINARIES += userfaultfd
 
 all: $(BINARIES)
 %: %.c
 	$(CC) $(CFLAGS) -o $@ $^ -lrt
-userfaultfd: userfaultfd.c ../../../../usr/include/linux/kernel.h
-	$(CC) $(CFLAGS) -O2 -o $@ $< -lpthread
-
-../../../../usr/include/linux/kernel.h:
-	make -C ../../../.. headers_install
 
 TEST_PROGS := run_vmtests
 TEST_FILES := $(BINARIES)

@@ -32,7 +32,6 @@
 #include <linux/gfp.h>
 #include <linux/uio.h>
 #include <linux/hugetlb.h>
-#include <linux/page_idle.h>
 
 #include "internal.h"
 
@@ -623,8 +622,6 @@ void mark_page_accessed(struct page *page)
 	} else if (!PageReferenced(page)) {
 		SetPageReferenced(page);
 	}
-	if (page_is_idle(page))
-		clear_page_idle(page);
 }
 EXPORT_SYMBOL(mark_page_accessed);
 

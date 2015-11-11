@@ -64,7 +64,8 @@
 	};
 
 	chosen {
-		stdout-path = "serial0:115200n8";
+		bootargs = "console=ttyS0,115200";
+		stdout-path = &uart0;
 	};
 };
 

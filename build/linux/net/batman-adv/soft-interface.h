@@ -22,6 +22,10 @@
 
 #include <net/rtnetlink.h>
 
+struct batadv_hard_iface;
+struct batadv_orig_node;
+struct batadv_priv;
+struct batadv_softif_vlan;
 struct net_device;
 struct sk_buff;
 

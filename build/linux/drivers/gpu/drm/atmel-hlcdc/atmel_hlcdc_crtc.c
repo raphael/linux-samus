@@ -239,8 +239,7 @@ static int atmel_hlcdc_crtc_atomic_check(struct drm_crtc *c,
 	return atmel_hlcdc_plane_prepare_disc_area(s);
 }
 
-static void atmel_hlcdc_crtc_atomic_begin(struct drm_crtc *c,
-					  struct drm_crtc_state *old_s)
+static void atmel_hlcdc_crtc_atomic_begin(struct drm_crtc *c)
 {
 	struct atmel_hlcdc_crtc *crtc = drm_crtc_to_atmel_hlcdc_crtc(c);
 
@@ -254,8 +253,7 @@ static void atmel_hlcdc_crtc_atomic_begin(struct drm_crtc *c,
 	}
 }
 
-static void atmel_hlcdc_crtc_atomic_flush(struct drm_crtc *crtc,
-					  struct drm_crtc_state *old_s)
+static void atmel_hlcdc_crtc_atomic_flush(struct drm_crtc *crtc)
 {
 	/* TODO: write common plane control register if available */
 }

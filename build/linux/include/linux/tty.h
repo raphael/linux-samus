@@ -709,10 +709,4 @@ static inline void proc_tty_register_driver(struct tty_driver *d) {}
 static inline void proc_tty_unregister_driver(struct tty_driver *d) {}
 #endif
 
-#define tty_debug(tty, f, args...)					\
-	do {								\
-		printk(KERN_DEBUG "%s: %s: " f, __func__,		\
-		       tty_name(tty), ##args);				\
-	} while (0)
-
 #endif

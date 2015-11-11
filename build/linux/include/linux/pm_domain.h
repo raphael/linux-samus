@@ -22,6 +22,9 @@
 
 enum gpd_status {
 	GPD_STATE_ACTIVE = 0,	/* PM domain is active */
+	GPD_STATE_WAIT_MASTER,	/* PM domain's master is being waited for */
+	GPD_STATE_BUSY,		/* Something is happening to the PM domain */
+	GPD_STATE_REPEAT,	/* Power off in progress, to be repeated */
 	GPD_STATE_POWER_OFF,	/* PM domain is off */
 };
 
@@ -56,6 +59,9 @@ struct generic_pm_domain {
 	unsigned int in_progress;	/* Number of devices being suspended now */
 	atomic_t sd_count;	/* Number of subdomains with power "on" */
 	enum gpd_status status;	/* Current state of the domain */
+	wait_queue_head_t status_wait_queue;
+	struct task_struct *poweroff_task;	/* Powering off task */
+	unsigned int resume_count;	/* Number of devices being resumed */
 	unsigned int device_count;	/* Number of devices */
 	unsigned int suspended_count;	/* System suspend device counter */
 	unsigned int prepared_count;	/* Suspend counter of prepared devices */
@@ -107,6 +113,7 @@ struct generic_pm_domain_data {
 	struct pm_domain_data base;
 	struct gpd_timing_data td;
 	struct notifier_block nb;
+	int need_restore;
 };
 
 #ifdef CONFIG_PM_GENERIC_DOMAINS
@@ -221,6 +228,8 @@ static inline int pm_genpd_name_poweron(const char *domain_name)
 	return -ENOSYS;
 }
 static inline void pm_genpd_poweroff_unused(void) {}
+#define simple_qos_governor NULL
+#define pm_domain_always_on_gov NULL
 #endif
 
 static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,

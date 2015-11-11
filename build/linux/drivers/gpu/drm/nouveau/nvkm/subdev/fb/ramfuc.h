@@ -1,11 +1,10 @@
 #ifndef __NVKM_FBRAM_FUC_H__
 #define __NVKM_FBRAM_FUC_H__
-#include <subdev/fb.h>
 #include <subdev/pmu.h>
 
 struct ramfuc {
 	struct nvkm_memx *memx;
-	struct nvkm_fb *fb;
+	struct nvkm_fb *pfb;
 	int sequence;
 };
 
@@ -55,14 +54,17 @@ ramfuc_reg(u32 addr)
 }
 
 static inline int
-ramfuc_init(struct ramfuc *ram, struct nvkm_fb *fb)
+ramfuc_init(struct ramfuc *ram, struct nvkm_fb *pfb)
 {
-	int ret = nvkm_memx_init(fb->subdev.device->pmu, &ram->memx);
+	struct nvkm_pmu *pmu = nvkm_pmu(pfb);
+	int ret;
+
+	ret = nvkm_memx_init(pmu, &ram->memx);
 	if (ret)
 		return ret;
 
 	ram->sequence++;
-	ram->fb = fb;
+	ram->pfb = pfb;
 	return 0;
 }
 
@@ -70,9 +72,9 @@ static inline int
 ramfuc_exec(struct ramfuc *ram, bool exec)
 {
 	int ret = 0;
-	if (ram->fb) {
+	if (ram->pfb) {
 		ret = nvkm_memx_fini(&ram->memx, exec);
-		ram->fb = NULL;
+		ram->pfb = NULL;
 	}
 	return ret;
 }
@@ -80,9 +82,8 @@ ramfuc_exec(struct ramfuc *ram, bool exec)
 static inline u32
 ramfuc_rd32(struct ramfuc *ram, struct ramfuc_reg *reg)
 {
-	struct nvkm_device *device = ram->fb->subdev.device;
 	if (reg->sequence != ram->sequence)
-		reg->data = nvkm_rd32(device, reg->addr);
+		reg->data = nv_rd32(ram->pfb, reg->addr);
 	return reg->data;
 }
 
@@ -143,9 +144,11 @@ ramfuc_train(struct ramfuc *ram)
 }
 
 static inline int
-ramfuc_train_result(struct nvkm_fb *fb, u32 *result, u32 rsize)
+ramfuc_train_result(struct nvkm_fb *pfb, u32 *result, u32 rsize)
 {
-	return nvkm_memx_train_result(fb->subdev.device->pmu, result, rsize);
+	struct nvkm_pmu *pmu = nvkm_pmu(pfb);
+
+	return nvkm_memx_train_result(pmu, result, rsize);
 }
 
 static inline void

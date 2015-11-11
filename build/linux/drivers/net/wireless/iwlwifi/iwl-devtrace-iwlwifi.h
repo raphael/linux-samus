@@ -36,7 +36,7 @@
 TRACE_EVENT(iwlwifi_dev_hcmd,
 	TP_PROTO(const struct device *dev,
 		 struct iwl_host_cmd *cmd, u16 total_size,
-		 struct iwl_cmd_header_wide *hdr),
+		 struct iwl_cmd_header *hdr),
 	TP_ARGS(dev, cmd, total_size, hdr),
 	TP_STRUCT__entry(
 		DEV_ENTRY
@@ -44,14 +44,11 @@ TRACE_EVENT(iwlwifi_dev_hcmd,
 		__field(u32, flags)
 	),
 	TP_fast_assign(
-		int i, offset = sizeof(struct iwl_cmd_header);
-
-		if (hdr->group_id)
-			offset = sizeof(struct iwl_cmd_header_wide);
+		int i, offset = sizeof(*hdr);
 
 		DEV_ASSIGN;
 		__entry->flags = cmd->flags;
-		memcpy(__get_dynamic_array(hcmd), hdr, offset);
+		memcpy(__get_dynamic_array(hcmd), hdr, sizeof(*hdr));
 
 		for (i = 0; i < IWL_MAX_CMD_TBS_PER_TFD; i++) {
 			if (!cmd->len[i])
@@ -61,9 +58,8 @@ TRACE_EVENT(iwlwifi_dev_hcmd,
 			offset += cmd->len[i];
 		}
 	),
-	TP_printk("[%s] hcmd %#.2x.%#.2x (%ssync)",
-		  __get_str(dev), ((u8 *)__get_dynamic_array(hcmd))[1],
-		  ((u8 *)__get_dynamic_array(hcmd))[0],
+	TP_printk("[%s] hcmd %#.2x (%ssync)",
+		  __get_str(dev), ((u8 *)__get_dynamic_array(hcmd))[0],
 		  __entry->flags & CMD_ASYNC ? "a" : "")
 );
 

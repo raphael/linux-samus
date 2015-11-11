@@ -237,11 +237,8 @@ static void etm_set_default(struct etm_drvdata *drvdata)
 
 	drvdata->seq_curr_state = 0x0;
 	drvdata->ctxid_idx = 0x0;
-	for (i = 0; i < drvdata->nr_ctxid_cmp; i++) {
-		drvdata->ctxid_pid[i] = 0x0;
-		drvdata->ctxid_vpid[i] = 0x0;
-	}
-
+	for (i = 0; i < drvdata->nr_ctxid_cmp; i++)
+		drvdata->ctxid_val[i] = 0x0;
 	drvdata->ctxid_mask = 0x0;
 }
 
@@ -292,7 +289,7 @@ static void etm_enable_hw(void *info)
 	for (i = 0; i < drvdata->nr_ext_out; i++)
 		etm_writel(drvdata, ETM_DEFAULT_EVENT_VAL, ETMEXTOUTEVRn(i));
 	for (i = 0; i < drvdata->nr_ctxid_cmp; i++)
-		etm_writel(drvdata, drvdata->ctxid_pid[i], ETMCIDCVRn(i));
+		etm_writel(drvdata, drvdata->ctxid_val[i], ETMCIDCVRn(i));
 	etm_writel(drvdata, drvdata->ctxid_mask, ETMCIDCMR);
 	etm_writel(drvdata, drvdata->sync_freq, ETMSYNCFR);
 	/* No external input selected */
@@ -1389,41 +1386,38 @@ static ssize_t ctxid_idx_store(struct device *dev,
 }
 static DEVICE_ATTR_RW(ctxid_idx);
 
-static ssize_t ctxid_pid_show(struct device *dev,
+static ssize_t ctxid_val_show(struct device *dev,
 			      struct device_attribute *attr, char *buf)
 {
 	unsigned long val;
 	struct etm_drvdata *drvdata = dev_get_drvdata(dev->parent);
 
 	spin_lock(&drvdata->spinlock);
-	val = drvdata->ctxid_vpid[drvdata->ctxid_idx];
+	val = drvdata->ctxid_val[drvdata->ctxid_idx];
 	spin_unlock(&drvdata->spinlock);
 
 	return sprintf(buf, "%#lx\n", val);
 }
 
-static ssize_t ctxid_pid_store(struct device *dev,
+static ssize_t ctxid_val_store(struct device *dev,
 			       struct device_attribute *attr,
 			       const char *buf, size_t size)
 {
 	int ret;
-	unsigned long vpid, pid;
+	unsigned long val;
 	struct etm_drvdata *drvdata = dev_get_drvdata(dev->parent);
 
-	ret = kstrtoul(buf, 16, &vpid);
+	ret = kstrtoul(buf, 16, &val);
 	if (ret)
 		return ret;
 
-	pid = coresight_vpid_to_pid(vpid);
-
 	spin_lock(&drvdata->spinlock);
-	drvdata->ctxid_pid[drvdata->ctxid_idx] = pid;
-	drvdata->ctxid_vpid[drvdata->ctxid_idx] = vpid;
+	drvdata->ctxid_val[drvdata->ctxid_idx] = val;
 	spin_unlock(&drvdata->spinlock);
 
 	return size;
 }
-static DEVICE_ATTR_RW(ctxid_pid);
+static DEVICE_ATTR_RW(ctxid_val);
 
 static ssize_t ctxid_mask_show(struct device *dev,
 			       struct device_attribute *attr, char *buf)
@@ -1615,7 +1609,7 @@ static struct attribute *coresight_etm_attrs[] = {
 	&dev_attr_seq_13_event.attr,
 	&dev_attr_seq_curr_state.attr,
 	&dev_attr_ctxid_idx.attr,
-	&dev_attr_ctxid_pid.attr,
+	&dev_attr_ctxid_val.attr,
 	&dev_attr_ctxid_mask.attr,
 	&dev_attr_sync_freq.attr,
 	&dev_attr_timestamp_event.attr,
@@ -1915,11 +1909,6 @@ static struct amba_id etm_ids[] = {
 	},
 	{	/* PTM 1.1 */
 		.id	= 0x0003b95f,
-		.mask	= 0x0003ffff,
-		.data	= "PTM 1.1",
-	},
-	{	/* PTM 1.1 Qualcomm */
-		.id	= 0x0003006f,
 		.mask	= 0x0003ffff,
 		.data	= "PTM 1.1",
 	},

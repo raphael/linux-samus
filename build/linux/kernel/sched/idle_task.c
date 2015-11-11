@@ -96,7 +96,6 @@ const struct sched_class idle_sched_class = {
 
 #ifdef CONFIG_SMP
 	.select_task_rq		= select_task_rq_idle,
-	.set_cpus_allowed	= set_cpus_allowed_common,
 #endif
 
 	.set_curr_task          = set_curr_task_idle,

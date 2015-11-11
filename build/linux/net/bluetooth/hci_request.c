@@ -317,7 +317,7 @@ static void set_random_addr(struct hci_request *req, bdaddr_t *rpa)
 	 * address be updated at the next cycle.
 	 */
 	if (hci_dev_test_flag(hdev, HCI_LE_ADV) ||
-	    hci_lookup_le_connect(hdev)) {
+	    hci_conn_hash_lookup_state(hdev, LE_LINK, BT_CONNECT)) {
 		BT_DBG("Deferring random address update");
 		hci_dev_set_flag(hdev, HCI_RPA_EXPIRED);
 		return;
@@ -479,6 +479,7 @@ void hci_update_page_scan(struct hci_dev *hdev)
 void __hci_update_background_scan(struct hci_request *req)
 {
 	struct hci_dev *hdev = req->hdev;
+	struct hci_conn *conn;
 
 	if (!test_bit(HCI_UP, &hdev->flags) ||
 	    test_bit(HCI_INIT, &hdev->flags) ||
@@ -528,7 +529,8 @@ void __hci_update_background_scan(struct hci_request *req)
 		 * since some controllers are not able to scan and connect at
 		 * the same time.
 		 */
-		if (hci_lookup_le_connect(hdev))
+		conn = hci_conn_hash_lookup_state(hdev, LE_LINK, BT_CONNECT);
+		if (conn)
 			return;
 
 		/* If controller is currently scanning, we stop it to ensure we

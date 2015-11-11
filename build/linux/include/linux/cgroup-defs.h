@@ -34,16 +34,11 @@ struct seq_file;
 
 /* define the enumeration of all cgroup subsystems */
 #define SUBSYS(_x) _x ## _cgrp_id,
-#define SUBSYS_TAG(_t) CGROUP_ ## _t, \
-	__unused_tag_ ## _t = CGROUP_ ## _t - 1,
 enum cgroup_subsys_id {
 #include <linux/cgroup_subsys.h>
 	CGROUP_SUBSYS_COUNT,
 };
-#undef SUBSYS_TAG
 #undef SUBSYS
-
-#define CGROUP_CANFORK_COUNT (CGROUP_CANFORK_END - CGROUP_CANFORK_START)
 
 /* bits in struct cgroup_subsys_state flags field */
 enum {
@@ -323,7 +318,7 @@ struct cftype {
 	 * end of cftype array.
 	 */
 	char name[MAX_CFTYPE_NAME];
-	unsigned long private;
+	int private;
 	/*
 	 * If not 0, file mode is set to this value, otherwise it will
 	 * be figured out automatically
@@ -411,9 +406,7 @@ struct cgroup_subsys {
 			      struct cgroup_taskset *tset);
 	void (*attach)(struct cgroup_subsys_state *css,
 		       struct cgroup_taskset *tset);
-	int (*can_fork)(struct task_struct *task, void **priv_p);
-	void (*cancel_fork)(struct task_struct *task, void *priv);
-	void (*fork)(struct task_struct *task, void *priv);
+	void (*fork)(struct task_struct *task);
 	void (*exit)(struct cgroup_subsys_state *css,
 		     struct cgroup_subsys_state *old_css,
 		     struct task_struct *task);
@@ -440,9 +433,6 @@ struct cgroup_subsys {
 	/* the following two fields are initialized automtically during boot */
 	int id;
 	const char *name;
-
-	/* optional, initialized automatically during boot if not set */
-	const char *legacy_name;
 
 	/* link to parent, protected by cgroup_lock() */
 	struct cgroup_root *root;
@@ -478,7 +468,6 @@ void cgroup_threadgroup_change_end(struct task_struct *tsk);
 
 #else	/* CONFIG_CGROUPS */
 
-#define CGROUP_CANFORK_COUNT 0
 #define CGROUP_SUBSYS_COUNT 0
 
 static inline void cgroup_threadgroup_change_begin(struct task_struct *tsk) {}

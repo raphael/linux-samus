@@ -287,7 +287,6 @@ err_unpin:
 	if (is_global_default_ctx && ctx->legacy_hw_ctx.rcs_state)
 		i915_gem_object_ggtt_unpin(ctx->legacy_hw_ctx.rcs_state);
 err_destroy:
-	idr_remove(&file_priv->context_idr, ctx->user_handle);
 	i915_gem_context_unreference(ctx);
 	return ERR_PTR(ret);
 }
@@ -408,23 +407,32 @@ void i915_gem_context_fini(struct drm_device *dev)
 	i915_gem_context_unreference(dctx);
 }
 
-int i915_gem_context_enable(struct drm_i915_gem_request *req)
+int i915_gem_context_enable(struct drm_i915_private *dev_priv)
 {
-	struct intel_engine_cs *ring = req->ring;
-	int ret;
+	struct intel_engine_cs *ring;
+	int ret, i;
+
+	BUG_ON(!dev_priv->ring[RCS].default_context);
 
 	if (i915.enable_execlists) {
-		if (ring->init_context == NULL)
-			return 0;
+		for_each_ring(ring, dev_priv, i) {
+			if (ring->init_context) {
+				ret = ring->init_context(ring,
+						ring->default_context);
+				if (ret) {
+					DRM_ERROR("ring init context: %d\n",
+							ret);
+					return ret;
+				}
+			}
+		}
 
-		ret = ring->init_context(req);
 	} else
-		ret = i915_switch_context(req);
-
-	if (ret) {
-		DRM_ERROR("ring init context: %d\n", ret);
-		return ret;
-	}
+		for_each_ring(ring, dev_priv, i) {
+			ret = i915_switch_context(ring, ring->default_context);
+			if (ret)
+				return ret;
+		}
 
 	return 0;
 }
@@ -477,9 +485,10 @@ i915_gem_context_get(struct drm_i915_file_private *file_priv, u32 id)
 }
 
 static inline int
-mi_set_context(struct drm_i915_gem_request *req, u32 hw_flags)
+mi_set_context(struct intel_engine_cs *ring,
+	       struct intel_context *new_context,
+	       u32 hw_flags)
 {
-	struct intel_engine_cs *ring = req->ring;
 	u32 flags = hw_flags | MI_MM_SPACE_GTT;
 	const int num_rings =
 		/* Use an extended w/a on ivb+ if signalling from other rings */
@@ -494,15 +503,13 @@ mi_set_context(struct drm_i915_gem_request *req, u32 hw_flags)
 	 * itlb_before_ctx_switch.
 	 */
 	if (IS_GEN6(ring->dev)) {
-		ret = ring->flush(req, I915_GEM_GPU_DOMAINS, 0);
+		ret = ring->flush(ring, I915_GEM_GPU_DOMAINS, 0);
 		if (ret)
 			return ret;
 	}
 
 	/* These flags are for resource streamer on HSW+ */
-	if (IS_HASWELL(ring->dev) || INTEL_INFO(ring->dev)->gen >= 8)
-		flags |= (HSW_MI_RS_SAVE_STATE_EN | HSW_MI_RS_RESTORE_STATE_EN);
-	else if (INTEL_INFO(ring->dev)->gen < 8)
+	if (!IS_HASWELL(ring->dev) && INTEL_INFO(ring->dev)->gen < 8)
 		flags |= (MI_SAVE_EXT_STATE_EN | MI_RESTORE_EXT_STATE_EN);
 
 
@@ -510,7 +517,7 @@ mi_set_context(struct drm_i915_gem_request *req, u32 hw_flags)
 	if (INTEL_INFO(ring->dev)->gen >= 7)
 		len += 2 + (num_rings ? 4*num_rings + 2 : 0);
 
-	ret = intel_ring_begin(req, len);
+	ret = intel_ring_begin(ring, len);
 	if (ret)
 		return ret;
 
@@ -533,7 +540,7 @@ mi_set_context(struct drm_i915_gem_request *req, u32 hw_flags)
 
 	intel_ring_emit(ring, MI_NOOP);
 	intel_ring_emit(ring, MI_SET_CONTEXT);
-	intel_ring_emit(ring, i915_gem_obj_ggtt_offset(req->ctx->legacy_hw_ctx.rcs_state) |
+	intel_ring_emit(ring, i915_gem_obj_ggtt_offset(new_context->legacy_hw_ctx.rcs_state) |
 			flags);
 	/*
 	 * w/a: MI_SET_CONTEXT must always be followed by MI_NOOP
@@ -614,10 +621,9 @@ needs_pd_load_post(struct intel_engine_cs *ring, struct intel_context *to,
 	return false;
 }
 
-static int do_switch(struct drm_i915_gem_request *req)
+static int do_switch(struct intel_engine_cs *ring,
+		     struct intel_context *to)
 {
-	struct intel_context *to = req->ctx;
-	struct intel_engine_cs *ring = req->ring;
 	struct drm_i915_private *dev_priv = ring->dev->dev_private;
 	struct intel_context *from = ring->last_context;
 	u32 hw_flags = 0;
@@ -653,7 +659,7 @@ static int do_switch(struct drm_i915_gem_request *req)
 		 * Register Immediate commands in Ring Buffer before submitting
 		 * a context."*/
 		trace_switch_mm(ring, to);
-		ret = to->ppgtt->switch_mm(to->ppgtt, req);
+		ret = to->ppgtt->switch_mm(to->ppgtt, ring);
 		if (ret)
 			goto unpin_out;
 
@@ -695,7 +701,7 @@ static int do_switch(struct drm_i915_gem_request *req)
 	WARN_ON(needs_pd_load_pre(ring, to) &&
 		needs_pd_load_post(ring, to, hw_flags));
 
-	ret = mi_set_context(req, hw_flags);
+	ret = mi_set_context(ring, to, hw_flags);
 	if (ret)
 		goto unpin_out;
 
@@ -704,7 +710,7 @@ static int do_switch(struct drm_i915_gem_request *req)
 	 */
 	if (needs_pd_load_post(ring, to, hw_flags)) {
 		trace_switch_mm(ring, to);
-		ret = to->ppgtt->switch_mm(to->ppgtt, req);
+		ret = to->ppgtt->switch_mm(to->ppgtt, ring);
 		/* The hardware context switch is emitted, but we haven't
 		 * actually changed the state - so it's probably safe to bail
 		 * here. Still, let the user know something dangerous has
@@ -720,7 +726,7 @@ static int do_switch(struct drm_i915_gem_request *req)
 		if (!(to->remap_slice & (1<<i)))
 			continue;
 
-		ret = i915_gem_l3_remap(req, i);
+		ret = i915_gem_l3_remap(ring, i);
 		/* If it failed, try again next round */
 		if (ret)
 			DRM_DEBUG_DRIVER("L3 remapping failed\n");
@@ -736,7 +742,7 @@ static int do_switch(struct drm_i915_gem_request *req)
 	 */
 	if (from != NULL) {
 		from->legacy_hw_ctx.rcs_state->base.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
-		i915_vma_move_to_active(i915_gem_obj_to_ggtt(from->legacy_hw_ctx.rcs_state), req);
+		i915_vma_move_to_active(i915_gem_obj_to_ggtt(from->legacy_hw_ctx.rcs_state), ring);
 		/* As long as MI_SET_CONTEXT is serializing, ie. it flushes the
 		 * whole damn pipeline, we don't need to explicitly mark the
 		 * object dirty. The only exception is that the context must be
@@ -760,7 +766,7 @@ done:
 
 	if (uninitialized) {
 		if (ring->init_context) {
-			ret = ring->init_context(req);
+			ret = ring->init_context(ring, to);
 			if (ret)
 				DRM_ERROR("ring init context: %d\n", ret);
 		}
@@ -776,7 +782,8 @@ unpin_out:
 
 /**
  * i915_switch_context() - perform a GPU context switch.
- * @req: request for which we'll execute the context switch
+ * @ring: ring for which we'll execute the context switch
+ * @to: the context to switch to
  *
  * The context life cycle is simple. The context refcount is incremented and
  * decremented by 1 and create and destroy. If the context is in use by the GPU,
@@ -787,25 +794,25 @@ unpin_out:
  * switched by writing to the ELSP and requests keep a reference to their
  * context.
  */
-int i915_switch_context(struct drm_i915_gem_request *req)
+int i915_switch_context(struct intel_engine_cs *ring,
+			struct intel_context *to)
 {
-	struct intel_engine_cs *ring = req->ring;
 	struct drm_i915_private *dev_priv = ring->dev->dev_private;
 
 	WARN_ON(i915.enable_execlists);
 	WARN_ON(!mutex_is_locked(&dev_priv->dev->struct_mutex));
 
-	if (req->ctx->legacy_hw_ctx.rcs_state == NULL) { /* We have the fake context */
-		if (req->ctx != ring->last_context) {
-			i915_gem_context_reference(req->ctx);
+	if (to->legacy_hw_ctx.rcs_state == NULL) { /* We have the fake context */
+		if (to != ring->last_context) {
+			i915_gem_context_reference(to);
 			if (ring->last_context)
 				i915_gem_context_unreference(ring->last_context);
-			ring->last_context = req->ctx;
+			ring->last_context = to;
 		}
 		return 0;
 	}
 
-	return do_switch(req);
+	return do_switch(ring, to);
 }
 
 static bool contexts_enabled(struct drm_device *dev)
@@ -891,9 +898,6 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 	case I915_CONTEXT_PARAM_BAN_PERIOD:
 		args->value = ctx->hang_stats.ban_period_seconds;
 		break;
-	case I915_CONTEXT_PARAM_NO_ZEROMAP:
-		args->value = ctx->flags & CONTEXT_NO_ZEROMAP;
-		break;
 	default:
 		ret = -EINVAL;
 		break;
@@ -930,14 +934,6 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 			ret = -EPERM;
 		else
 			ctx->hang_stats.ban_period_seconds = args->value;
-		break;
-	case I915_CONTEXT_PARAM_NO_ZEROMAP:
-		if (args->size) {
-			ret = -EINVAL;
-		} else {
-			ctx->flags &= ~CONTEXT_NO_ZEROMAP;
-			ctx->flags |= args->value ? CONTEXT_NO_ZEROMAP : 0;
-		}
 		break;
 	default:
 		ret = -EINVAL;

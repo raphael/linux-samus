@@ -803,7 +803,10 @@ static int rfc4106_init(struct crypto_aead *aead)
 		return PTR_ERR(cryptd_tfm);
 
 	*ctx = cryptd_tfm;
-	crypto_aead_set_reqsize(aead, crypto_aead_reqsize(&cryptd_tfm->base));
+	crypto_aead_set_reqsize(
+		aead,
+		sizeof(struct aead_request) +
+		crypto_aead_reqsize(&cryptd_tfm->base));
 	return 0;
 }
 
@@ -952,8 +955,8 @@ static int helper_rfc4106_encrypt(struct aead_request *req)
 
 	/* Assuming we are supporting rfc4106 64-bit extended */
 	/* sequence numbers We need to have the AAD length equal */
-	/* to 16 or 20 bytes */
-	if (unlikely(req->assoclen != 16 && req->assoclen != 20))
+	/* to 8 or 12 bytes */
+	if (unlikely(req->assoclen != 8 && req->assoclen != 12))
 		return -EINVAL;
 
 	/* IV below built */
@@ -989,9 +992,9 @@ static int helper_rfc4106_encrypt(struct aead_request *req)
 	}
 
 	kernel_fpu_begin();
-	aesni_gcm_enc_tfm(aes_ctx, dst, src, req->cryptlen, iv,
-			  ctx->hash_subkey, assoc, req->assoclen - 8,
-			  dst + req->cryptlen, auth_tag_len);
+	aesni_gcm_enc_tfm(aes_ctx, dst, src, (unsigned long)req->cryptlen, iv,
+		ctx->hash_subkey, assoc, (unsigned long)req->assoclen, dst
+		+ ((unsigned long)req->cryptlen), auth_tag_len);
 	kernel_fpu_end();
 
 	/* The authTag (aka the Integrity Check Value) needs to be written
@@ -1030,12 +1033,12 @@ static int helper_rfc4106_decrypt(struct aead_request *req)
 	struct scatter_walk dst_sg_walk;
 	unsigned int i;
 
-	if (unlikely(req->assoclen != 16 && req->assoclen != 20))
+	if (unlikely(req->assoclen != 8 && req->assoclen != 12))
 		return -EINVAL;
 
 	/* Assuming we are supporting rfc4106 64-bit extended */
 	/* sequence numbers We need to have the AAD length */
-	/* equal to 16 or 20 bytes */
+	/* equal to 8 or 12 bytes */
 
 	tempCipherLen = (unsigned long)(req->cryptlen - auth_tag_len);
 	/* IV below built */
@@ -1072,8 +1075,8 @@ static int helper_rfc4106_decrypt(struct aead_request *req)
 
 	kernel_fpu_begin();
 	aesni_gcm_dec_tfm(aes_ctx, dst, src, tempCipherLen, iv,
-			  ctx->hash_subkey, assoc, req->assoclen - 8,
-			  authTag, auth_tag_len);
+		ctx->hash_subkey, assoc, (unsigned long)req->assoclen,
+		authTag, auth_tag_len);
 	kernel_fpu_end();
 
 	/* Compare generated tag with passed in tag. */
@@ -1102,12 +1105,19 @@ static int rfc4106_encrypt(struct aead_request *req)
 	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
 	struct cryptd_aead **ctx = crypto_aead_ctx(tfm);
 	struct cryptd_aead *cryptd_tfm = *ctx;
+	struct aead_request *subreq = aead_request_ctx(req);
 
-	aead_request_set_tfm(req, irq_fpu_usable() ?
-				  cryptd_aead_child(cryptd_tfm) :
-				  &cryptd_tfm->base);
+	aead_request_set_tfm(subreq, irq_fpu_usable() ?
+				     cryptd_aead_child(cryptd_tfm) :
+				     &cryptd_tfm->base);
 
-	return crypto_aead_encrypt(req);
+	aead_request_set_callback(subreq, req->base.flags,
+				  req->base.complete, req->base.data);
+	aead_request_set_crypt(subreq, req->src, req->dst,
+			       req->cryptlen, req->iv);
+	aead_request_set_ad(subreq, req->assoclen);
+
+	return crypto_aead_encrypt(subreq);
 }
 
 static int rfc4106_decrypt(struct aead_request *req)
@@ -1115,12 +1125,19 @@ static int rfc4106_decrypt(struct aead_request *req)
 	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
 	struct cryptd_aead **ctx = crypto_aead_ctx(tfm);
 	struct cryptd_aead *cryptd_tfm = *ctx;
+	struct aead_request *subreq = aead_request_ctx(req);
 
-	aead_request_set_tfm(req, irq_fpu_usable() ?
-				  cryptd_aead_child(cryptd_tfm) :
-				  &cryptd_tfm->base);
+	aead_request_set_tfm(subreq, irq_fpu_usable() ?
+				     cryptd_aead_child(cryptd_tfm) :
+				     &cryptd_tfm->base);
 
-	return crypto_aead_decrypt(req);
+	aead_request_set_callback(subreq, req->base.flags,
+				  req->base.complete, req->base.data);
+	aead_request_set_crypt(subreq, req->src, req->dst,
+			       req->cryptlen, req->iv);
+	aead_request_set_ad(subreq, req->assoclen);
+
+	return crypto_aead_decrypt(subreq);
 }
 #endif
 

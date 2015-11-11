@@ -31,8 +31,7 @@ static int get_first_sibling(unsigned int cpu)
 	return cpu;
 }
 
-int blk_mq_update_queue_map(unsigned int *map, unsigned int nr_queues,
-			    const struct cpumask *online_mask)
+int blk_mq_update_queue_map(unsigned int *map, unsigned int nr_queues)
 {
 	unsigned int i, nr_cpus, nr_uniq_cpus, queue, first_sibling;
 	cpumask_var_t cpus;
@@ -42,7 +41,7 @@ int blk_mq_update_queue_map(unsigned int *map, unsigned int nr_queues,
 
 	cpumask_clear(cpus);
 	nr_cpus = nr_uniq_cpus = 0;
-	for_each_cpu(i, online_mask) {
+	for_each_online_cpu(i) {
 		nr_cpus++;
 		first_sibling = get_first_sibling(i);
 		if (!cpumask_test_cpu(first_sibling, cpus))
@@ -52,7 +51,7 @@ int blk_mq_update_queue_map(unsigned int *map, unsigned int nr_queues,
 
 	queue = 0;
 	for_each_possible_cpu(i) {
-		if (!cpumask_test_cpu(i, online_mask)) {
+		if (!cpu_online(i)) {
 			map[i] = 0;
 			continue;
 		}
@@ -96,7 +95,7 @@ unsigned int *blk_mq_make_queue_map(struct blk_mq_tag_set *set)
 	if (!map)
 		return NULL;
 
-	if (!blk_mq_update_queue_map(map, set->nr_hw_queues, cpu_online_mask))
+	if (!blk_mq_update_queue_map(map, set->nr_hw_queues))
 		return map;
 
 	kfree(map);

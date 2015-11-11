@@ -655,7 +655,14 @@ static int ocfs2_control_init(void)
 
 static void ocfs2_control_exit(void)
 {
-	misc_deregister(&ocfs2_control_device);
+	int rc;
+
+	rc = misc_deregister(&ocfs2_control_device);
+	if (rc)
+		printk(KERN_ERR
+		       "ocfs2: Unable to deregister ocfs2_control device "
+		       "(errno %d)\n",
+		       -rc);
 }
 
 static void fsdlm_lock_ast_wrapper(void *astarg)

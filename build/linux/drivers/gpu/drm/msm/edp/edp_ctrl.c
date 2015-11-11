@@ -373,7 +373,7 @@ static int edp_gpio_config(struct edp_ctrl *ctrl)
 	struct device *dev = &ctrl->pdev->dev;
 	int ret;
 
-	ctrl->panel_hpd_gpio = devm_gpiod_get(dev, "panel-hpd", GPIOD_IN);
+	ctrl->panel_hpd_gpio = devm_gpiod_get(dev, "panel-hpd");
 	if (IS_ERR(ctrl->panel_hpd_gpio)) {
 		ret = PTR_ERR(ctrl->panel_hpd_gpio);
 		ctrl->panel_hpd_gpio = NULL;
@@ -381,11 +381,24 @@ static int edp_gpio_config(struct edp_ctrl *ctrl)
 		return ret;
 	}
 
-	ctrl->panel_en_gpio = devm_gpiod_get(dev, "panel-en", GPIOD_OUT_LOW);
+	ret = gpiod_direction_input(ctrl->panel_hpd_gpio);
+	if (ret) {
+		pr_err("%s: Set direction for hpd failed, %d\n", __func__, ret);
+		return ret;
+	}
+
+	ctrl->panel_en_gpio = devm_gpiod_get(dev, "panel-en");
 	if (IS_ERR(ctrl->panel_en_gpio)) {
 		ret = PTR_ERR(ctrl->panel_en_gpio);
 		ctrl->panel_en_gpio = NULL;
 		pr_err("%s: cannot get panel-en-gpios, %d\n", __func__, ret);
+		return ret;
+	}
+
+	ret = gpiod_direction_output(ctrl->panel_en_gpio, 0);
+	if (ret) {
+		pr_err("%s: Set direction for panel_en failed, %d\n",
+				__func__, ret);
 		return ret;
 	}
 

@@ -44,7 +44,7 @@ static void cache_revisit_request(struct cache_head *item);
 static void cache_init(struct cache_head *h)
 {
 	time_t now = seconds_since_boot();
-	INIT_HLIST_NODE(&h->cache_list);
+	h->next = NULL;
 	h->flags = 0;
 	kref_init(&h->ref);
 	h->expiry_time = now + CACHE_NEW_EXPIRY;
@@ -54,14 +54,15 @@ static void cache_init(struct cache_head *h)
 struct cache_head *sunrpc_cache_lookup(struct cache_detail *detail,
 				       struct cache_head *key, int hash)
 {
-	struct cache_head *new = NULL, *freeme = NULL, *tmp = NULL;
-	struct hlist_head *head;
+	struct cache_head **head,  **hp;
+	struct cache_head *new = NULL, *freeme = NULL;
 
 	head = &detail->hash_table[hash];
 
 	read_lock(&detail->hash_lock);
 
-	hlist_for_each_entry(tmp, head, cache_list) {
+	for (hp=head; *hp != NULL ; hp = &(*hp)->next) {
+		struct cache_head *tmp = *hp;
 		if (detail->match(tmp, key)) {
 			if (cache_is_expired(detail, tmp))
 				/* This entry is expired, we will discard it. */
@@ -87,10 +88,12 @@ struct cache_head *sunrpc_cache_lookup(struct cache_detail *detail,
 	write_lock(&detail->hash_lock);
 
 	/* check if entry appeared while we slept */
-	hlist_for_each_entry(tmp, head, cache_list) {
+	for (hp=head; *hp != NULL ; hp = &(*hp)->next) {
+		struct cache_head *tmp = *hp;
 		if (detail->match(tmp, key)) {
 			if (cache_is_expired(detail, tmp)) {
-				hlist_del_init(&tmp->cache_list);
+				*hp = tmp->next;
+				tmp->next = NULL;
 				detail->entries --;
 				freeme = tmp;
 				break;
@@ -101,8 +104,8 @@ struct cache_head *sunrpc_cache_lookup(struct cache_detail *detail,
 			return tmp;
 		}
 	}
-
-	hlist_add_head(&new->cache_list, head);
+	new->next = *head;
+	*head = new;
 	detail->entries++;
 	cache_get(new);
 	write_unlock(&detail->hash_lock);
@@ -140,6 +143,7 @@ struct cache_head *sunrpc_cache_update(struct cache_detail *detail,
 	 * If 'old' is not VALID, we update it directly,
 	 * otherwise we need to replace it
 	 */
+	struct cache_head **head;
 	struct cache_head *tmp;
 
 	if (!test_bit(CACHE_VALID, &old->flags)) {
@@ -164,13 +168,15 @@ struct cache_head *sunrpc_cache_update(struct cache_detail *detail,
 	}
 	cache_init(tmp);
 	detail->init(tmp, old);
+	head = &detail->hash_table[hash];
 
 	write_lock(&detail->hash_lock);
 	if (test_bit(CACHE_NEGATIVE, &new->flags))
 		set_bit(CACHE_NEGATIVE, &tmp->flags);
 	else
 		detail->update(tmp, new);
-	hlist_add_head(&tmp->cache_list, &detail->hash_table[hash]);
+	tmp->next = *head;
+	*head = tmp;
 	detail->entries++;
 	cache_get(tmp);
 	cache_fresh_locked(tmp, new->expiry_time);
@@ -410,29 +416,28 @@ static int cache_clean(void)
 	/* find a non-empty bucket in the table */
 	while (current_detail &&
 	       current_index < current_detail->hash_size &&
-	       hlist_empty(&current_detail->hash_table[current_index]))
+	       current_detail->hash_table[current_index] == NULL)
 		current_index++;
 
 	/* find a cleanable entry in the bucket and clean it, or set to next bucket */
 
 	if (current_detail && current_index < current_detail->hash_size) {
-		struct cache_head *ch = NULL;
+		struct cache_head *ch, **cp;
 		struct cache_detail *d;
-		struct hlist_head *head;
-		struct hlist_node *tmp;
 
 		write_lock(&current_detail->hash_lock);
 
 		/* Ok, now to clean this strand */
 
-		head = &current_detail->hash_table[current_index];
-		hlist_for_each_entry_safe(ch, tmp, head, cache_list) {
+		cp = & current_detail->hash_table[current_index];
+		for (ch = *cp ; ch ; cp = & ch->next, ch = *cp) {
 			if (current_detail->nextcheck > ch->expiry_time)
 				current_detail->nextcheck = ch->expiry_time+1;
 			if (!cache_is_expired(current_detail, ch))
 				continue;
 
-			hlist_del_init(&ch->cache_list);
+			*cp = ch->next;
+			ch->next = NULL;
 			current_detail->entries--;
 			rv = 1;
 			break;
@@ -1265,13 +1270,18 @@ EXPORT_SYMBOL_GPL(qword_get);
  * get a header, then pass each real item in the cache
  */
 
-void *cache_seq_start(struct seq_file *m, loff_t *pos)
+struct handle {
+	struct cache_detail *cd;
+};
+
+static void *c_start(struct seq_file *m, loff_t *pos)
 	__acquires(cd->hash_lock)
 {
 	loff_t n = *pos;
 	unsigned int hash, entry;
 	struct cache_head *ch;
-	struct cache_detail *cd = m->private;
+	struct cache_detail *cd = ((struct handle*)m->private)->cd;
+
 
 	read_lock(&cd->hash_lock);
 	if (!n--)
@@ -1279,7 +1289,7 @@ void *cache_seq_start(struct seq_file *m, loff_t *pos)
 	hash = n >> 32;
 	entry = n & ((1LL<<32) - 1);
 
-	hlist_for_each_entry(ch, &cd->hash_table[hash], cache_list)
+	for (ch=cd->hash_table[hash]; ch; ch=ch->next)
 		if (!entry--)
 			return ch;
 	n &= ~((1LL<<32) - 1);
@@ -1287,57 +1297,51 @@ void *cache_seq_start(struct seq_file *m, loff_t *pos)
 		hash++;
 		n += 1LL<<32;
 	} while(hash < cd->hash_size &&
-		hlist_empty(&cd->hash_table[hash]));
+		cd->hash_table[hash]==NULL);
 	if (hash >= cd->hash_size)
 		return NULL;
 	*pos = n+1;
-	return hlist_entry_safe(cd->hash_table[hash].first,
-				struct cache_head, cache_list);
+	return cd->hash_table[hash];
 }
-EXPORT_SYMBOL_GPL(cache_seq_start);
 
-void *cache_seq_next(struct seq_file *m, void *p, loff_t *pos)
+static void *c_next(struct seq_file *m, void *p, loff_t *pos)
 {
 	struct cache_head *ch = p;
 	int hash = (*pos >> 32);
-	struct cache_detail *cd = m->private;
+	struct cache_detail *cd = ((struct handle*)m->private)->cd;
 
 	if (p == SEQ_START_TOKEN)
 		hash = 0;
-	else if (ch->cache_list.next == NULL) {
+	else if (ch->next == NULL) {
 		hash++;
 		*pos += 1LL<<32;
 	} else {
 		++*pos;
-		return hlist_entry_safe(ch->cache_list.next,
-					struct cache_head, cache_list);
+		return ch->next;
 	}
 	*pos &= ~((1LL<<32) - 1);
 	while (hash < cd->hash_size &&
-	       hlist_empty(&cd->hash_table[hash])) {
+	       cd->hash_table[hash] == NULL) {
 		hash++;
 		*pos += 1LL<<32;
 	}
 	if (hash >= cd->hash_size)
 		return NULL;
 	++*pos;
-	return hlist_entry_safe(cd->hash_table[hash].first,
-				struct cache_head, cache_list);
+	return cd->hash_table[hash];
 }
-EXPORT_SYMBOL_GPL(cache_seq_next);
 
-void cache_seq_stop(struct seq_file *m, void *p)
+static void c_stop(struct seq_file *m, void *p)
 	__releases(cd->hash_lock)
 {
-	struct cache_detail *cd = m->private;
+	struct cache_detail *cd = ((struct handle*)m->private)->cd;
 	read_unlock(&cd->hash_lock);
 }
-EXPORT_SYMBOL_GPL(cache_seq_stop);
 
 static int c_show(struct seq_file *m, void *p)
 {
 	struct cache_head *cp = p;
-	struct cache_detail *cd = m->private;
+	struct cache_detail *cd = ((struct handle*)m->private)->cd;
 
 	if (p == SEQ_START_TOKEN)
 		return cd->cache_show(m, cd, NULL);
@@ -1360,36 +1364,33 @@ static int c_show(struct seq_file *m, void *p)
 }
 
 static const struct seq_operations cache_content_op = {
-	.start	= cache_seq_start,
-	.next	= cache_seq_next,
-	.stop	= cache_seq_stop,
+	.start	= c_start,
+	.next	= c_next,
+	.stop	= c_stop,
 	.show	= c_show,
 };
 
 static int content_open(struct inode *inode, struct file *file,
 			struct cache_detail *cd)
 {
-	struct seq_file *seq;
-	int err;
+	struct handle *han;
 
 	if (!cd || !try_module_get(cd->owner))
 		return -EACCES;
-
-	err = seq_open(file, &cache_content_op);
-	if (err) {
+	han = __seq_open_private(file, &cache_content_op, sizeof(*han));
+	if (han == NULL) {
 		module_put(cd->owner);
-		return err;
+		return -ENOMEM;
 	}
 
-	seq = file->private_data;
-	seq->private = cd;
+	han->cd = cd;
 	return 0;
 }
 
 static int content_release(struct inode *inode, struct file *file,
 		struct cache_detail *cd)
 {
-	int ret = seq_release(inode, file);
+	int ret = seq_release_private(inode, file);
 	module_put(cd->owner);
 	return ret;
 }
@@ -1664,21 +1665,17 @@ EXPORT_SYMBOL_GPL(cache_unregister_net);
 struct cache_detail *cache_create_net(struct cache_detail *tmpl, struct net *net)
 {
 	struct cache_detail *cd;
-	int i;
 
 	cd = kmemdup(tmpl, sizeof(struct cache_detail), GFP_KERNEL);
 	if (cd == NULL)
 		return ERR_PTR(-ENOMEM);
 
-	cd->hash_table = kzalloc(cd->hash_size * sizeof(struct hlist_head),
+	cd->hash_table = kzalloc(cd->hash_size * sizeof(struct cache_head *),
 				 GFP_KERNEL);
 	if (cd->hash_table == NULL) {
 		kfree(cd);
 		return ERR_PTR(-ENOMEM);
 	}
-
-	for (i = 0; i < cd->hash_size; i++)
-		INIT_HLIST_HEAD(&cd->hash_table[i]);
 	cd->net = net;
 	return cd;
 }

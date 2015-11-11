@@ -76,11 +76,11 @@ static int wil_ioc_memio_dword(struct wil6210_priv *wil, void __user *data)
 	/* operation */
 	switch (io.op & wil_mmio_op_mask) {
 	case wil_mmio_read:
-		io.val = readl(a);
+		io.val = ioread32(a);
 		need_copy = true;
 		break;
 	case wil_mmio_write:
-		writel(io.val, a);
+		iowrite32(io.val, a);
 		wmb(); /* make sure write propagated to HW */
 		break;
 	default:

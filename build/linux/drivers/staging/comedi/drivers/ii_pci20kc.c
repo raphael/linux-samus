@@ -28,7 +28,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/io.h>
 #include "../comedidev.h"
 
 /*

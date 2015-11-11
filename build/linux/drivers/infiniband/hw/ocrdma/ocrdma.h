@@ -246,6 +246,7 @@ struct ocrdma_dev {
 	u16 base_eqid;
 	u16 max_eq;
 
+	union ib_gid *sgid_tbl;
 	/* provided synchronization to sgid table for
 	 * updating gid entries triggered by notifier.
 	 */

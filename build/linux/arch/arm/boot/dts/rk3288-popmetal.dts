@@ -49,7 +49,6 @@
 	compatible = "chipspark,popmetal-rk3288", "rockchip,rk3288";
 
 	memory{
-		device_type = "memory";
 		reg = <0 0x80000000>;
 	};
 

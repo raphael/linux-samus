@@ -108,7 +108,6 @@ static struct snd_soc_dai_link bfin_eval_adau1x61_dai = {
 
 static struct snd_soc_card bfin_eval_adau1x61 = {
 	.name = "bfin-eval-adau1x61",
-	.owner = THIS_MODULE,
 	.driver_name = "eval-adau1x61",
 	.dai_link = &bfin_eval_adau1x61_dai,
 	.num_links = 1,

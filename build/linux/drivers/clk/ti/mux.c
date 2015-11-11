@@ -31,7 +31,7 @@
 static u8 ti_clk_mux_get_parent(struct clk_hw *hw)
 {
 	struct clk_mux *mux = to_clk_mux(hw);
-	int num_parents = clk_hw_get_num_parents(hw);
+	int num_parents = __clk_get_num_parents(hw->clk);
 	u32 val;
 
 	/*
@@ -190,6 +190,7 @@ static void of_mux_clk_setup(struct device_node *node)
 	void __iomem *reg;
 	int num_parents;
 	const char **parent_names;
+	int i;
 	u8 clk_mux_flags = 0;
 	u32 mask = 0;
 	u32 shift = 0;
@@ -204,7 +205,8 @@ static void of_mux_clk_setup(struct device_node *node)
 	if (!parent_names)
 		goto cleanup;
 
-	of_clk_parent_fill(node, parent_names, num_parents);
+	for (i = 0; i < num_parents; i++)
+		parent_names[i] = of_clk_get_parent_name(node, i);
 
 	reg = ti_clk_get_reg_addr(node, 0);
 

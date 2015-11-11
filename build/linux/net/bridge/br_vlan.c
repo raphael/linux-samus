@@ -117,11 +117,10 @@ out_filt:
 	return err;
 }
 
-static int __vlan_vid_del(struct net_device *dev, struct net_bridge *br,
-			  u16 vid)
+static void __vlan_vid_del(struct net_device *dev, struct net_bridge *br,
+			   u16 vid)
 {
 	const struct net_device_ops *ops = dev->netdev_ops;
-	int err = 0;
 
 	/* If driver uses VLAN ndo ops, use 8021q to delete vid
 	 * on device, otherwise try switchdev ops to delete vid.
@@ -138,12 +137,8 @@ static int __vlan_vid_del(struct net_device *dev, struct net_bridge *br,
 			},
 		};
 
-		err = switchdev_port_obj_del(dev, &vlan_obj);
-		if (err == -EOPNOTSUPP)
-			err = 0;
+		switchdev_port_obj_del(dev, &vlan_obj);
 	}
-
-	return err;
 }
 
 static int __vlan_del(struct net_port_vlans *v, u16 vid)
@@ -156,11 +151,7 @@ static int __vlan_del(struct net_port_vlans *v, u16 vid)
 
 	if (v->port_idx) {
 		struct net_bridge_port *p = v->parent.port;
-		int err;
-
-		err = __vlan_vid_del(p->dev, p->br, vid);
-		if (err)
-			return err;
+		__vlan_vid_del(p->dev, p->br, vid);
 	}
 
 	clear_bit(vid, v->vlan_bitmap);
@@ -477,40 +468,41 @@ void br_recalculate_fwd_mask(struct net_bridge *br)
 					      ~(1u << br->group_addr[5]);
 }
 
-int __br_vlan_filter_toggle(struct net_bridge *br, unsigned long val)
+int br_vlan_filter_toggle(struct net_bridge *br, unsigned long val)
 {
+	if (!rtnl_trylock())
+		return restart_syscall();
+
 	if (br->vlan_enabled == val)
-		return 0;
+		goto unlock;
 
 	br->vlan_enabled = val;
 	br_manage_promisc(br);
 	recalculate_group_addr(br);
 	br_recalculate_fwd_mask(br);
 
-	return 0;
-}
-
-int br_vlan_filter_toggle(struct net_bridge *br, unsigned long val)
-{
-	if (!rtnl_trylock())
-		return restart_syscall();
-
-	__br_vlan_filter_toggle(br, val);
+unlock:
 	rtnl_unlock();
-
 	return 0;
 }
 
-int __br_vlan_set_proto(struct net_bridge *br, __be16 proto)
+int br_vlan_set_proto(struct net_bridge *br, unsigned long val)
 {
 	int err = 0;
 	struct net_bridge_port *p;
 	struct net_port_vlans *pv;
-	__be16 oldproto;
+	__be16 proto, oldproto;
 	u16 vid, errvid;
 
+	if (val != ETH_P_8021Q && val != ETH_P_8021AD)
+		return -EPROTONOSUPPORT;
+
+	if (!rtnl_trylock())
+		return restart_syscall();
+
+	proto = htons(val);
 	if (br->vlan_proto == proto)
-		return 0;
+		goto unlock;
 
 	/* Add VLANs for the new proto to the device filter. */
 	list_for_each_entry(p, &br->port_list, list) {
@@ -541,7 +533,9 @@ int __br_vlan_set_proto(struct net_bridge *br, __be16 proto)
 			vlan_vid_del(p->dev, oldproto, vid);
 	}
 
-	return 0;
+unlock:
+	rtnl_unlock();
+	return err;
 
 err_filt:
 	errvid = vid;
@@ -557,23 +551,7 @@ err_filt:
 			vlan_vid_del(p->dev, proto, vid);
 	}
 
-	return err;
-}
-
-int br_vlan_set_proto(struct net_bridge *br, unsigned long val)
-{
-	int err;
-
-	if (val != ETH_P_8021Q && val != ETH_P_8021AD)
-		return -EPROTONOSUPPORT;
-
-	if (!rtnl_trylock())
-		return restart_syscall();
-
-	err = __br_vlan_set_proto(br, htons(val));
-	rtnl_unlock();
-
-	return err;
+	goto unlock;
 }
 
 static bool vlan_default_pvid(struct net_port_vlans *pv, u16 vid)

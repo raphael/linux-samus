@@ -51,10 +51,6 @@
 	pr_warn("%s-%d: %16s (port %d): WARNING: " format, __func__, __LINE__,\
 	(group)->name, group->demux->port, ## arg)
 
-#define mcg_debug_group(group, format, arg...) \
-	pr_debug("%s-%d: %16s (port %d): WARNING: " format, __func__, __LINE__,\
-		 (group)->name, (group)->demux->port, ## arg)
-
 #define mcg_error_group(group, format, arg...) \
 	pr_err("  %16s: " format, (group)->name, ## arg)
 
@@ -966,8 +962,8 @@ int mlx4_ib_mcg_multiplex_handler(struct ib_device *ibdev, int port,
 		mutex_lock(&group->lock);
 		if (group->func[slave].num_pend_reqs > MAX_PEND_REQS_PER_FUNC) {
 			mutex_unlock(&group->lock);
-			mcg_debug_group(group, "Port %d, Func %d has too many pending requests (%d), dropping\n",
-					port, slave, MAX_PEND_REQS_PER_FUNC);
+			mcg_warn_group(group, "Port %d, Func %d has too many pending requests (%d), dropping\n",
+				       port, slave, MAX_PEND_REQS_PER_FUNC);
 			release_group(group, 0);
 			kfree(req);
 			return -ENOMEM;

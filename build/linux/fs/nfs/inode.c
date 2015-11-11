@@ -504,7 +504,7 @@ nfs_setattr(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = d_inode(dentry);
 	struct nfs_fattr *fattr;
-	int error = 0;
+	int error = -ENOMEM;
 
 	nfs_inc_stats(inode, NFSIOS_VFSSETATTR);
 
@@ -513,14 +513,15 @@ nfs_setattr(struct dentry *dentry, struct iattr *attr)
 		attr->ia_valid &= ~ATTR_MODE;
 
 	if (attr->ia_valid & ATTR_SIZE) {
+		loff_t i_size;
+
 		BUG_ON(!S_ISREG(inode->i_mode));
 
-		error = inode_newsize_ok(inode, attr->ia_size);
-		if (error)
-			return error;
-
-		if (attr->ia_size == i_size_read(inode))
+		i_size = i_size_read(inode);
+		if (attr->ia_size == i_size)
 			attr->ia_valid &= ~ATTR_SIZE;
+		else if (attr->ia_size < i_size && IS_SWAPFILE(inode))
+			return -ETXTBSY;
 	}
 
 	/* Optimization: if the end result is no change, don't RPC */
@@ -535,11 +536,8 @@ nfs_setattr(struct dentry *dentry, struct iattr *attr)
 		nfs_sync_inode(inode);
 
 	fattr = nfs_alloc_fattr();
-	if (fattr == NULL) {
-		error = -ENOMEM;
+	if (fattr == NULL)
 		goto out;
-	}
-
 	/*
 	 * Return any delegations if we're going to change ACLs
 	 */
@@ -761,13 +759,11 @@ EXPORT_SYMBOL_GPL(nfs_put_lock_context);
  * @ctx: pointer to context
  * @is_sync: is this a synchronous close
  *
- * Ensure that the attributes are up to date if we're mounted
- * with close-to-open semantics and we have cached data that will
- * need to be revalidated on open.
+ * always ensure that the attributes are up to date if we're mounted
+ * with close-to-open semantics
  */
 void nfs_close_context(struct nfs_open_context *ctx, int is_sync)
 {
-	struct nfs_inode *nfsi;
 	struct inode *inode;
 	struct nfs_server *server;
 
@@ -776,12 +772,7 @@ void nfs_close_context(struct nfs_open_context *ctx, int is_sync)
 	if (!is_sync)
 		return;
 	inode = d_inode(ctx->dentry);
-	nfsi = NFS_I(inode);
-	if (inode->i_mapping->nrpages == 0)
-		return;
-	if (nfsi->cache_validity & NFS_INO_INVALID_DATA)
-		return;
-	if (!list_empty(&nfsi->open_files))
+	if (!list_empty(&NFS_I(inode)->open_files))
 		return;
 	server = NFS_SERVER(inode);
 	if (server->flags & NFS_MOUNT_NOCTO)
@@ -853,11 +844,6 @@ void put_nfs_open_context(struct nfs_open_context *ctx)
 }
 EXPORT_SYMBOL_GPL(put_nfs_open_context);
 
-static void put_nfs_open_context_sync(struct nfs_open_context *ctx)
-{
-	__put_nfs_open_context(ctx, 1);
-}
-
 /*
  * Ensure that mmap has a recent RPC credential for use when writing out
  * shared pages
@@ -902,7 +888,7 @@ struct nfs_open_context *nfs_find_open_context(struct inode *inode, struct rpc_c
 	return ctx;
 }
 
-void nfs_file_clear_open_context(struct file *filp)
+static void nfs_file_clear_open_context(struct file *filp)
 {
 	struct nfs_open_context *ctx = nfs_file_open_context(filp);
 
@@ -913,7 +899,7 @@ void nfs_file_clear_open_context(struct file *filp)
 		spin_lock(&inode->i_lock);
 		list_move_tail(&ctx->list, &NFS_I(inode)->open_files);
 		spin_unlock(&inode->i_lock);
-		put_nfs_open_context_sync(ctx);
+		__put_nfs_open_context(ctx, filp->f_flags & O_DIRECT ? 0 : 1);
 	}
 }
 
@@ -930,6 +916,12 @@ int nfs_open(struct inode *inode, struct file *filp)
 	nfs_file_set_open_context(filp, ctx);
 	put_nfs_open_context(ctx);
 	nfs_fscache_open_file(inode, filp);
+	return 0;
+}
+
+int nfs_release(struct inode *inode, struct file *filp)
+{
+	nfs_file_clear_open_context(filp);
 	return 0;
 }
 

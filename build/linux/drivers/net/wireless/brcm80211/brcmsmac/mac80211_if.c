@@ -1472,7 +1472,9 @@ struct brcms_timer *brcms_init_timer(struct brcms_info *wl,
 	wl->timers = t;
 
 #ifdef DEBUG
-	t->name = kstrdup(name, GFP_ATOMIC);
+	t->name = kmalloc(strlen(name) + 1, GFP_ATOMIC);
+	if (t->name)
+		strcpy(t->name, name);
 #endif
 
 	return t;

@@ -407,9 +407,9 @@ static int gpio_irq_set_type(struct irq_data *d, u32 type)
 	return 0;
 }
 
-static void gpio_irq_handler(struct irq_desc *desc)
+static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
 {
-	struct orion_gpio_chip *ochip = irq_desc_get_handler_data(desc);
+	struct orion_gpio_chip *ochip = irq_get_handler_data(irq);
 	u32 cause, type;
 	int i;
 
@@ -582,9 +582,8 @@ void __init orion_gpio_init(struct device_node *np,
 
 	for (i = 0; i < 4; i++) {
 		if (irqs[i]) {
-			irq_set_chained_handler_and_data(irqs[i],
-							 gpio_irq_handler,
-							 ochip);
+			irq_set_handler_data(irqs[i], ochip);
+			irq_set_chained_handler(irqs[i], gpio_irq_handler);
 		}
 	}
 

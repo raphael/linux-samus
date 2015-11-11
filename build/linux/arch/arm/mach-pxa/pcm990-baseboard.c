@@ -284,9 +284,8 @@ static struct irq_chip pcm990_irq_chip = {
 	.irq_unmask	= pcm990_unmask_irq,
 };
 
-static void pcm990_irq_handler(struct irq_desc *desc)
+static void pcm990_irq_handler(unsigned int irq, struct irq_desc *desc)
 {
-	unsigned int irq;
 	unsigned long pending;
 
 	pending = ~pcm990_cpld_readb(PCM990_CTRL_INTSETCLR);
@@ -312,7 +311,7 @@ static void __init pcm990_init_irq(void)
 	for (irq = PCM027_IRQ(0); irq <= PCM027_IRQ(3); irq++) {
 		irq_set_chip_and_handler(irq, &pcm990_irq_chip,
 					 handle_level_irq);
-		irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
+		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
 
 	/* disable all Interrupts */

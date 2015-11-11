@@ -13,7 +13,14 @@
 #include <linux/crypto.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <crypto/chacha20.h>
+
+#define CHACHA20_NONCE_SIZE 16
+#define CHACHA20_KEY_SIZE   32
+#define CHACHA20_BLOCK_SIZE 64
+
+struct chacha20_ctx {
+	u32 key[8];
+};
 
 static inline u32 rotl32(u32 v, u8 n)
 {
@@ -101,7 +108,7 @@ static void chacha20_docrypt(u32 *state, u8 *dst, const u8 *src,
 	}
 }
 
-void crypto_chacha20_init(u32 *state, struct chacha20_ctx *ctx, u8 *iv)
+static void chacha20_init(u32 *state, struct chacha20_ctx *ctx, u8 *iv)
 {
 	static const char constant[16] = "expand 32-byte k";
 
@@ -122,9 +129,8 @@ void crypto_chacha20_init(u32 *state, struct chacha20_ctx *ctx, u8 *iv)
 	state[14] = le32_to_cpuvp(iv +  8);
 	state[15] = le32_to_cpuvp(iv + 12);
 }
-EXPORT_SYMBOL_GPL(crypto_chacha20_init);
 
-int crypto_chacha20_setkey(struct crypto_tfm *tfm, const u8 *key,
+static int chacha20_setkey(struct crypto_tfm *tfm, const u8 *key,
 			   unsigned int keysize)
 {
 	struct chacha20_ctx *ctx = crypto_tfm_ctx(tfm);
@@ -138,9 +144,8 @@ int crypto_chacha20_setkey(struct crypto_tfm *tfm, const u8 *key,
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(crypto_chacha20_setkey);
 
-int crypto_chacha20_crypt(struct blkcipher_desc *desc, struct scatterlist *dst,
+static int chacha20_crypt(struct blkcipher_desc *desc, struct scatterlist *dst,
 			  struct scatterlist *src, unsigned int nbytes)
 {
 	struct blkcipher_walk walk;
@@ -150,7 +155,7 @@ int crypto_chacha20_crypt(struct blkcipher_desc *desc, struct scatterlist *dst,
 	blkcipher_walk_init(&walk, dst, src, nbytes);
 	err = blkcipher_walk_virt_block(desc, &walk, CHACHA20_BLOCK_SIZE);
 
-	crypto_chacha20_init(state, crypto_blkcipher_ctx(desc->tfm), walk.iv);
+	chacha20_init(state, crypto_blkcipher_ctx(desc->tfm), walk.iv);
 
 	while (walk.nbytes >= CHACHA20_BLOCK_SIZE) {
 		chacha20_docrypt(state, walk.dst.virt.addr, walk.src.virt.addr,
@@ -167,7 +172,6 @@ int crypto_chacha20_crypt(struct blkcipher_desc *desc, struct scatterlist *dst,
 
 	return err;
 }
-EXPORT_SYMBOL_GPL(crypto_chacha20_crypt);
 
 static struct crypto_alg alg = {
 	.cra_name		= "chacha20",
@@ -183,11 +187,11 @@ static struct crypto_alg alg = {
 		.blkcipher = {
 			.min_keysize	= CHACHA20_KEY_SIZE,
 			.max_keysize	= CHACHA20_KEY_SIZE,
-			.ivsize		= CHACHA20_IV_SIZE,
+			.ivsize		= CHACHA20_NONCE_SIZE,
 			.geniv		= "seqiv",
-			.setkey		= crypto_chacha20_setkey,
-			.encrypt	= crypto_chacha20_crypt,
-			.decrypt	= crypto_chacha20_crypt,
+			.setkey		= chacha20_setkey,
+			.encrypt	= chacha20_crypt,
+			.decrypt	= chacha20_crypt,
 		},
 	},
 };

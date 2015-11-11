@@ -218,7 +218,7 @@ static struct lu_device *osc_device_alloc(const struct lu_env *env,
 	int rc;
 
 	od = kzalloc(sizeof(*od), GFP_NOFS);
-	if (!od)
+	if (od == NULL)
 		return ERR_PTR(-ENOMEM);
 
 	cl_device_init(&od->od_cl, t);

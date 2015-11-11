@@ -136,7 +136,11 @@ static int fl512_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 	s->range_table	= &range_fl512;
 	s->insn_write	= fl512_ao_insn_write;
 
-	return comedi_alloc_subdev_readback(s);
+	ret = comedi_alloc_subdev_readback(s);
+	if (ret)
+		return ret;
+
+	return 0;
 }
 
 static struct comedi_driver fl512_driver = {

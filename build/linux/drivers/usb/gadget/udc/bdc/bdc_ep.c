@@ -159,10 +159,8 @@ static int ep_bd_list_alloc(struct bdc_ep *ep)
 		bd_table->start_bd = dma_pool_alloc(bdc->bd_table_pool,
 							GFP_ATOMIC,
 							&dma);
-		if (!bd_table->start_bd) {
-			kfree(bd_table);
+		if (!bd_table->start_bd)
 			goto fail;
-		}
 
 		bd_table->dma = dma;
 
@@ -1954,18 +1952,12 @@ static int init_ep(struct bdc *bdc, u32 epnum, u32 dir)
 	ep->bdc = bdc;
 	ep->dir = dir;
 
-	if (dir)
-		ep->usb_ep.caps.dir_in = true;
-	else
-		ep->usb_ep.caps.dir_out = true;
-
 	/* ep->ep_num is the index inside bdc_ep */
 	if (epnum == 1) {
 		ep->ep_num = 1;
 		bdc->bdc_ep_array[ep->ep_num] = ep;
 		snprintf(ep->name, sizeof(ep->name), "ep%d", epnum - 1);
 		usb_ep_set_maxpacket_limit(&ep->usb_ep, EP0_MAX_PKT_SIZE);
-		ep->usb_ep.caps.type_control = true;
 		ep->comp_desc = NULL;
 		bdc->gadget.ep0 = &ep->usb_ep;
 	} else {
@@ -1979,9 +1971,6 @@ static int init_ep(struct bdc *bdc, u32 epnum, u32 dir)
 			 dir & 1 ? "in" : "out");
 
 		usb_ep_set_maxpacket_limit(&ep->usb_ep, 1024);
-		ep->usb_ep.caps.type_iso = true;
-		ep->usb_ep.caps.type_bulk = true;
-		ep->usb_ep.caps.type_int = true;
 		ep->usb_ep.max_streams = 0;
 		list_add_tail(&ep->usb_ep.ep_list, &bdc->gadget.ep_list);
 	}

@@ -76,8 +76,6 @@ void rcu_barrier_bh(void);
 void rcu_barrier_sched(void);
 unsigned long get_state_synchronize_rcu(void);
 void cond_synchronize_rcu(unsigned long oldstate);
-unsigned long get_state_synchronize_sched(void);
-void cond_synchronize_sched(unsigned long oldstate);
 
 extern unsigned long rcutorture_testseq;
 extern unsigned long rcutorture_vernum;

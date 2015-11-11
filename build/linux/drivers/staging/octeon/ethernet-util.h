@@ -8,10 +8,6 @@
  * published by the Free Software Foundation.
  */
 
-#include <asm/octeon/cvmx-pip.h>
-#include <asm/octeon/cvmx-helper.h>
-#include <asm/octeon/cvmx-helper-util.h>
-
 /**
  * cvm_oct_get_buffer_ptr - convert packet data address to pointer
  * @packet_ptr: Packet data hardware address
@@ -32,12 +28,14 @@ static inline void *cvm_oct_get_buffer_ptr(union cvmx_buf_ptr packet_ptr)
  */
 static inline int INTERFACE(int ipd_port)
 {
-	int interface = cvmx_helper_get_interface_num(ipd_port);
-
-	if (interface >= 0)
-		return interface;
-	else if (ipd_port == CVMX_PIP_NUM_INPUT_PORTS)
-		return 10;
+	if (ipd_port < 32)	/* Interface 0 or 1 for RGMII,GMII,SPI, etc */
+		return ipd_port >> 4;
+	else if (ipd_port < 36)	/* Interface 2 for NPI */
+		return 2;
+	else if (ipd_port < 40)	/* Interface 3 for loopback */
+		return 3;
+	else if (ipd_port == 40)	/* Non existent interface for POW0 */
+		return 4;
 	panic("Illegal ipd_port %d passed to INTERFACE\n", ipd_port);
 }
 
@@ -49,5 +47,7 @@ static inline int INTERFACE(int ipd_port)
  */
 static inline int INDEX(int ipd_port)
 {
-	return cvmx_helper_get_interface_index_num(ipd_port);
+	if (ipd_port < 32)
+		return ipd_port & 15;
+	return ipd_port & 3;
 }

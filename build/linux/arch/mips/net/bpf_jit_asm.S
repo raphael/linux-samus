@@ -57,13 +57,12 @@
 
 LEAF(sk_load_word)
 	is_offset_negative(word)
-FEXPORT(sk_load_word_positive)
+	.globl sk_load_word_positive
+sk_load_word_positive:
 	is_offset_in_header(4, word)
 	/* Offset within header boundaries */
 	PTR_ADDU t1, $r_skb_data, offset
-	.set	reorder
 	lw	$r_A, 0(t1)
-	.set	noreorder
 #ifdef CONFIG_CPU_LITTLE_ENDIAN
 # if defined(__mips_isa_rev) && (__mips_isa_rev >= 2)
 	wsbh	t0, $r_A
@@ -86,13 +85,12 @@ FEXPORT(sk_load_word_positive)
 
 LEAF(sk_load_half)
 	is_offset_negative(half)
-FEXPORT(sk_load_half_positive)
+	.globl sk_load_half_positive
+sk_load_half_positive:
 	is_offset_in_header(2, half)
 	/* Offset within header boundaries */
 	PTR_ADDU t1, $r_skb_data, offset
-	.set	reorder
 	lh	$r_A, 0(t1)
-	.set	noreorder
 #ifdef CONFIG_CPU_LITTLE_ENDIAN
 # if defined(__mips_isa_rev) && (__mips_isa_rev >= 2)
 	wsbh	t0, $r_A
@@ -111,7 +109,8 @@ FEXPORT(sk_load_half_positive)
 
 LEAF(sk_load_byte)
 	is_offset_negative(byte)
-FEXPORT(sk_load_byte_positive)
+	.globl sk_load_byte_positive
+sk_load_byte_positive:
 	is_offset_in_header(1, byte)
 	/* Offset within header boundaries */
 	PTR_ADDU t1, $r_skb_data, offset

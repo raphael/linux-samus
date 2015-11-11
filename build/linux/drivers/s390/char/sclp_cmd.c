@@ -25,7 +25,6 @@
 #include <asm/setup.h>
 #include <asm/page.h>
 #include <asm/sclp.h>
-#include <asm/numa.h>
 
 #include "sclp.h"
 
@@ -389,11 +388,11 @@ static struct notifier_block sclp_mem_nb = {
 };
 
 static void __init align_to_block_size(unsigned long long *start,
-				       unsigned long long *size,
-				       unsigned long long alignment)
+				       unsigned long long *size)
 {
-	unsigned long long start_align, size_align;
+	unsigned long long start_align, size_align, alignment;
 
+	alignment = memory_block_size_bytes();
 	start_align = roundup(*start, alignment);
 	size_align = rounddown(*start + *size, alignment) - start_align;
 
@@ -405,8 +404,8 @@ static void __init align_to_block_size(unsigned long long *start,
 
 static void __init add_memory_merged(u16 rn)
 {
-	unsigned long long start, size, addr, block_size;
 	static u16 first_rn, num;
+	unsigned long long start, size;
 
 	if (rn && first_rn && (first_rn + num == rn)) {
 		num++;
@@ -424,12 +423,9 @@ static void __init add_memory_merged(u16 rn)
 		goto skip_add;
 	if (memory_end_set && (start + size > memory_end))
 		size = memory_end - start;
-	block_size = memory_block_size_bytes();
-	align_to_block_size(&start, &size, block_size);
-	if (!size)
-		goto skip_add;
-	for (addr = start; addr < start + size; addr += block_size)
-		add_memory(numa_pfn_to_nid(PFN_DOWN(addr)), addr, block_size);
+	align_to_block_size(&start, &size);
+	if (size)
+		add_memory(0, start, size);
 skip_add:
 	first_rn = rn;
 	num = 1;

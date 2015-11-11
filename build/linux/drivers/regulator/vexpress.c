@@ -103,7 +103,6 @@ static const struct of_device_id vexpress_regulator_of_match[] = {
 	{ .compatible = "arm,vexpress-volt", },
 	{ }
 };
-MODULE_DEVICE_TABLE(of, vexpress_regulator_of_match);
 
 static struct platform_driver vexpress_regulator_driver = {
 	.probe = vexpress_regulator_probe,

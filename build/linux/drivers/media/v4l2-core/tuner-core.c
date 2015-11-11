@@ -1366,6 +1366,7 @@ MODULE_DEVICE_TABLE(i2c, tuner_id);
 
 static struct i2c_driver tuner_driver = {
 	.driver = {
+		.owner	= THIS_MODULE,
 		.name	= "tuner",
 		.pm	= &tuner_pm_ops,
 	},

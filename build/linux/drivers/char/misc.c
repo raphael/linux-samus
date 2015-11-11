@@ -243,15 +243,17 @@ int misc_register(struct miscdevice * misc)
  *	@misc: device to unregister
  *
  *	Unregister a miscellaneous device that was previously
- *	successfully registered with misc_register().
+ *	successfully registered with misc_register(). Success
+ *	is indicated by a zero return, a negative errno code
+ *	indicates an error.
  */
 
-void misc_deregister(struct miscdevice *misc)
+int misc_deregister(struct miscdevice *misc)
 {
 	int i = DYNAMIC_MINORS - misc->minor - 1;
 
 	if (WARN_ON(list_empty(&misc->list)))
-		return;
+		return -EINVAL;
 
 	mutex_lock(&misc_mtx);
 	list_del(&misc->list);
@@ -259,6 +261,7 @@ void misc_deregister(struct miscdevice *misc)
 	if (i < DYNAMIC_MINORS && i >= 0)
 		clear_bit(i, misc_minors);
 	mutex_unlock(&misc_mtx);
+	return 0;
 }
 
 EXPORT_SYMBOL(misc_register);
@@ -278,9 +281,10 @@ static char *misc_devnode(struct device *dev, umode_t *mode)
 static int __init misc_init(void)
 {
 	int err;
-	struct proc_dir_entry *ret;
 
-	ret = proc_create("misc", 0, NULL, &misc_proc_fops);
+#ifdef CONFIG_PROC_FS
+	proc_create("misc", 0, NULL, &misc_proc_fops);
+#endif
 	misc_class = class_create(THIS_MODULE, "misc");
 	err = PTR_ERR(misc_class);
 	if (IS_ERR(misc_class))
@@ -296,8 +300,7 @@ fail_printk:
 	printk("unable to get major %d for misc devices\n", MISC_MAJOR);
 	class_destroy(misc_class);
 fail_remove:
-	if (ret)
-		remove_proc_entry("misc", NULL);
+	remove_proc_entry("misc", NULL);
 	return err;
 }
 subsys_initcall(misc_init);

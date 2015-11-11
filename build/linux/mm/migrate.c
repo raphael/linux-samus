@@ -37,7 +37,6 @@
 #include <linux/gfp.h>
 #include <linux/balloon_compaction.h>
 #include <linux/mmu_notifier.h>
-#include <linux/page_idle.h>
 
 #include <asm/tlbflush.h>
 
@@ -525,11 +524,6 @@ void migrate_page_copy(struct page *newpage, struct page *page)
 			__set_page_dirty_nobuffers(newpage);
  	}
 
-	if (page_is_young(page))
-		set_page_young(newpage);
-	if (page_is_idle(page))
-		set_page_idle(newpage);
-
 	/*
 	 * Copy NUMA information to the new page, to prevent over-eager
 	 * future migrations of this same page.
@@ -896,7 +890,8 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 	/* Establish migration ptes or remove ptes */
 	if (page_mapped(page)) {
 		try_to_unmap(page,
-			TTU_MIGRATION|TTU_IGNORE_MLOCK|TTU_IGNORE_ACCESS);
+			TTU_MIGRATION|TTU_IGNORE_MLOCK|TTU_IGNORE_ACCESS|
+			TTU_IGNORE_HWPOISON);
 		page_was_mapped = 1;
 	}
 
@@ -967,11 +962,9 @@ out:
 		dec_zone_page_state(page, NR_ISOLATED_ANON +
 				page_is_file_cache(page));
 		/* Soft-offlined page shouldn't go through lru cache list */
-		if (reason == MR_MEMORY_FAILURE) {
+		if (reason == MR_MEMORY_FAILURE)
 			put_page(page);
-			if (!test_set_page_hwpoison(page))
-				num_poisoned_pages_inc();
-		} else
+		else
 			putback_lru_page(page);
 	}
 
@@ -1211,7 +1204,7 @@ static struct page *new_page_node(struct page *p, unsigned long private,
 		return alloc_huge_page_node(page_hstate(compound_head(p)),
 					pm->node);
 	else
-		return __alloc_pages_node(pm->node,
+		return alloc_pages_exact_node(pm->node,
 				GFP_HIGHUSER_MOVABLE | __GFP_THISNODE, 0);
 }
 
@@ -1243,9 +1236,7 @@ static int do_move_page_to_node_array(struct mm_struct *mm,
 		if (!vma || pp->addr < vma->vm_start || !vma_migratable(vma))
 			goto set_status;
 
-		/* FOLL_DUMP to ignore special (like zero) pages */
-		page = follow_page(vma, pp->addr,
-				FOLL_GET | FOLL_SPLIT | FOLL_DUMP);
+		page = follow_page(vma, pp->addr, FOLL_GET|FOLL_SPLIT);
 
 		err = PTR_ERR(page);
 		if (IS_ERR(page))
@@ -1254,6 +1245,10 @@ static int do_move_page_to_node_array(struct mm_struct *mm,
 		err = -ENOENT;
 		if (!page)
 			goto set_status;
+
+		/* Use PageReserved to check for zero page */
+		if (PageReserved(page))
+			goto put_and_set;
 
 		pp->page = page;
 		err = page_to_nid(page);
@@ -1411,14 +1406,18 @@ static void do_pages_stat_array(struct mm_struct *mm, unsigned long nr_pages,
 		if (!vma || addr < vma->vm_start)
 			goto set_status;
 
-		/* FOLL_DUMP to ignore special (like zero) pages */
-		page = follow_page(vma, addr, FOLL_DUMP);
+		page = follow_page(vma, addr, 0);
 
 		err = PTR_ERR(page);
 		if (IS_ERR(page))
 			goto set_status;
 
-		err = page ? page_to_nid(page) : -ENOENT;
+		err = -ENOENT;
+		/* Use PageReserved to check for zero page */
+		if (!page || PageReserved(page))
+			goto set_status;
+
+		err = page_to_nid(page);
 set_status:
 		*status = err;
 
@@ -1571,7 +1570,7 @@ static struct page *alloc_misplaced_dst_page(struct page *page,
 	int nid = (int) data;
 	struct page *newpage;
 
-	newpage = __alloc_pages_node(nid,
+	newpage = alloc_pages_exact_node(nid,
 					 (GFP_HIGHUSER_MOVABLE |
 					  __GFP_THISNODE | __GFP_NOMEMALLOC |
 					  __GFP_NORETRY | __GFP_NOWARN) &

@@ -22,7 +22,6 @@
 #include <linux/init.h>
 #include <linux/i2c.h>
 #include <linux/delay.h>
-#include <linux/module.h>
 #include <sound/core.h>
 #include "pmac.h"
 
@@ -102,7 +101,6 @@ static const struct i2c_device_id keywest_i2c_id[] = {
 	{ "keywest", 0 },		/* instantiated by us if needed */
 	{ }
 };
-MODULE_DEVICE_TABLE(i2c, keywest_i2c_id);
 
 static struct i2c_driver keywest_driver = {
 	.driver = {

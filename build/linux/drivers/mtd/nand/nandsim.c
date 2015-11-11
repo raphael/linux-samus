@@ -649,8 +649,7 @@ static void free_device(struct nandsim *ns)
 				kmem_cache_free(ns->nand_pages_slab,
 						ns->pages[i].byte);
 		}
-		if (ns->nand_pages_slab)
-			kmem_cache_destroy(ns->nand_pages_slab);
+		kmem_cache_destroy(ns->nand_pages_slab);
 		vfree(ns->pages);
 	}
 }
@@ -730,7 +729,8 @@ static int init_nandsim(struct mtd_info *mtd)
 	/* Fill the partition_info structure */
 	if (parts_num > ARRAY_SIZE(ns->partitions)) {
 		NS_ERR("too many partitions.\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto error;
 	}
 	remains = ns->geom.totsz;
 	next_offset = 0;
@@ -739,12 +739,14 @@ static int init_nandsim(struct mtd_info *mtd)
 
 		if (!part_sz || part_sz > remains) {
 			NS_ERR("bad partition size.\n");
-			return -EINVAL;
+			ret = -EINVAL;
+			goto error;
 		}
 		ns->partitions[i].name   = get_partition_name(i);
 		if (!ns->partitions[i].name) {
 			NS_ERR("unable to allocate memory.\n");
-			return -ENOMEM;
+			ret = -ENOMEM;
+			goto error;
 		}
 		ns->partitions[i].offset = next_offset;
 		ns->partitions[i].size   = part_sz;
@@ -755,12 +757,14 @@ static int init_nandsim(struct mtd_info *mtd)
 	if (remains) {
 		if (parts_num + 1 > ARRAY_SIZE(ns->partitions)) {
 			NS_ERR("too many partitions.\n");
-			return -EINVAL;
+			ret = -EINVAL;
+			goto error;
 		}
 		ns->partitions[i].name   = get_partition_name(i);
 		if (!ns->partitions[i].name) {
 			NS_ERR("unable to allocate memory.\n");
-			return -ENOMEM;
+			ret = -ENOMEM;
+			goto error;
 		}
 		ns->partitions[i].offset = next_offset;
 		ns->partitions[i].size   = remains;
@@ -788,18 +792,24 @@ static int init_nandsim(struct mtd_info *mtd)
 	printk("options: %#x\n",                ns->options);
 
 	if ((ret = alloc_device(ns)) != 0)
-		return ret;
+		goto error;
 
 	/* Allocate / initialize the internal buffer */
 	ns->buf.byte = kmalloc(ns->geom.pgszoob, GFP_KERNEL);
 	if (!ns->buf.byte) {
 		NS_ERR("init_nandsim: unable to allocate %u bytes for the internal buffer\n",
 			ns->geom.pgszoob);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto error;
 	}
 	memset(ns->buf.byte, 0xFF, ns->geom.pgszoob);
 
 	return 0;
+
+error:
+	free_device(ns);
+
+	return ret;
 }
 
 /*

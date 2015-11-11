@@ -147,37 +147,21 @@ static inline void tick_nohz_full_add_cpus_to(struct cpumask *mask)
 		cpumask_or(mask, mask, tick_nohz_full_mask);
 }
 
-static inline int housekeeping_any_cpu(void)
-{
-	return cpumask_any_and(housekeeping_mask, cpu_online_mask);
-}
-
+extern void __tick_nohz_full_check(void);
 extern void tick_nohz_full_kick(void);
 extern void tick_nohz_full_kick_cpu(int cpu);
 extern void tick_nohz_full_kick_all(void);
-extern void __tick_nohz_task_switch(void);
+extern void __tick_nohz_task_switch(struct task_struct *tsk);
 #else
-static inline int housekeeping_any_cpu(void)
-{
-	return smp_processor_id();
-}
 static inline bool tick_nohz_full_enabled(void) { return false; }
 static inline bool tick_nohz_full_cpu(int cpu) { return false; }
 static inline void tick_nohz_full_add_cpus_to(struct cpumask *mask) { }
+static inline void __tick_nohz_full_check(void) { }
 static inline void tick_nohz_full_kick_cpu(int cpu) { }
 static inline void tick_nohz_full_kick(void) { }
 static inline void tick_nohz_full_kick_all(void) { }
-static inline void __tick_nohz_task_switch(void) { }
+static inline void __tick_nohz_task_switch(struct task_struct *tsk) { }
 #endif
-
-static inline const struct cpumask *housekeeping_cpumask(void)
-{
-#ifdef CONFIG_NO_HZ_FULL
-	if (tick_nohz_full_enabled())
-		return housekeeping_mask;
-#endif
-	return cpu_possible_mask;
-}
 
 static inline bool is_housekeeping_cpu(int cpu)
 {
@@ -197,10 +181,16 @@ static inline void housekeeping_affine(struct task_struct *t)
 #endif
 }
 
-static inline void tick_nohz_task_switch(void)
+static inline void tick_nohz_full_check(void)
 {
 	if (tick_nohz_full_enabled())
-		__tick_nohz_task_switch();
+		__tick_nohz_full_check();
+}
+
+static inline void tick_nohz_task_switch(struct task_struct *tsk)
+{
+	if (tick_nohz_full_enabled())
+		__tick_nohz_task_switch(tsk);
 }
 
 #endif

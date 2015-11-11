@@ -611,6 +611,7 @@ static int iio_dummy_probe(int index)
 	 */
 	iio_dummy_devs[index] = indio_dev;
 
+
 	/*
 	 * Set the device name.
 	 *
@@ -673,6 +674,7 @@ static void iio_dummy_remove(int index)
 	 * struct iio_dev *indio_dev = spi_get_drvdata(spi);
 	 */
 	struct iio_dev *indio_dev = iio_dummy_devs[index];
+
 
 	/* Unregister the device */
 	iio_device_unregister(indio_dev);

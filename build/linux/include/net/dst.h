@@ -57,7 +57,6 @@ struct dst_entry {
 #define DST_FAKE_RTABLE		0x0040
 #define DST_XFRM_TUNNEL		0x0080
 #define DST_XFRM_QUEUE		0x0100
-#define DST_METADATA		0x0200
 
 	unsigned short		pending_confirm;
 
@@ -84,13 +83,12 @@ struct dst_entry {
 	__u32			__pad2;
 #endif
 
-#ifdef CONFIG_64BIT
-	struct lwtunnel_state   *lwtstate;
 	/*
 	 * Align __refcnt to a 64 bytes alignment
 	 * (L1_CACHE_SIZE would be too much)
 	 */
-	long			__pad_to_align_refcnt[1];
+#ifdef CONFIG_64BIT
+	long			__pad_to_align_refcnt[2];
 #endif
 	/*
 	 * __refcnt wants to be on a different cache line from
@@ -99,9 +97,6 @@ struct dst_entry {
 	atomic_t		__refcnt;	/* client references	*/
 	int			__use;
 	unsigned long		lastuse;
-#ifndef CONFIG_64BIT
-	struct lwtunnel_state   *lwtstate;
-#endif
 	union {
 		struct dst_entry	*next;
 		struct rtable __rcu	*rt_next;
@@ -207,12 +202,6 @@ static inline void dst_metric_set(struct dst_entry *dst, int metric, u32 val)
 		p[metric-1] = val;
 }
 
-/* Kernel-internal feature bits that are unallocated in user space. */
-#define DST_FEATURE_ECN_CA	(1 << 31)
-
-#define DST_FEATURE_MASK	(DST_FEATURE_ECN_CA)
-#define DST_FEATURE_ECN_MASK	(DST_FEATURE_ECN_CA | RTAX_FEATURE_ECN)
-
 static inline u32
 dst_feature(const struct dst_entry *dst, u32 feature)
 {
@@ -295,16 +284,11 @@ static inline void skb_dst_drop(struct sk_buff *skb)
 	}
 }
 
-static inline void __skb_dst_copy(struct sk_buff *nskb, unsigned long refdst)
-{
-	nskb->_skb_refdst = refdst;
-	if (!(nskb->_skb_refdst & SKB_DST_NOREF))
-		dst_clone(skb_dst(nskb));
-}
-
 static inline void skb_dst_copy(struct sk_buff *nskb, const struct sk_buff *oskb)
 {
-	__skb_dst_copy(nskb, oskb->_skb_refdst);
+	nskb->_skb_refdst = oskb->_skb_refdst;
+	if (!(nskb->_skb_refdst & SKB_DST_NOREF))
+		dst_clone(skb_dst(nskb));
 }
 
 /**
@@ -372,9 +356,6 @@ static inline int dst_discard(struct sk_buff *skb)
 }
 void *dst_alloc(struct dst_ops *ops, struct net_device *dev, int initial_ref,
 		int initial_obsolete, unsigned short flags);
-void dst_init(struct dst_entry *dst, struct dst_ops *ops,
-	      struct net_device *dev, int initial_ref, int initial_obsolete,
-	      unsigned short flags);
 void __dst_free(struct dst_entry *dst);
 struct dst_entry *dst_destroy(struct dst_entry *dst);
 
@@ -476,7 +457,7 @@ static inline struct dst_entry *dst_check(struct dst_entry *dst, u32 cookie)
 	return dst;
 }
 
-void dst_subsys_init(void);
+void dst_init(void);
 
 /* Flags for xfrm_lookup flags argument. */
 enum {

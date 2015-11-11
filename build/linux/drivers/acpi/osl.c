@@ -19,6 +19,10 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
  */
@@ -43,7 +47,6 @@
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <asm-generic/io-64-nonatomic-lo-hi.h>
 
 #include "internal.h"
 
@@ -80,7 +83,6 @@ static void *acpi_irq_context;
 static struct workqueue_struct *kacpid_wq;
 static struct workqueue_struct *kacpi_notify_wq;
 static struct workqueue_struct *kacpi_hotplug_wq;
-static bool acpi_os_initialized;
 
 /*
  * This list of permanent mappings is for memory that may be accessed from
@@ -945,6 +947,21 @@ acpi_status acpi_os_write_port(acpi_io_address port, u32 value, u32 width)
 
 EXPORT_SYMBOL(acpi_os_write_port);
 
+#ifdef readq
+static inline u64 read64(const volatile void __iomem *addr)
+{
+	return readq(addr);
+}
+#else
+static inline u64 read64(const volatile void __iomem *addr)
+{
+	u64 l, h;
+	l = readl(addr);
+	h = readl(addr+4);
+	return l | (h << 32);
+}
+#endif
+
 acpi_status
 acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
 {
@@ -977,7 +994,7 @@ acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
 		*(u32 *) value = readl(virt_addr);
 		break;
 	case 64:
-		*(u64 *) value = readq(virt_addr);
+		*(u64 *) value = read64(virt_addr);
 		break;
 	default:
 		BUG();
@@ -990,6 +1007,19 @@ acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
 
 	return AE_OK;
 }
+
+#ifdef writeq
+static inline void write64(u64 val, volatile void __iomem *addr)
+{
+	writeq(val, addr);
+}
+#else
+static inline void write64(u64 val, volatile void __iomem *addr)
+{
+	writel(val, addr);
+	writel(val>>32, addr+4);
+}
+#endif
 
 acpi_status
 acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
@@ -1019,7 +1049,7 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
 		writel(value, virt_addr);
 		break;
 	case 64:
-		writeq(value, virt_addr);
+		write64(value, virt_addr);
 		break;
 	default:
 		BUG();
@@ -1286,9 +1316,6 @@ acpi_status acpi_os_wait_semaphore(acpi_handle handle, u32 units, u16 timeout)
 	long jiffies;
 	int ret = 0;
 
-	if (!acpi_os_initialized)
-		return AE_OK;
-
 	if (!sem || (units < 1))
 		return AE_BAD_PARAMETER;
 
@@ -1327,9 +1354,6 @@ acpi_status acpi_os_wait_semaphore(acpi_handle handle, u32 units, u16 timeout)
 acpi_status acpi_os_signal_semaphore(acpi_handle handle, u32 units)
 {
 	struct semaphore *sem = (struct semaphore *)handle;
-
-	if (!acpi_os_initialized)
-		return AE_OK;
 
 	if (!sem || (units < 1))
 		return AE_BAD_PARAMETER;
@@ -1839,7 +1863,6 @@ acpi_status __init acpi_os_initialize(void)
 		rv = acpi_os_map_generic_address(&acpi_gbl_FADT.reset_register);
 		pr_debug(PREFIX "%s: map reset_reg status %d\n", __func__, rv);
 	}
-	acpi_os_initialized = true;
 
 	return AE_OK;
 }

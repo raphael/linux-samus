@@ -357,7 +357,7 @@ static int ll_xattr_cache_refill(struct inode *inode, struct lookup_intent *oit)
 	struct ll_inode_info *lli = ll_i2info(inode);
 	struct mdt_body *body;
 	__u32 *xsizes;
-	int rc, i;
+	int rc = 0, i;
 
 
 

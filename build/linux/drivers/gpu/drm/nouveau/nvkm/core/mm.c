@@ -26,7 +26,7 @@
 #define node(root, dir) ((root)->nl_entry.dir == &mm->nodes) ? NULL :          \
 	list_entry((root)->nl_entry.dir, struct nvkm_mm_node, nl_entry)
 
-void
+static void
 nvkm_mm_dump(struct nvkm_mm *mm, const char *header)
 {
 	struct nvkm_mm_node *node;

@@ -7,6 +7,8 @@
  * published by the Free Software Foundation.
  */
 
+#include <linux/of_gpio.h>
+
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_panel.h>
 #include "drm.h"
@@ -57,17 +59,10 @@ tegra_output_connector_detect(struct drm_connector *connector, bool force)
 	enum drm_connector_status status = connector_status_unknown;
 
 	if (gpio_is_valid(output->hpd_gpio)) {
-		if (output->hpd_gpio_flags & OF_GPIO_ACTIVE_LOW) {
-			if (gpio_get_value(output->hpd_gpio) != 0)
-				status = connector_status_disconnected;
-			else
-				status = connector_status_connected;
-		} else {
-			if (gpio_get_value(output->hpd_gpio) == 0)
-				status = connector_status_disconnected;
-			else
-				status = connector_status_connected;
-		}
+		if (gpio_get_value(output->hpd_gpio) == 0)
+			status = connector_status_disconnected;
+		else
+			status = connector_status_connected;
 	} else {
 		if (!output->panel)
 			status = connector_status_disconnected;
@@ -102,6 +97,7 @@ static irqreturn_t hpd_irq(int irq, void *data)
 int tegra_output_probe(struct tegra_output *output)
 {
 	struct device_node *ddc, *panel;
+	enum of_gpio_flags flags;
 	int err, size;
 
 	if (!output->of_node)
@@ -132,7 +128,7 @@ int tegra_output_probe(struct tegra_output *output)
 
 	output->hpd_gpio = of_get_named_gpio_flags(output->of_node,
 						   "nvidia,hpd-gpio", 0,
-						   &output->hpd_gpio_flags);
+						   &flags);
 	if (gpio_is_valid(output->hpd_gpio)) {
 		unsigned long flags;
 

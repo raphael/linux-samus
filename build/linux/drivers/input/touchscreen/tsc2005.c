@@ -30,11 +30,10 @@
 #include <linux/delay.h>
 #include <linux/pm.h>
 #include <linux/of.h>
+#include <linux/of_gpio.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/tsc2005.h>
 #include <linux/regulator/consumer.h>
-#include <linux/regmap.h>
-#include <linux/gpio/consumer.h>
 
 /*
  * The touchscreen interface operates as follows:
@@ -62,24 +61,16 @@
 #define TSC2005_CMD_12BIT		0x04
 
 /* control byte 0 */
-#define TSC2005_REG_READ		0x01 /* R/W access */
-#define TSC2005_REG_PND0		0x02 /* Power Not Down Control */
-#define TSC2005_REG_X			(0x0 << 3)
-#define TSC2005_REG_Y			(0x1 << 3)
-#define TSC2005_REG_Z1			(0x2 << 3)
-#define TSC2005_REG_Z2			(0x3 << 3)
-#define TSC2005_REG_AUX			(0x4 << 3)
-#define TSC2005_REG_TEMP1		(0x5 << 3)
-#define TSC2005_REG_TEMP2		(0x6 << 3)
-#define TSC2005_REG_STATUS		(0x7 << 3)
-#define TSC2005_REG_AUX_HIGH		(0x8 << 3)
-#define TSC2005_REG_AUX_LOW		(0x9 << 3)
-#define TSC2005_REG_TEMP_HIGH		(0xA << 3)
-#define TSC2005_REG_TEMP_LOW		(0xB << 3)
-#define TSC2005_REG_CFR0		(0xC << 3)
-#define TSC2005_REG_CFR1		(0xD << 3)
-#define TSC2005_REG_CFR2		(0xE << 3)
-#define TSC2005_REG_CONV_FUNC		(0xF << 3)
+#define TSC2005_REG_READ		0x0001
+#define TSC2005_REG_PND0		0x0002
+#define TSC2005_REG_X			0x0000
+#define TSC2005_REG_Y			0x0008
+#define TSC2005_REG_Z1			0x0010
+#define TSC2005_REG_Z2			0x0018
+#define TSC2005_REG_TEMP_HIGH		0x0050
+#define TSC2005_REG_CFR0		0x0060
+#define TSC2005_REG_CFR1		0x0068
+#define TSC2005_REG_CFR2		0x0070
 
 /* configuration register 0 */
 #define TSC2005_CFR0_PRECHARGE_276US	0x0040
@@ -121,37 +112,20 @@
 #define TSC2005_SPI_MAX_SPEED_HZ	10000000
 #define TSC2005_PENUP_TIME_MS		40
 
-static const struct regmap_range tsc2005_writable_ranges[] = {
-	regmap_reg_range(TSC2005_REG_AUX_HIGH, TSC2005_REG_CFR2),
+struct tsc2005_spi_rd {
+	struct spi_transfer	spi_xfer;
+	u32			spi_tx;
+	u32			spi_rx;
 };
-
-static const struct regmap_access_table tsc2005_writable_table = {
-	.yes_ranges = tsc2005_writable_ranges,
-	.n_yes_ranges = ARRAY_SIZE(tsc2005_writable_ranges),
-};
-
-static struct regmap_config tsc2005_regmap_config = {
-	.reg_bits = 8,
-	.val_bits = 16,
-	.reg_stride = 0x08,
-	.max_register = 0x78,
-	.read_flag_mask = TSC2005_REG_READ,
-	.write_flag_mask = TSC2005_REG_PND0,
-	.wr_table = &tsc2005_writable_table,
-	.use_single_rw = true,
-};
-
-struct tsc2005_data {
-	u16 x;
-	u16 y;
-	u16 z1;
-	u16 z2;
-} __packed;
-#define TSC2005_DATA_REGS 4
 
 struct tsc2005 {
 	struct spi_device	*spi;
-	struct regmap		*regmap;
+
+	struct spi_message      spi_read_msg;
+	struct tsc2005_spi_rd	spi_x;
+	struct tsc2005_spi_rd	spi_y;
+	struct tsc2005_spi_rd	spi_z1;
+	struct tsc2005_spi_rd	spi_z2;
 
 	struct input_dev	*idev;
 	char			phys[32];
@@ -180,7 +154,7 @@ struct tsc2005 {
 
 	struct regulator	*vio;
 
-	struct gpio_desc	*reset_gpio;
+	int			reset_gpio;
 	void			(*set_reset)(bool enable);
 };
 
@@ -205,6 +179,62 @@ static int tsc2005_cmd(struct tsc2005 *ts, u8 cmd)
 		return error;
 	}
 
+	return 0;
+}
+
+static int tsc2005_write(struct tsc2005 *ts, u8 reg, u16 value)
+{
+	u32 tx = ((reg | TSC2005_REG_PND0) << 16) | value;
+	struct spi_transfer xfer = {
+		.tx_buf		= &tx,
+		.len		= 4,
+		.bits_per_word	= 24,
+	};
+	struct spi_message msg;
+	int error;
+
+	spi_message_init(&msg);
+	spi_message_add_tail(&xfer, &msg);
+
+	error = spi_sync(ts->spi, &msg);
+	if (error) {
+		dev_err(&ts->spi->dev,
+			"%s: failed, register: %x, value: %x, error: %d\n",
+			__func__, reg, value, error);
+		return error;
+	}
+
+	return 0;
+}
+
+static void tsc2005_setup_read(struct tsc2005_spi_rd *rd, u8 reg, bool last)
+{
+	memset(rd, 0, sizeof(*rd));
+
+	rd->spi_tx		   = (reg | TSC2005_REG_READ) << 16;
+	rd->spi_xfer.tx_buf	   = &rd->spi_tx;
+	rd->spi_xfer.rx_buf	   = &rd->spi_rx;
+	rd->spi_xfer.len	   = 4;
+	rd->spi_xfer.bits_per_word = 24;
+	rd->spi_xfer.cs_change	   = !last;
+}
+
+static int tsc2005_read(struct tsc2005 *ts, u8 reg, u16 *value)
+{
+	struct tsc2005_spi_rd spi_rd;
+	struct spi_message msg;
+	int error;
+
+	tsc2005_setup_read(&spi_rd, reg, true);
+
+	spi_message_init(&msg);
+	spi_message_add_tail(&spi_rd.spi_xfer, &msg);
+
+	error = spi_sync(ts->spi, &msg);
+	if (error)
+		return error;
+
+	*value = spi_rd.spi_rx;
 	return 0;
 }
 
@@ -236,23 +266,26 @@ static irqreturn_t tsc2005_irq_thread(int irq, void *_ts)
 	struct tsc2005 *ts = _ts;
 	unsigned long flags;
 	unsigned int pressure;
-	struct tsc2005_data tsdata;
+	u32 x, y;
+	u32 z1, z2;
 	int error;
 
 	/* read the coordinates */
-	error = regmap_bulk_read(ts->regmap, TSC2005_REG_X, &tsdata,
-				 TSC2005_DATA_REGS);
+	error = spi_sync(ts->spi, &ts->spi_read_msg);
 	if (unlikely(error))
 		goto out;
 
+	x = ts->spi_x.spi_rx;
+	y = ts->spi_y.spi_rx;
+	z1 = ts->spi_z1.spi_rx;
+	z2 = ts->spi_z2.spi_rx;
+
 	/* validate position */
-	if (unlikely(tsdata.x > MAX_12BIT || tsdata.y > MAX_12BIT))
+	if (unlikely(x > MAX_12BIT || y > MAX_12BIT))
 		goto out;
 
 	/* Skip reading if the pressure components are out of range */
-	if (unlikely(tsdata.z1 == 0 || tsdata.z2 > MAX_12BIT))
-		goto out;
-	if (unlikely(tsdata.z1 >= tsdata.z2))
+	if (unlikely(z1 == 0 || z2 > MAX_12BIT || z1 >= z2))
 		goto out;
 
        /*
@@ -260,8 +293,8 @@ static irqreturn_t tsc2005_irq_thread(int irq, void *_ts)
 	* the value before pen-up - that implies SPI fed us stale data
 	*/
 	if (!ts->pen_down &&
-	    ts->in_x == tsdata.x && ts->in_y == tsdata.y &&
-	    ts->in_z1 == tsdata.z1 && ts->in_z2 == tsdata.z2) {
+	    ts->in_x == x && ts->in_y == y &&
+	    ts->in_z1 == z1 && ts->in_z2 == z2) {
 		goto out;
 	}
 
@@ -269,20 +302,20 @@ static irqreturn_t tsc2005_irq_thread(int irq, void *_ts)
 	 * At this point we are happy we have a valid and useful reading.
 	 * Remember it for later comparisons. We may now begin downsampling.
 	 */
-	ts->in_x = tsdata.x;
-	ts->in_y = tsdata.y;
-	ts->in_z1 = tsdata.z1;
-	ts->in_z2 = tsdata.z2;
+	ts->in_x = x;
+	ts->in_y = y;
+	ts->in_z1 = z1;
+	ts->in_z2 = z2;
 
 	/* Compute touch pressure resistance using equation #1 */
-	pressure = tsdata.x * (tsdata.z2 - tsdata.z1) / tsdata.z1;
+	pressure = x * (z2 - z1) / z1;
 	pressure = pressure * ts->x_plate_ohm / 4096;
 	if (unlikely(pressure > MAX_12BIT))
 		goto out;
 
 	spin_lock_irqsave(&ts->lock, flags);
 
-	tsc2005_update_pen_state(ts, tsdata.x, tsdata.y, pressure);
+	tsc2005_update_pen_state(ts, x, y, pressure);
 	mod_timer(&ts->penup_timer,
 		  jiffies + msecs_to_jiffies(TSC2005_PENUP_TIME_MS));
 
@@ -305,9 +338,9 @@ static void tsc2005_penup_timer(unsigned long data)
 
 static void tsc2005_start_scan(struct tsc2005 *ts)
 {
-	regmap_write(ts->regmap, TSC2005_REG_CFR0, TSC2005_CFR0_INITVALUE);
-	regmap_write(ts->regmap, TSC2005_REG_CFR1, TSC2005_CFR1_INITVALUE);
-	regmap_write(ts->regmap, TSC2005_REG_CFR2, TSC2005_CFR2_INITVALUE);
+	tsc2005_write(ts, TSC2005_REG_CFR0, TSC2005_CFR0_INITVALUE);
+	tsc2005_write(ts, TSC2005_REG_CFR1, TSC2005_CFR1_INITVALUE);
+	tsc2005_write(ts, TSC2005_REG_CFR2, TSC2005_CFR2_INITVALUE);
 	tsc2005_cmd(ts, TSC2005_CMD_NORMAL);
 }
 
@@ -318,8 +351,8 @@ static void tsc2005_stop_scan(struct tsc2005 *ts)
 
 static void tsc2005_set_reset(struct tsc2005 *ts, bool enable)
 {
-	if (ts->reset_gpio)
-		gpiod_set_value_cansleep(ts->reset_gpio, enable);
+	if (ts->reset_gpio >= 0)
+		gpio_set_value(ts->reset_gpio, enable);
 	else if (ts->set_reset)
 		ts->set_reset(enable);
 }
@@ -355,10 +388,11 @@ static ssize_t tsc2005_selftest_show(struct device *dev,
 				     struct device_attribute *attr,
 				     char *buf)
 {
-	struct tsc2005 *ts = dev_get_drvdata(dev);
-	unsigned int temp_high;
-	unsigned int temp_high_orig;
-	unsigned int temp_high_test;
+	struct spi_device *spi = to_spi_device(dev);
+	struct tsc2005 *ts = spi_get_drvdata(spi);
+	u16 temp_high;
+	u16 temp_high_orig;
+	u16 temp_high_test;
 	bool success = true;
 	int error;
 
@@ -369,7 +403,7 @@ static ssize_t tsc2005_selftest_show(struct device *dev,
 	 */
 	__tsc2005_disable(ts);
 
-	error = regmap_read(ts->regmap, TSC2005_REG_TEMP_HIGH, &temp_high_orig);
+	error = tsc2005_read(ts, TSC2005_REG_TEMP_HIGH, &temp_high_orig);
 	if (error) {
 		dev_warn(dev, "selftest failed: read error %d\n", error);
 		success = false;
@@ -378,14 +412,14 @@ static ssize_t tsc2005_selftest_show(struct device *dev,
 
 	temp_high_test = (temp_high_orig - 1) & MAX_12BIT;
 
-	error = regmap_write(ts->regmap, TSC2005_REG_TEMP_HIGH, temp_high_test);
+	error = tsc2005_write(ts, TSC2005_REG_TEMP_HIGH, temp_high_test);
 	if (error) {
 		dev_warn(dev, "selftest failed: write error %d\n", error);
 		success = false;
 		goto out;
 	}
 
-	error = regmap_read(ts->regmap, TSC2005_REG_TEMP_HIGH, &temp_high);
+	error = tsc2005_read(ts, TSC2005_REG_TEMP_HIGH, &temp_high);
 	if (error) {
 		dev_warn(dev, "selftest failed: read error %d after write\n",
 			 error);
@@ -408,7 +442,7 @@ static ssize_t tsc2005_selftest_show(struct device *dev,
 		goto out;
 
 	/* test that the reset really happened */
-	error = regmap_read(ts->regmap, TSC2005_REG_TEMP_HIGH, &temp_high);
+	error = tsc2005_read(ts, TSC2005_REG_TEMP_HIGH, &temp_high);
 	if (error) {
 		dev_warn(dev, "selftest failed: read error %d after reset\n",
 			 error);
@@ -440,7 +474,8 @@ static umode_t tsc2005_attr_is_visible(struct kobject *kobj,
 				      struct attribute *attr, int n)
 {
 	struct device *dev = container_of(kobj, struct device, kobj);
-	struct tsc2005 *ts = dev_get_drvdata(dev);
+	struct spi_device *spi = to_spi_device(dev);
+	struct tsc2005 *ts = spi_get_drvdata(spi);
 	umode_t mode = attr->mode;
 
 	if (attr == &dev_attr_selftest.attr) {
@@ -460,7 +495,7 @@ static void tsc2005_esd_work(struct work_struct *work)
 {
 	struct tsc2005 *ts = container_of(work, struct tsc2005, esd_work.work);
 	int error;
-	unsigned int r;
+	u16 r;
 
 	if (!mutex_trylock(&ts->mutex)) {
 		/*
@@ -476,7 +511,7 @@ static void tsc2005_esd_work(struct work_struct *work)
 		goto out;
 
 	/* We should be able to read register without disabling interrupts. */
-	error = regmap_read(ts->regmap, TSC2005_REG_CFR0, &r);
+	error = tsc2005_read(ts, TSC2005_REG_CFR0, &r);
 	if (!error &&
 	    !((r ^ TSC2005_CFR0_INITVALUE) & TSC2005_CFR0_RW_MASK)) {
 		goto out;
@@ -538,6 +573,20 @@ static void tsc2005_close(struct input_dev *input)
 	ts->opened = false;
 
 	mutex_unlock(&ts->mutex);
+}
+
+static void tsc2005_setup_spi_xfer(struct tsc2005 *ts)
+{
+	tsc2005_setup_read(&ts->spi_x, TSC2005_REG_X, false);
+	tsc2005_setup_read(&ts->spi_y, TSC2005_REG_Y, false);
+	tsc2005_setup_read(&ts->spi_z1, TSC2005_REG_Z1, false);
+	tsc2005_setup_read(&ts->spi_z2, TSC2005_REG_Z2, true);
+
+	spi_message_init(&ts->spi_read_msg);
+	spi_message_add_tail(&ts->spi_x.spi_xfer, &ts->spi_read_msg);
+	spi_message_add_tail(&ts->spi_y.spi_xfer, &ts->spi_read_msg);
+	spi_message_add_tail(&ts->spi_z1.spi_xfer, &ts->spi_read_msg);
+	spi_message_add_tail(&ts->spi_z2.spi_xfer, &ts->spi_read_msg);
 }
 
 static int tsc2005_probe(struct spi_device *spi)
@@ -604,30 +653,37 @@ static int tsc2005_probe(struct spi_device *spi)
 	ts->spi = spi;
 	ts->idev = input_dev;
 
-	ts->regmap = devm_regmap_init_spi(spi, &tsc2005_regmap_config);
-	if (IS_ERR(ts->regmap))
-		return PTR_ERR(ts->regmap);
-
 	ts->x_plate_ohm = x_plate_ohm;
 	ts->esd_timeout = esd_timeout;
 
-	ts->reset_gpio = devm_gpiod_get_optional(&spi->dev, "reset",
-						 GPIOD_OUT_HIGH);
-	if (IS_ERR(ts->reset_gpio)) {
-		error = PTR_ERR(ts->reset_gpio);
-		dev_err(&spi->dev, "error acquiring reset gpio: %d\n", error);
-		return error;
-	}
+	if (np) {
+		ts->reset_gpio = of_get_named_gpio(np, "reset-gpios", 0);
+		if (ts->reset_gpio == -EPROBE_DEFER)
+			return ts->reset_gpio;
+		if (ts->reset_gpio < 0) {
+			dev_err(&spi->dev, "error acquiring reset gpio: %d\n",
+				ts->reset_gpio);
+			return ts->reset_gpio;
+		}
 
-	ts->vio = devm_regulator_get_optional(&spi->dev, "vio");
-	if (IS_ERR(ts->vio)) {
-		error = PTR_ERR(ts->vio);
-		dev_err(&spi->dev, "vio regulator missing (%d)", error);
-		return error;
-	}
+		error = devm_gpio_request_one(&spi->dev, ts->reset_gpio, 0,
+					      "reset-gpios");
+		if (error) {
+			dev_err(&spi->dev, "error requesting reset gpio: %d\n",
+				error);
+			return error;
+		}
 
-	if (!ts->reset_gpio && pdata)
+		ts->vio = devm_regulator_get(&spi->dev, "vio");
+		if (IS_ERR(ts->vio)) {
+			error = PTR_ERR(ts->vio);
+			dev_err(&spi->dev, "vio regulator missing (%d)", error);
+			return error;
+		}
+	} else {
+		ts->reset_gpio = -1;
 		ts->set_reset = pdata->set_reset;
+	}
 
 	mutex_init(&ts->mutex);
 
@@ -635,6 +691,8 @@ static int tsc2005_probe(struct spi_device *spi)
 	setup_timer(&ts->penup_timer, tsc2005_penup_timer, (unsigned long)ts);
 
 	INIT_DELAYED_WORK(&ts->esd_work, tsc2005_esd_work);
+
+	tsc2005_setup_spi_xfer(ts);
 
 	snprintf(ts->phys, sizeof(ts->phys),
 		 "%s/input-ts", dev_name(&spi->dev));
@@ -651,7 +709,7 @@ static int tsc2005_probe(struct spi_device *spi)
 	input_set_abs_params(input_dev, ABS_PRESSURE, 0, max_p, fudge_p, 0);
 
 	if (np)
-		touchscreen_parse_properties(input_dev, false);
+		touchscreen_parse_of_params(input_dev, false);
 
 	input_dev->open = tsc2005_open;
 	input_dev->close = tsc2005_close;
@@ -677,7 +735,7 @@ static int tsc2005_probe(struct spi_device *spi)
 			return error;
 	}
 
-	dev_set_drvdata(&spi->dev, ts);
+	spi_set_drvdata(spi, ts);
 	error = sysfs_create_group(&spi->dev.kobj, &tsc2005_attr_group);
 	if (error) {
 		dev_err(&spi->dev,
@@ -705,7 +763,7 @@ disable_regulator:
 
 static int tsc2005_remove(struct spi_device *spi)
 {
-	struct tsc2005 *ts = dev_get_drvdata(&spi->dev);
+	struct tsc2005 *ts = spi_get_drvdata(spi);
 
 	sysfs_remove_group(&spi->dev.kobj, &tsc2005_attr_group);
 
@@ -717,7 +775,8 @@ static int tsc2005_remove(struct spi_device *spi)
 
 static int __maybe_unused tsc2005_suspend(struct device *dev)
 {
-	struct tsc2005 *ts = dev_get_drvdata(dev);
+	struct spi_device *spi = to_spi_device(dev);
+	struct tsc2005 *ts = spi_get_drvdata(spi);
 
 	mutex_lock(&ts->mutex);
 
@@ -733,7 +792,8 @@ static int __maybe_unused tsc2005_suspend(struct device *dev)
 
 static int __maybe_unused tsc2005_resume(struct device *dev)
 {
-	struct tsc2005 *ts = dev_get_drvdata(dev);
+	struct spi_device *spi = to_spi_device(dev);
+	struct tsc2005 *ts = spi_get_drvdata(spi);
 
 	mutex_lock(&ts->mutex);
 

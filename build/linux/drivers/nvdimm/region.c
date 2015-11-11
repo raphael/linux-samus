@@ -53,7 +53,6 @@ static int nd_region_probe(struct device *dev)
 		return -ENODEV;
 
 	nd_region->btt_seed = nd_btt_create(nd_region);
-	nd_region->pfn_seed = nd_pfn_create(nd_region);
 	if (err == 0)
 		return 0;
 
@@ -85,7 +84,6 @@ static int nd_region_remove(struct device *dev)
 	nvdimm_bus_lock(dev);
 	nd_region->ns_seed = NULL;
 	nd_region->btt_seed = NULL;
-	nd_region->pfn_seed = NULL;
 	dev_set_drvdata(dev, NULL);
 	nvdimm_bus_unlock(dev);
 

@@ -56,13 +56,18 @@ int __init security_init(void)
 	pr_info("Security Framework initialized\n");
 
 	/*
-	 * Load minor LSMs, with the capability module always first.
+	 * Always load the capability module.
 	 */
 	capability_add_hooks();
-	yama_add_hooks();
-
+#ifdef CONFIG_SECURITY_YAMA_STACKED
 	/*
-	 * Load all the remaining security modules.
+	 * If Yama is configured for stacking load it next.
+	 */
+	yama_add_hooks();
+#endif
+	/*
+	 * Load the chosen module if there is one.
+	 * This will also find yama if it is stacking
 	 */
 	do_security_initcalls();
 
@@ -771,7 +776,7 @@ static inline unsigned long mmap_prot(struct file *file, unsigned long prot)
 	 * ditto if it's not on noexec mount, except that on !MMU we need
 	 * NOMMU_MAP_EXEC (== VM_MAYEXEC) in this case
 	 */
-	if (!path_noexec(&file->f_path)) {
+	if (!(file->f_path.mnt->mnt_flags & MNT_NOEXEC)) {
 #ifndef CONFIG_MMU
 		if (file->f_op->mmap_capabilities) {
 			unsigned caps = file->f_op->mmap_capabilities(file);

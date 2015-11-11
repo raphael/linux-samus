@@ -159,7 +159,7 @@ static inline struct shmid_kernel *shm_lock(struct ipc_namespace *ns, int id)
 	 * We raced in the idr lookup or with shm_destroy().  Either way, the
 	 * ID is busted.
 	 */
-	WARN_ON(IS_ERR(ipcp));
+	BUG_ON(IS_ERR(ipcp));
 
 	return container_of(ipcp, struct shmid_kernel, shm_perm);
 }
@@ -393,7 +393,7 @@ static int shm_mmap(struct file *file, struct vm_area_struct *vma)
 		return ret;
 	sfd->vm_ops = vma->vm_ops;
 #ifdef CONFIG_MMU
-	WARN_ON(!sfd->vm_ops->fault);
+	BUG_ON(!sfd->vm_ops->fault);
 #endif
 	vma->vm_ops = &shm_vm_ops;
 	shm_open(vma);

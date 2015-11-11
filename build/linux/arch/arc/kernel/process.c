@@ -65,7 +65,7 @@ asmlinkage void ret_from_fork(void);
  * ------------------
  * |     r25        |   <==== top of Stack (thread.ksp)
  * ~                ~
- * |    --to--      |   (CALLEE Regs of kernel mode)
+ * |    --to--      |   (CALLEE Regs of user mode)
  * |     r13        |
  * ------------------
  * |     fp         |

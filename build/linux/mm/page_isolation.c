@@ -9,8 +9,7 @@
 #include <linux/hugetlb.h>
 #include "internal.h"
 
-static int set_migratetype_isolate(struct page *page,
-				bool skip_hwpoisoned_pages)
+int set_migratetype_isolate(struct page *page, bool skip_hwpoisoned_pages)
 {
 	struct zone *zone;
 	unsigned long flags, pfn;
@@ -73,7 +72,7 @@ out:
 	return ret;
 }
 
-static void unset_migratetype_isolate(struct page *page, unsigned migratetype)
+void unset_migratetype_isolate(struct page *page, unsigned migratetype)
 {
 	struct zone *zone;
 	unsigned long flags, nr_pages;
@@ -224,16 +223,34 @@ __test_page_isolated_in_pageblock(unsigned long pfn, unsigned long end_pfn,
 			continue;
 		}
 		page = pfn_to_page(pfn);
-		if (PageBuddy(page))
+		if (PageBuddy(page)) {
 			/*
-			 * If the page is on a free list, it has to be on
-			 * the correct MIGRATE_ISOLATE freelist. There is no
-			 * simple way to verify that as VM_BUG_ON(), though.
+			 * If race between isolatation and allocation happens,
+			 * some free pages could be in MIGRATE_MOVABLE list
+			 * although pageblock's migratation type of the page
+			 * is MIGRATE_ISOLATE. Catch it and move the page into
+			 * MIGRATE_ISOLATE list.
 			 */
+			if (get_freepage_migratetype(page) != MIGRATE_ISOLATE) {
+				struct page *end_page;
+
+				end_page = page + (1 << page_order(page)) - 1;
+				move_freepages(page_zone(page), page, end_page,
+						MIGRATE_ISOLATE);
+			}
 			pfn += 1 << page_order(page);
-		else if (skip_hwpoisoned_pages && PageHWPoison(page))
-			/* A HWPoisoned page cannot be also PageBuddy */
+		}
+		else if (page_count(page) == 0 &&
+			get_freepage_migratetype(page) == MIGRATE_ISOLATE)
+			pfn += 1;
+		else if (skip_hwpoisoned_pages && PageHWPoison(page)) {
+			/*
+			 * The HWPoisoned page may be not in buddy
+			 * system, and page_count() is not 0.
+			 */
 			pfn++;
+			continue;
+		}
 		else
 			break;
 	}

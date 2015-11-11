@@ -62,7 +62,6 @@ struct cc10001_adc_device {
 	struct regulator *reg;
 	u16 *buf;
 
-	bool shared;
 	struct mutex lock;
 	unsigned int start_delay_ns;
 	unsigned int eoc_delay_ns;
@@ -154,8 +153,7 @@ static irqreturn_t cc10001_adc_trigger_h(int irq, void *p)
 
 	mutex_lock(&adc_dev->lock);
 
-	if (!adc_dev->shared)
-		cc10001_adc_power_up(adc_dev);
+	cc10001_adc_power_up(adc_dev);
 
 	/* Calculate delay step for eoc and sampled data */
 	delay_ns = adc_dev->eoc_delay_ns / CC10001_MAX_POLL_COUNT;
@@ -179,8 +177,7 @@ static irqreturn_t cc10001_adc_trigger_h(int irq, void *p)
 	}
 
 done:
-	if (!adc_dev->shared)
-		cc10001_adc_power_down(adc_dev);
+	cc10001_adc_power_down(adc_dev);
 
 	mutex_unlock(&adc_dev->lock);
 
@@ -199,8 +196,7 @@ static u16 cc10001_adc_read_raw_voltage(struct iio_dev *indio_dev,
 	unsigned int delay_ns;
 	u16 val;
 
-	if (!adc_dev->shared)
-		cc10001_adc_power_up(adc_dev);
+	cc10001_adc_power_up(adc_dev);
 
 	/* Calculate delay step for eoc and sampled data */
 	delay_ns = adc_dev->eoc_delay_ns / CC10001_MAX_POLL_COUNT;
@@ -209,8 +205,7 @@ static u16 cc10001_adc_read_raw_voltage(struct iio_dev *indio_dev,
 
 	val = cc10001_adc_poll_done(indio_dev, chan->channel, delay_ns);
 
-	if (!adc_dev->shared)
-		cc10001_adc_power_down(adc_dev);
+	cc10001_adc_power_down(adc_dev);
 
 	return val;
 }
@@ -327,10 +322,8 @@ static int cc10001_adc_probe(struct platform_device *pdev)
 	adc_dev = iio_priv(indio_dev);
 
 	channel_map = GENMASK(CC10001_ADC_NUM_CHANNELS - 1, 0);
-	if (!of_property_read_u32(node, "adc-reserved-channels", &ret)) {
-		adc_dev->shared = true;
+	if (!of_property_read_u32(node, "adc-reserved-channels", &ret))
 		channel_map &= ~ret;
-	}
 
 	adc_dev->reg = devm_regulator_get(&pdev->dev, "vref");
 	if (IS_ERR(adc_dev->reg))
@@ -375,14 +368,6 @@ static int cc10001_adc_probe(struct platform_device *pdev)
 	adc_dev->eoc_delay_ns = NSEC_PER_SEC / adc_clk_rate;
 	adc_dev->start_delay_ns = adc_dev->eoc_delay_ns * CC10001_WAIT_CYCLES;
 
-	/*
-	 * There is only one register to power-up/power-down the AUX ADC.
-	 * If the ADC is shared among multiple CPUs, always power it up here.
-	 * If the ADC is used only by the MIPS, power-up/power-down at runtime.
-	 */
-	if (adc_dev->shared)
-		cc10001_adc_power_up(adc_dev);
-
 	/* Setup the ADC channels available on the device */
 	ret = cc10001_adc_channel_init(indio_dev, channel_map);
 	if (ret < 0)
@@ -417,7 +402,6 @@ static int cc10001_adc_remove(struct platform_device *pdev)
 	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
 	struct cc10001_adc_device *adc_dev = iio_priv(indio_dev);
 
-	cc10001_adc_power_down(adc_dev);
 	iio_device_unregister(indio_dev);
 	iio_triggered_buffer_cleanup(indio_dev);
 	clk_disable_unprepare(adc_dev->adc_clk);

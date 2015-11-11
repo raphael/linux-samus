@@ -82,7 +82,7 @@ static unsigned long get_random_long(void)
 
 	if (has_cpuflag(X86_FEATURE_TSC)) {
 		debug_putstr(" RDTSC");
-		raw = rdtsc();
+		rdtscll(raw);
 
 		random ^= raw;
 		use_i8254 = false;

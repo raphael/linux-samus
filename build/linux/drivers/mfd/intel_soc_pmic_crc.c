@@ -109,9 +109,6 @@ static struct mfd_cell crystal_cove_dev[] = {
 	{
 		.name = "crystal_cove_pmic",
 	},
-	{
-		.name = "crystal_cove_pwm",
-	},
 };
 
 static const struct regmap_config crystal_cove_regmap_config = {

@@ -78,8 +78,12 @@ atomic_t obd_dirty_pages;
 EXPORT_SYMBOL(obd_dirty_pages);
 unsigned int obd_timeout = OBD_TIMEOUT_DEFAULT;   /* seconds */
 EXPORT_SYMBOL(obd_timeout);
+unsigned int ldlm_timeout = LDLM_TIMEOUT_DEFAULT; /* seconds */
+EXPORT_SYMBOL(ldlm_timeout);
 unsigned int obd_timeout_set;
 EXPORT_SYMBOL(obd_timeout_set);
+unsigned int ldlm_timeout_set;
+EXPORT_SYMBOL(ldlm_timeout_set);
 /* Adaptive timeout defs here instead of ptlrpc module for /proc/sys/ access */
 unsigned int at_min = 0;
 EXPORT_SYMBOL(at_min);
@@ -140,11 +144,11 @@ int obd_alloc_fail(const void *ptr, const char *name, const char *type,
 		CERROR("%s%salloc of %s (%llu bytes) failed at %s:%d\n",
 		       ptr ? "force " :"", type, name, (__u64)size, file,
 		       line);
-		CERROR("%llu total bytes and %llu total pages"
-			" (%llu bytes) allocated by Lustre\n",
+		CERROR("%llu total bytes and %llu total pages (%llu bytes) allocated by Lustre, %d total bytes by LNET\n",
 		       obd_memory_sum(),
 		       obd_pages_sum() << PAGE_CACHE_SHIFT,
-		       obd_pages_sum());
+		       obd_pages_sum(),
+		       atomic_read(&libcfs_kmemory));
 		return 1;
 	}
 	return 0;
@@ -228,7 +232,7 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
 			goto out;
 		}
 		lcfg = kzalloc(data->ioc_plen1, GFP_NOFS);
-		if (!lcfg) {
+		if (lcfg == NULL) {
 			err = -ENOMEM;
 			goto out;
 		}
@@ -567,11 +571,9 @@ static int __init init_obdclass(void)
 	if (err)
 		return err;
 
-	err = class_procfs_init();
-	if (err)
-		return err;
+	obd_sysctl_init();
 
-	err = obd_sysctl_init();
+	err = class_procfs_init();
 	if (err)
 		return err;
 
@@ -659,6 +661,7 @@ static void cleanup_obdclass(void)
 	lu_global_fini();
 
 	obd_cleanup_caches();
+	obd_sysctl_clean();
 
 	class_procfs_clean();
 

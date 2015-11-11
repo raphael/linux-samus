@@ -1,6 +1,5 @@
 #ifndef __NVKM_BIOS_PRIV_H__
 #define __NVKM_BIOS_PRIV_H__
-#define nvkm_bios(p) container_of((p), struct nvkm_bios, subdev)
 #include <subdev/bios.h>
 
 struct nvbios_source {
@@ -8,10 +7,7 @@ struct nvbios_source {
 	void *(*init)(struct nvkm_bios *, const char *);
 	void  (*fini)(void *);
 	u32   (*read)(void *, u32 offset, u32 length, struct nvkm_bios *);
-	u32   (*size)(void *);
 	bool rw;
-	bool ignore_checksum;
-	bool no_pcir;
 };
 
 int nvbios_extend(struct nvkm_bios *, u32 length);

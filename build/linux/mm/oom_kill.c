@@ -196,26 +196,27 @@ unsigned long oom_badness(struct task_struct *p, struct mem_cgroup *memcg,
  * Determine the type of allocation constraint.
  */
 #ifdef CONFIG_NUMA
-static enum oom_constraint constrained_alloc(struct oom_control *oc,
-					     unsigned long *totalpages)
+static enum oom_constraint constrained_alloc(struct zonelist *zonelist,
+				gfp_t gfp_mask, nodemask_t *nodemask,
+				unsigned long *totalpages)
 {
 	struct zone *zone;
 	struct zoneref *z;
-	enum zone_type high_zoneidx = gfp_zone(oc->gfp_mask);
+	enum zone_type high_zoneidx = gfp_zone(gfp_mask);
 	bool cpuset_limited = false;
 	int nid;
 
 	/* Default to all available memory */
 	*totalpages = totalram_pages + total_swap_pages;
 
-	if (!oc->zonelist)
+	if (!zonelist)
 		return CONSTRAINT_NONE;
 	/*
 	 * Reach here only when __GFP_NOFAIL is used. So, we should avoid
 	 * to kill current.We have to random task kill in this case.
 	 * Hopefully, CONSTRAINT_THISNODE...but no way to handle it, now.
 	 */
-	if (oc->gfp_mask & __GFP_THISNODE)
+	if (gfp_mask & __GFP_THISNODE)
 		return CONSTRAINT_NONE;
 
 	/*
@@ -223,18 +224,17 @@ static enum oom_constraint constrained_alloc(struct oom_control *oc,
 	 * the page allocator means a mempolicy is in effect.  Cpuset policy
 	 * is enforced in get_page_from_freelist().
 	 */
-	if (oc->nodemask &&
-	    !nodes_subset(node_states[N_MEMORY], *oc->nodemask)) {
+	if (nodemask && !nodes_subset(node_states[N_MEMORY], *nodemask)) {
 		*totalpages = total_swap_pages;
-		for_each_node_mask(nid, *oc->nodemask)
+		for_each_node_mask(nid, *nodemask)
 			*totalpages += node_spanned_pages(nid);
 		return CONSTRAINT_MEMORY_POLICY;
 	}
 
 	/* Check this allocation failure is caused by cpuset's wall function */
-	for_each_zone_zonelist_nodemask(zone, z, oc->zonelist,
-			high_zoneidx, oc->nodemask)
-		if (!cpuset_zone_allowed(zone, oc->gfp_mask))
+	for_each_zone_zonelist_nodemask(zone, z, zonelist,
+			high_zoneidx, nodemask)
+		if (!cpuset_zone_allowed(zone, gfp_mask))
 			cpuset_limited = true;
 
 	if (cpuset_limited) {
@@ -246,18 +246,20 @@ static enum oom_constraint constrained_alloc(struct oom_control *oc,
 	return CONSTRAINT_NONE;
 }
 #else
-static enum oom_constraint constrained_alloc(struct oom_control *oc,
-					     unsigned long *totalpages)
+static enum oom_constraint constrained_alloc(struct zonelist *zonelist,
+				gfp_t gfp_mask, nodemask_t *nodemask,
+				unsigned long *totalpages)
 {
 	*totalpages = totalram_pages + total_swap_pages;
 	return CONSTRAINT_NONE;
 }
 #endif
 
-enum oom_scan_t oom_scan_process_thread(struct oom_control *oc,
-			struct task_struct *task, unsigned long totalpages)
+enum oom_scan_t oom_scan_process_thread(struct task_struct *task,
+		unsigned long totalpages, const nodemask_t *nodemask,
+		bool force_kill)
 {
-	if (oom_unkillable_task(task, NULL, oc->nodemask))
+	if (oom_unkillable_task(task, NULL, nodemask))
 		return OOM_SCAN_CONTINUE;
 
 	/*
@@ -265,7 +267,7 @@ enum oom_scan_t oom_scan_process_thread(struct oom_control *oc,
 	 * Don't allow any other task to have access to the reserves.
 	 */
 	if (test_tsk_thread_flag(task, TIF_MEMDIE)) {
-		if (oc->order != -1)
+		if (!force_kill)
 			return OOM_SCAN_ABORT;
 	}
 	if (!task->mm)
@@ -278,7 +280,7 @@ enum oom_scan_t oom_scan_process_thread(struct oom_control *oc,
 	if (oom_task_origin(task))
 		return OOM_SCAN_SELECT;
 
-	if (task_will_free_mem(task) && oc->order != -1)
+	if (task_will_free_mem(task) && !force_kill)
 		return OOM_SCAN_ABORT;
 
 	return OOM_SCAN_OK;
@@ -287,9 +289,12 @@ enum oom_scan_t oom_scan_process_thread(struct oom_control *oc,
 /*
  * Simple selection loop. We chose the process with the highest
  * number of 'points'.  Returns -1 on scan abort.
+ *
+ * (not docbooked, we don't want this one cluttering up the manual)
  */
-static struct task_struct *select_bad_process(struct oom_control *oc,
-		unsigned int *ppoints, unsigned long totalpages)
+static struct task_struct *select_bad_process(unsigned int *ppoints,
+		unsigned long totalpages, const nodemask_t *nodemask,
+		bool force_kill)
 {
 	struct task_struct *g, *p;
 	struct task_struct *chosen = NULL;
@@ -299,7 +304,8 @@ static struct task_struct *select_bad_process(struct oom_control *oc,
 	for_each_process_thread(g, p) {
 		unsigned int points;
 
-		switch (oom_scan_process_thread(oc, p, totalpages)) {
+		switch (oom_scan_process_thread(p, totalpages, nodemask,
+						force_kill)) {
 		case OOM_SCAN_SELECT:
 			chosen = p;
 			chosen_points = ULONG_MAX;
@@ -312,7 +318,7 @@ static struct task_struct *select_bad_process(struct oom_control *oc,
 		case OOM_SCAN_OK:
 			break;
 		};
-		points = oom_badness(p, NULL, oc->nodemask, totalpages);
+		points = oom_badness(p, NULL, nodemask, totalpages);
 		if (!points || points < chosen_points)
 			continue;
 		/* Prefer thread group leaders for display purposes */
@@ -374,13 +380,13 @@ static void dump_tasks(struct mem_cgroup *memcg, const nodemask_t *nodemask)
 	rcu_read_unlock();
 }
 
-static void dump_header(struct oom_control *oc, struct task_struct *p,
-			struct mem_cgroup *memcg)
+static void dump_header(struct task_struct *p, gfp_t gfp_mask, int order,
+			struct mem_cgroup *memcg, const nodemask_t *nodemask)
 {
 	task_lock(current);
 	pr_warning("%s invoked oom-killer: gfp_mask=0x%x, order=%d, "
 		"oom_score_adj=%hd\n",
-		current->comm, oc->gfp_mask, oc->order,
+		current->comm, gfp_mask, order,
 		current->signal->oom_score_adj);
 	cpuset_print_task_mems_allowed(current);
 	task_unlock(current);
@@ -390,7 +396,7 @@ static void dump_header(struct oom_control *oc, struct task_struct *p,
 	else
 		show_mem(SHOW_MEM_FILTER_NODES);
 	if (sysctl_oom_dump_tasks)
-		dump_tasks(memcg, oc->nodemask);
+		dump_tasks(memcg, nodemask);
 }
 
 /*
@@ -481,9 +487,10 @@ void oom_killer_enable(void)
  * Must be called while holding a reference to p, which will be released upon
  * returning.
  */
-void oom_kill_process(struct oom_control *oc, struct task_struct *p,
+void oom_kill_process(struct task_struct *p, gfp_t gfp_mask, int order,
 		      unsigned int points, unsigned long totalpages,
-		      struct mem_cgroup *memcg, const char *message)
+		      struct mem_cgroup *memcg, nodemask_t *nodemask,
+		      const char *message)
 {
 	struct task_struct *victim = p;
 	struct task_struct *child;
@@ -507,7 +514,7 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 	task_unlock(p);
 
 	if (__ratelimit(&oom_rs))
-		dump_header(oc, p, memcg);
+		dump_header(p, gfp_mask, order, memcg, nodemask);
 
 	task_lock(p);
 	pr_err("%s: Kill process %d (%s) score %u or sacrifice child\n",
@@ -530,7 +537,7 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 			/*
 			 * oom_badness() returns 0 if the thread is unkillable
 			 */
-			child_points = oom_badness(child, memcg, oc->nodemask,
+			child_points = oom_badness(child, memcg, nodemask,
 								totalpages);
 			if (child_points > victim_points) {
 				put_task_struct(victim);
@@ -593,7 +600,8 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 /*
  * Determines whether the kernel must panic because of the panic_on_oom sysctl.
  */
-void check_panic_on_oom(struct oom_control *oc, enum oom_constraint constraint,
+void check_panic_on_oom(enum oom_constraint constraint, gfp_t gfp_mask,
+			int order, const nodemask_t *nodemask,
 			struct mem_cgroup *memcg)
 {
 	if (likely(!sysctl_panic_on_oom))
@@ -607,10 +615,7 @@ void check_panic_on_oom(struct oom_control *oc, enum oom_constraint constraint,
 		if (constraint != CONSTRAINT_NONE)
 			return;
 	}
-	/* Do not panic for oom kills triggered by sysrq */
-	if (oc->order == -1)
-		return;
-	dump_header(oc, NULL, memcg);
+	dump_header(NULL, gfp_mask, order, memcg, nodemask);
 	panic("Out of memory: %s panic_on_oom is enabled\n",
 		sysctl_panic_on_oom == 2 ? "compulsory" : "system-wide");
 }
@@ -630,21 +635,28 @@ int unregister_oom_notifier(struct notifier_block *nb)
 EXPORT_SYMBOL_GPL(unregister_oom_notifier);
 
 /**
- * out_of_memory - kill the "best" process when we run out of memory
- * @oc: pointer to struct oom_control
+ * __out_of_memory - kill the "best" process when we run out of memory
+ * @zonelist: zonelist pointer
+ * @gfp_mask: memory allocation flags
+ * @order: amount of memory being requested as a power of 2
+ * @nodemask: nodemask passed to page allocator
+ * @force_kill: true if a task must be killed, even if others are exiting
  *
  * If we run out of memory, we have the choice between either
  * killing a random task (bad), letting the system crash (worse)
  * OR try to be smart about which process to kill. Note that we
  * don't have to be perfect here, we just have to be good.
  */
-bool out_of_memory(struct oom_control *oc)
+bool out_of_memory(struct zonelist *zonelist, gfp_t gfp_mask,
+		   int order, nodemask_t *nodemask, bool force_kill)
 {
+	const nodemask_t *mpol_mask;
 	struct task_struct *p;
 	unsigned long totalpages;
 	unsigned long freed = 0;
 	unsigned int uninitialized_var(points);
 	enum oom_constraint constraint = CONSTRAINT_NONE;
+	int killed = 0;
 
 	if (oom_killer_disabled)
 		return false;
@@ -652,7 +664,7 @@ bool out_of_memory(struct oom_control *oc)
 	blocking_notifier_call_chain(&oom_notify_list, 0, &freed);
 	if (freed > 0)
 		/* Got some memory back in the last second. */
-		return true;
+		goto out;
 
 	/*
 	 * If current has a pending SIGKILL or is exiting, then automatically
@@ -665,42 +677,47 @@ bool out_of_memory(struct oom_control *oc)
 	if (current->mm &&
 	    (fatal_signal_pending(current) || task_will_free_mem(current))) {
 		mark_oom_victim(current);
-		return true;
+		goto out;
 	}
 
 	/*
 	 * Check if there were limitations on the allocation (only relevant for
 	 * NUMA) that may require different handling.
 	 */
-	constraint = constrained_alloc(oc, &totalpages);
-	if (constraint != CONSTRAINT_MEMORY_POLICY)
-		oc->nodemask = NULL;
-	check_panic_on_oom(oc, constraint, NULL);
+	constraint = constrained_alloc(zonelist, gfp_mask, nodemask,
+						&totalpages);
+	mpol_mask = (constraint == CONSTRAINT_MEMORY_POLICY) ? nodemask : NULL;
+	check_panic_on_oom(constraint, gfp_mask, order, mpol_mask, NULL);
 
 	if (sysctl_oom_kill_allocating_task && current->mm &&
-	    !oom_unkillable_task(current, NULL, oc->nodemask) &&
+	    !oom_unkillable_task(current, NULL, nodemask) &&
 	    current->signal->oom_score_adj != OOM_SCORE_ADJ_MIN) {
 		get_task_struct(current);
-		oom_kill_process(oc, current, 0, totalpages, NULL,
+		oom_kill_process(current, gfp_mask, order, 0, totalpages, NULL,
+				 nodemask,
 				 "Out of memory (oom_kill_allocating_task)");
-		return true;
+		goto out;
 	}
 
-	p = select_bad_process(oc, &points, totalpages);
+	p = select_bad_process(&points, totalpages, mpol_mask, force_kill);
 	/* Found nothing?!?! Either we hang forever, or we panic. */
-	if (!p && oc->order != -1) {
-		dump_header(oc, NULL, NULL);
+	if (!p) {
+		dump_header(NULL, gfp_mask, order, NULL, mpol_mask);
 		panic("Out of memory and no killable processes...\n");
 	}
-	if (p && p != (void *)-1UL) {
-		oom_kill_process(oc, p, points, totalpages, NULL,
-				 "Out of memory");
-		/*
-		 * Give the killed process a good chance to exit before trying
-		 * to allocate memory again.
-		 */
-		schedule_timeout_killable(1);
+	if (p != (void *)-1UL) {
+		oom_kill_process(p, gfp_mask, order, points, totalpages, NULL,
+				 nodemask, "Out of memory");
+		killed = 1;
 	}
+out:
+	/*
+	 * Give the killed threads a good chance of exiting before trying to
+	 * allocate memory again.
+	 */
+	if (killed)
+		schedule_timeout_killable(1);
+
 	return true;
 }
 
@@ -711,20 +728,13 @@ bool out_of_memory(struct oom_control *oc)
  */
 void pagefault_out_of_memory(void)
 {
-	struct oom_control oc = {
-		.zonelist = NULL,
-		.nodemask = NULL,
-		.gfp_mask = 0,
-		.order = 0,
-	};
-
 	if (mem_cgroup_oom_synchronize(true))
 		return;
 
 	if (!mutex_trylock(&oom_lock))
 		return;
 
-	if (!out_of_memory(&oc)) {
+	if (!out_of_memory(NULL, 0, 0, NULL, false)) {
 		/*
 		 * There shouldn't be any user tasks runnable while the
 		 * OOM killer is disabled, so the current task has to

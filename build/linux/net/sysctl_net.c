@@ -94,14 +94,10 @@ __init int net_sysctl_init(void)
 		goto out;
 	ret = register_pernet_subsys(&sysctl_pernet_ops);
 	if (ret)
-		goto out1;
+		goto out;
 	register_sysctl_root(&net_sysctl_root);
 out:
 	return ret;
-out1:
-	unregister_sysctl_table(net_header);
-	net_header = NULL;
-	goto out;
 }
 
 struct ctl_table_header *register_net_sysctl(struct net *net,

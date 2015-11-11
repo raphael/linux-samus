@@ -86,11 +86,11 @@ static struct fb_ops omap_fb_ops = {
 	/* Note: to properly handle manual update displays, we wrap the
 	 * basic fbdev ops which write to the framebuffer
 	 */
-	.fb_read = drm_fb_helper_sys_read,
-	.fb_write = drm_fb_helper_sys_write,
-	.fb_fillrect = drm_fb_helper_sys_fillrect,
-	.fb_copyarea = drm_fb_helper_sys_copyarea,
-	.fb_imageblit = drm_fb_helper_sys_imageblit,
+	.fb_read = fb_sys_read,
+	.fb_write = fb_sys_write,
+	.fb_fillrect = sys_fillrect,
+	.fb_copyarea = sys_copyarea,
+	.fb_imageblit = sys_imageblit,
 
 	.fb_check_var = drm_fb_helper_check_var,
 	.fb_set_par = drm_fb_helper_set_par,
@@ -179,10 +179,10 @@ static int omap_fbdev_create(struct drm_fb_helper *helper,
 
 	mutex_lock(&dev->struct_mutex);
 
-	fbi = drm_fb_helper_alloc_fbi(helper);
-	if (IS_ERR(fbi)) {
+	fbi = framebuffer_alloc(0, dev->dev);
+	if (!fbi) {
 		dev_err(dev->dev, "failed to allocate fb info\n");
-		ret = PTR_ERR(fbi);
+		ret = -ENOMEM;
 		goto fail_unlock;
 	}
 
@@ -190,12 +190,19 @@ static int omap_fbdev_create(struct drm_fb_helper *helper,
 
 	fbdev->fb = fb;
 	helper->fb = fb;
+	helper->fbdev = fbi;
 
 	fbi->par = helper;
 	fbi->flags = FBINFO_DEFAULT;
 	fbi->fbops = &omap_fb_ops;
 
 	strcpy(fbi->fix.id, MODULE_NAME);
+
+	ret = fb_alloc_cmap(&fbi->cmap, 256, 0);
+	if (ret) {
+		ret = -ENOMEM;
+		goto fail_unlock;
+	}
 
 	drm_fb_helper_fill_fix(fbi, fb->pitches[0], fb->depth);
 	drm_fb_helper_fill_var(fbi, helper, sizes->fb_width, sizes->fb_height);
@@ -229,9 +236,8 @@ fail_unlock:
 fail:
 
 	if (ret) {
-
-		drm_fb_helper_release_fbi(helper);
-
+		if (fbi)
+			framebuffer_release(fbi);
 		if (fb) {
 			drm_framebuffer_unregister_private(fb);
 			drm_framebuffer_remove(fb);
@@ -306,11 +312,17 @@ void omap_fbdev_free(struct drm_device *dev)
 	struct omap_drm_private *priv = dev->dev_private;
 	struct drm_fb_helper *helper = priv->fbdev;
 	struct omap_fbdev *fbdev;
+	struct fb_info *fbi;
 
 	DBG();
 
-	drm_fb_helper_unregister_fbi(helper);
-	drm_fb_helper_release_fbi(helper);
+	fbi = helper->fbdev;
+
+	/* only cleanup framebuffer if it is present */
+	if (fbi) {
+		unregister_framebuffer(fbi);
+		framebuffer_release(fbi);
+	}
 
 	drm_fb_helper_fini(helper);
 

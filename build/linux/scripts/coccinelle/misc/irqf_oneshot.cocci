@@ -1,8 +1,5 @@
-/// Since commit 1c6c69525b40 ("genirq: Reject bogus threaded irq requests")
-/// threaded IRQs without a primary handler need to be requested with
-/// IRQF_ONESHOT, otherwise the request will fail.
-///
-/// So pass the IRQF_ONESHOT flag in this case.
+/// Make sure threaded IRQs without a primary handler are always request with
+/// IRQF_ONESHOT
 ///
 //
 // Confidence: Good

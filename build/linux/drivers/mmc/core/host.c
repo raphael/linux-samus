@@ -398,7 +398,7 @@ int mmc_of_parse(struct mmc_host *host)
 {
 	struct device_node *np;
 	u32 bus_width;
-	int ret;
+	int len, ret;
 	bool cd_cap_invert, cd_gpio_invert = false;
 	bool ro_cap_invert, ro_gpio_invert = false;
 
@@ -445,12 +445,12 @@ int mmc_of_parse(struct mmc_host *host)
 	 */
 
 	/* Parse Card Detection */
-	if (of_property_read_bool(np, "non-removable")) {
+	if (of_find_property(np, "non-removable", &len)) {
 		host->caps |= MMC_CAP_NONREMOVABLE;
 	} else {
 		cd_cap_invert = of_property_read_bool(np, "cd-inverted");
 
-		if (of_property_read_bool(np, "broken-cd"))
+		if (of_find_property(np, "broken-cd", &len))
 			host->caps |= MMC_CAP_NEEDS_POLL;
 
 		ret = mmc_gpiod_request_cd(host, "cd", 0, true,
@@ -491,41 +491,41 @@ int mmc_of_parse(struct mmc_host *host)
 	if (ro_cap_invert ^ ro_gpio_invert)
 		host->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
 
-	if (of_property_read_bool(np, "cap-sd-highspeed"))
+	if (of_find_property(np, "cap-sd-highspeed", &len))
 		host->caps |= MMC_CAP_SD_HIGHSPEED;
-	if (of_property_read_bool(np, "cap-mmc-highspeed"))
+	if (of_find_property(np, "cap-mmc-highspeed", &len))
 		host->caps |= MMC_CAP_MMC_HIGHSPEED;
-	if (of_property_read_bool(np, "sd-uhs-sdr12"))
+	if (of_find_property(np, "sd-uhs-sdr12", &len))
 		host->caps |= MMC_CAP_UHS_SDR12;
-	if (of_property_read_bool(np, "sd-uhs-sdr25"))
+	if (of_find_property(np, "sd-uhs-sdr25", &len))
 		host->caps |= MMC_CAP_UHS_SDR25;
-	if (of_property_read_bool(np, "sd-uhs-sdr50"))
+	if (of_find_property(np, "sd-uhs-sdr50", &len))
 		host->caps |= MMC_CAP_UHS_SDR50;
-	if (of_property_read_bool(np, "sd-uhs-sdr104"))
+	if (of_find_property(np, "sd-uhs-sdr104", &len))
 		host->caps |= MMC_CAP_UHS_SDR104;
-	if (of_property_read_bool(np, "sd-uhs-ddr50"))
+	if (of_find_property(np, "sd-uhs-ddr50", &len))
 		host->caps |= MMC_CAP_UHS_DDR50;
-	if (of_property_read_bool(np, "cap-power-off-card"))
+	if (of_find_property(np, "cap-power-off-card", &len))
 		host->caps |= MMC_CAP_POWER_OFF_CARD;
-	if (of_property_read_bool(np, "cap-sdio-irq"))
+	if (of_find_property(np, "cap-sdio-irq", &len))
 		host->caps |= MMC_CAP_SDIO_IRQ;
-	if (of_property_read_bool(np, "full-pwr-cycle"))
+	if (of_find_property(np, "full-pwr-cycle", &len))
 		host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
-	if (of_property_read_bool(np, "keep-power-in-suspend"))
+	if (of_find_property(np, "keep-power-in-suspend", &len))
 		host->pm_caps |= MMC_PM_KEEP_POWER;
-	if (of_property_read_bool(np, "enable-sdio-wakeup"))
+	if (of_find_property(np, "enable-sdio-wakeup", &len))
 		host->pm_caps |= MMC_PM_WAKE_SDIO_IRQ;
-	if (of_property_read_bool(np, "mmc-ddr-1_8v"))
+	if (of_find_property(np, "mmc-ddr-1_8v", &len))
 		host->caps |= MMC_CAP_1_8V_DDR;
-	if (of_property_read_bool(np, "mmc-ddr-1_2v"))
+	if (of_find_property(np, "mmc-ddr-1_2v", &len))
 		host->caps |= MMC_CAP_1_2V_DDR;
-	if (of_property_read_bool(np, "mmc-hs200-1_8v"))
+	if (of_find_property(np, "mmc-hs200-1_8v", &len))
 		host->caps2 |= MMC_CAP2_HS200_1_8V_SDR;
-	if (of_property_read_bool(np, "mmc-hs200-1_2v"))
+	if (of_find_property(np, "mmc-hs200-1_2v", &len))
 		host->caps2 |= MMC_CAP2_HS200_1_2V_SDR;
-	if (of_property_read_bool(np, "mmc-hs400-1_8v"))
+	if (of_find_property(np, "mmc-hs400-1_8v", &len))
 		host->caps2 |= MMC_CAP2_HS400_1_8V | MMC_CAP2_HS200_1_8V_SDR;
-	if (of_property_read_bool(np, "mmc-hs400-1_2v"))
+	if (of_find_property(np, "mmc-hs400-1_2v", &len))
 		host->caps2 |= MMC_CAP2_HS400_1_2V | MMC_CAP2_HS200_1_2V_SDR;
 
 	host->dsr_req = !of_property_read_u32(np, "dsr", &host->dsr);

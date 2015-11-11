@@ -223,7 +223,7 @@ int diag_ftp_startup(void)
 	if (rc)
 		return rc;
 
-	irq_subclass_register(IRQ_SUBCLASS_SERVICE_SIGNAL);
+	ctl_set_bit(0, 63 - 22);
 	return 0;
 }
 
@@ -232,6 +232,6 @@ int diag_ftp_startup(void)
  */
 void diag_ftp_shutdown(void)
 {
-	irq_subclass_unregister(IRQ_SUBCLASS_SERVICE_SIGNAL);
+	ctl_clear_bit(0, 63 - 22);
 	unregister_external_irq(EXT_IRQ_CP_SERVICE, diag_ftp_handler);
 }

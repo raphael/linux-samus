@@ -128,7 +128,7 @@ struct msm_otg_platform_data {
  */
 struct msm_usb_cable {
 	struct notifier_block		nb;
-	struct extcon_dev		*extcon;
+	struct extcon_specific_cable_nb conn;
 };
 
 /**
@@ -155,10 +155,6 @@ struct msm_usb_cable {
  *	starting controller using usbcmd run/stop bit.
  * @vbus: VBUS signal state trakining, using extcon framework
  * @id: ID signal state trakining, using extcon framework
- * @switch_gpio: Descriptor for GPIO used to control external Dual
- *               SPDT USB Switch.
- * @reboot: Used to inform the driver to route USB D+/D- line to Device
- *	    connector
  */
 struct msm_otg {
 	struct usb_phy phy;
@@ -192,9 +188,6 @@ struct msm_otg {
 
 	struct msm_usb_cable vbus;
 	struct msm_usb_cable id;
-
-	struct gpio_desc *switch_gpio;
-	struct notifier_block reboot;
 };
 
 #endif

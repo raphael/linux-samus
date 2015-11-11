@@ -51,8 +51,8 @@ static int init_hw(struct echoaudio *chip, u16 device_id, u16 subdevice_id)
 
 	chip->device_id = device_id;
 	chip->subdevice_id = subdevice_id;
-	chip->bad_board = true;
-	chip->has_midi = true;
+	chip->bad_board = TRUE;
+	chip->has_midi = TRUE;
 	chip->dsp_code_to_load = FW_LAYLA20_DSP;
 	chip->input_clock_types =
 		ECHO_CLOCK_BIT_INTERNAL | ECHO_CLOCK_BIT_SPDIF |
@@ -62,7 +62,7 @@ static int init_hw(struct echoaudio *chip, u16 device_id, u16 subdevice_id)
 
 	if ((err = load_firmware(chip)) < 0)
 		return err;
-	chip->bad_board = false;
+	chip->bad_board = FALSE;
 
 	return err;
 }
@@ -71,7 +71,7 @@ static int init_hw(struct echoaudio *chip, u16 device_id, u16 subdevice_id)
 
 static int set_mixer_defaults(struct echoaudio *chip)
 {
-	chip->professional_spdif = false;
+	chip->professional_spdif = FALSE;
 	return init_line_levels(chip);
 }
 
@@ -113,7 +113,7 @@ static int check_asic_status(struct echoaudio *chip)
 	u32 asic_status;
 	int goodcnt, i;
 
-	chip->asic_loaded = false;
+	chip->asic_loaded = FALSE;
 	for (i = goodcnt = 0; i < 5; i++) {
 		send_vector(chip, DSP_VC_TEST_ASIC);
 
@@ -127,7 +127,7 @@ static int check_asic_status(struct echoaudio *chip)
 
 		if (asic_status == ASIC_ALREADY_LOADED) {
 			if (++goodcnt == 3) {
-				chip->asic_loaded = true;
+				chip->asic_loaded = TRUE;
 				return 0;
 			}
 		}

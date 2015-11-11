@@ -64,7 +64,7 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
 	signal_setup_done(err, ksig, singlestep);
 }
 
-void do_signal(struct pt_regs *regs)
+static int kern_do_signal(struct pt_regs *regs)
 {
 	struct ksignal ksig;
 	int handled_sig = 0;
@@ -110,4 +110,10 @@ void do_signal(struct pt_regs *regs)
 	 */
 	if (!handled_sig)
 		restore_saved_sigmask();
+	return handled_sig;
+}
+
+int do_signal(void)
+{
+	return kern_do_signal(&current->thread.regs);
 }

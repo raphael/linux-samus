@@ -53,6 +53,7 @@
 #include "samsung.h"
 
 #if	defined(CONFIG_SERIAL_SAMSUNG_DEBUG) &&	\
+	defined(CONFIG_DEBUG_LL) &&		\
 	!defined(MODULE)
 
 extern void printascii(const char *);

@@ -624,22 +624,6 @@ static struct pinctrl_desc tegra_pinctrl_desc = {
 	.owner = THIS_MODULE,
 };
 
-static bool gpio_node_has_range(void)
-{
-	struct device_node *np;
-	bool has_prop = false;
-
-	np = of_find_compatible_node(NULL, NULL, "nvidia,tegra30-gpio");
-	if (!np)
-		return has_prop;
-
-	has_prop = of_find_property(np, "gpio-ranges", NULL);
-
-	of_node_put(np);
-
-	return has_prop;
-}
-
 int tegra_pinctrl_probe(struct platform_device *pdev,
 			const struct tegra_pinctrl_soc_data *soc_data)
 {
@@ -724,8 +708,7 @@ int tegra_pinctrl_probe(struct platform_device *pdev,
 		return PTR_ERR(pmx->pctl);
 	}
 
-	if (!gpio_node_has_range())
-		pinctrl_add_gpio_range(pmx->pctl, &tegra_pinctrl_gpio_range);
+	pinctrl_add_gpio_range(pmx->pctl, &tegra_pinctrl_gpio_range);
 
 	platform_set_drvdata(pdev, pmx);
 

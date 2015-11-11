@@ -22,19 +22,17 @@
 
 /**
  * handle_bad_irq - handle spurious and unhandled irqs
+ * @irq:       the interrupt number
  * @desc:      description of the interrupt
  *
  * Handles spurious and unhandled IRQ's. It also prints a debugmessage.
  */
-void handle_bad_irq(struct irq_desc *desc)
+void handle_bad_irq(unsigned int irq, struct irq_desc *desc)
 {
-	unsigned int irq = irq_desc_get_irq(desc);
-
 	print_irq_desc(irq, desc);
-	kstat_incr_irqs_this_cpu(desc);
+	kstat_incr_irqs_this_cpu(irq, desc);
 	ack_bad_irq(irq);
 }
-EXPORT_SYMBOL_GPL(handle_bad_irq);
 
 /*
  * Special, empty irq handler:
@@ -178,7 +176,7 @@ handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
 	add_interrupt_randomness(irq, flags);
 
 	if (!noirqdebug)
-		note_interrupt(desc, retval);
+		note_interrupt(irq, desc, retval);
 	return retval;
 }
 

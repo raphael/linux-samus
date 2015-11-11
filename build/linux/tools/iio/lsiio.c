@@ -20,6 +20,7 @@
 #include <sys/dir.h>
 #include "iio_utils.h"
 
+
 static enum verbosity {
 	VERBLEVEL_DEFAULT,	/* 0 gives lspci behaviour */
 	VERBLEVEL_SENSORS,	/* 1 lists sensors */
@@ -28,16 +29,17 @@ static enum verbosity {
 const char *type_device = "iio:device";
 const char *type_trigger = "trigger";
 
+
 static inline int check_prefix(const char *str, const char *prefix)
 {
 	return strlen(str) > strlen(prefix) &&
-	       strncmp(str, prefix, strlen(prefix)) == 0;
+		strncmp(str, prefix, strlen(prefix)) == 0;
 }
 
 static inline int check_postfix(const char *str, const char *postfix)
 {
 	return strlen(str) > strlen(postfix) &&
-	       strcmp(str + strlen(str) - strlen(postfix), postfix) == 0;
+		strcmp(str + strlen(str) - strlen(postfix), postfix) == 0;
 }
 
 static int dump_channels(const char *dev_dir_name)
@@ -46,13 +48,13 @@ static int dump_channels(const char *dev_dir_name)
 	const struct dirent *ent;
 
 	dp = opendir(dev_dir_name);
-	if (!dp)
+	if (dp == NULL)
 		return -errno;
-
-	while (ent = readdir(dp), ent)
+	while (ent = readdir(dp), ent != NULL)
 		if (check_prefix(ent->d_name, "in_") &&
-		    check_postfix(ent->d_name, "_raw"))
+		    check_postfix(ent->d_name, "_raw")) {
 			printf("   %-10s\n", ent->d_name);
+		}
 
 	return (closedir(dp) == -1) ? -errno : 0;
 }
@@ -61,22 +63,20 @@ static int dump_one_device(const char *dev_dir_name)
 {
 	char name[IIO_MAX_NAME_LENGTH];
 	int dev_idx;
-	int ret;
+	int retval;
 
-	ret = sscanf(dev_dir_name + strlen(iio_dir) + strlen(type_device), "%i",
-		     &dev_idx);
-	if (ret != 1)
+	retval = sscanf(dev_dir_name + strlen(iio_dir) + strlen(type_device),
+			"%i", &dev_idx);
+	if (retval != 1)
 		return -EINVAL;
-
-	ret = read_sysfs_string("name", dev_dir_name, name);
-	if (ret < 0)
-		return ret;
+	retval = read_sysfs_string("name", dev_dir_name, name);
+	if (retval)
+		return retval;
 
 	printf("Device %03d: %s\n", dev_idx, name);
 
 	if (verblevel >= VERBLEVEL_SENSORS)
 		return dump_channels(dev_dir_name);
-
 	return 0;
 }
 
@@ -84,19 +84,17 @@ static int dump_one_trigger(const char *dev_dir_name)
 {
 	char name[IIO_MAX_NAME_LENGTH];
 	int dev_idx;
-	int ret;
+	int retval;
 
-	ret = sscanf(dev_dir_name + strlen(iio_dir) + strlen(type_trigger),
-		     "%i", &dev_idx);
-	if (ret != 1)
+	retval = sscanf(dev_dir_name + strlen(iio_dir) + strlen(type_trigger),
+			"%i", &dev_idx);
+	if (retval != 1)
 		return -EINVAL;
-
-	ret = read_sysfs_string("name", dev_dir_name, name);
-	if (ret < 0)
-		return ret;
+	retval = read_sysfs_string("name", dev_dir_name, name);
+	if (retval)
+		return retval;
 
 	printf("Trigger %03d: %s\n", dev_idx, name);
-
 	return 0;
 }
 
@@ -107,12 +105,12 @@ static int dump_devices(void)
 	DIR *dp;
 
 	dp = opendir(iio_dir);
-	if (!dp) {
-		fprintf(stderr, "No industrial I/O devices available\n");
+	if (dp == NULL) {
+		printf("No industrial I/O devices available\n");
 		return -ENODEV;
 	}
 
-	while (ent = readdir(dp), ent) {
+	while (ent = readdir(dp), ent != NULL) {
 		if (check_prefix(ent->d_name, type_device)) {
 			char *dev_dir_name;
 
@@ -134,7 +132,7 @@ static int dump_devices(void)
 		}
 	}
 	rewinddir(dp);
-	while (ent = readdir(dp), ent) {
+	while (ent = readdir(dp), ent != NULL) {
 		if (check_prefix(ent->d_name, type_trigger)) {
 			char *dev_dir_name;
 
@@ -153,7 +151,6 @@ static int dump_devices(void)
 			free(dev_dir_name);
 		}
 	}
-
 	return (closedir(dp) == -1) ? -errno : 0;
 
 error_close_dir:

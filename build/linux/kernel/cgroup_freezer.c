@@ -203,7 +203,7 @@ static void freezer_attach(struct cgroup_subsys_state *new_css,
  * to do anything as freezer_attach() will put @task into the appropriate
  * state.
  */
-static void freezer_fork(struct task_struct *task, void *private)
+static void freezer_fork(struct task_struct *task)
 {
 	struct freezer *freezer;
 

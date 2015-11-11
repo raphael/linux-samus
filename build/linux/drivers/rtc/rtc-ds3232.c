@@ -443,7 +443,7 @@ static int ds3232_remove(struct i2c_client *client)
 {
 	struct ds3232 *ds3232 = i2c_get_clientdata(client);
 
-	if (client->irq > 0) {
+	if (client->irq >= 0) {
 		mutex_lock(&ds3232->mutex);
 		ds3232->exiting = 1;
 		mutex_unlock(&ds3232->mutex);
@@ -463,10 +463,7 @@ static int ds3232_suspend(struct device *dev)
 
 	if (device_can_wakeup(dev)) {
 		ds3232->suspended = true;
-		if (irq_set_irq_wake(client->irq, 1)) {
-			dev_warn_once(dev, "Cannot set wakeup source\n");
-			ds3232->suspended = false;
-		}
+		irq_set_irq_wake(client->irq, 1);
 	}
 
 	return 0;
@@ -503,6 +500,7 @@ MODULE_DEVICE_TABLE(i2c, ds3232_id);
 static struct i2c_driver ds3232_driver = {
 	.driver = {
 		.name = "rtc-ds3232",
+		.owner = THIS_MODULE,
 		.pm	= &ds3232_pm_ops,
 	},
 	.probe = ds3232_probe,

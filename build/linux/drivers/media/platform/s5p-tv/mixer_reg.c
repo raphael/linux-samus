@@ -357,15 +357,17 @@ void mxr_reg_streamoff(struct mxr_device *mdev)
 
 int mxr_reg_wait4vsync(struct mxr_device *mdev)
 {
-	long time_left;
+	int ret;
 
 	clear_bit(MXR_EVENT_VSYNC, &mdev->event_flags);
 	/* TODO: consider adding interruptible */
-	time_left = wait_event_timeout(mdev->event_queue,
-			test_bit(MXR_EVENT_VSYNC, &mdev->event_flags),
-				 msecs_to_jiffies(1000));
-	if (time_left > 0)
+	ret = wait_event_timeout(mdev->event_queue,
+		test_bit(MXR_EVENT_VSYNC, &mdev->event_flags),
+		msecs_to_jiffies(1000));
+	if (ret > 0)
 		return 0;
+	if (ret < 0)
+		return ret;
 	mxr_warn(mdev, "no vsync detected - timeout\n");
 	return -ETIME;
 }

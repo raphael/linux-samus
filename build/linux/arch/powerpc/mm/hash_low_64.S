@@ -701,7 +701,7 @@ htab_pte_insert_failure:
 
 #endif /* CONFIG_PPC_64K_PAGES */
 
-#ifdef CONFIG_PPC_64K_PAGES
+#ifdef CONFIG_PPC_HAS_HASH_64K
 
 /*****************************************************************************
  *                                                                           *
@@ -993,7 +993,7 @@ ht64_pte_insert_failure:
 	b	ht64_bail
 
 
-#endif /* CONFIG_PPC_64K_PAGES */
+#endif /* CONFIG_PPC_HAS_HASH_64K */
 
 
 /*****************************************************************************

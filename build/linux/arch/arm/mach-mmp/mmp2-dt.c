@@ -30,7 +30,7 @@ static void __init mmp_init_time(void)
 	of_clk_init(NULL);
 }
 
-static const char *const mmp2_dt_board_compat[] __initconst = {
+static const char *mmp2_dt_board_compat[] __initdata = {
 	"mrvl,mmp2-brownstone",
 	NULL,
 };

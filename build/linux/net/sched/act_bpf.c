@@ -37,24 +37,25 @@ static int tcf_bpf(struct sk_buff *skb, const struct tc_action *act,
 		   struct tcf_result *res)
 {
 	struct tcf_bpf *prog = act->priv;
-	struct bpf_prog *filter;
 	int action, filter_res;
 	bool at_ingress = G_TC_AT(skb->tc_verd) & AT_INGRESS;
 
 	if (unlikely(!skb_mac_header_was_set(skb)))
 		return TC_ACT_UNSPEC;
 
-	tcf_lastuse_update(&prog->tcf_tm);
-	bstats_cpu_update(this_cpu_ptr(prog->common.cpu_bstats), skb);
+	spin_lock(&prog->tcf_lock);
 
+	prog->tcf_tm.lastuse = jiffies;
+	bstats_update(&prog->tcf_bstats, skb);
+
+	/* Needed here for accessing maps. */
 	rcu_read_lock();
-	filter = rcu_dereference(prog->filter);
 	if (at_ingress) {
 		__skb_push(skb, skb->mac_len);
-		filter_res = BPF_PROG_RUN(filter, skb);
+		filter_res = BPF_PROG_RUN(prog->filter, skb);
 		__skb_pull(skb, skb->mac_len);
 	} else {
-		filter_res = BPF_PROG_RUN(filter, skb);
+		filter_res = BPF_PROG_RUN(prog->filter, skb);
 	}
 	rcu_read_unlock();
 
@@ -76,7 +77,7 @@ static int tcf_bpf(struct sk_buff *skb, const struct tc_action *act,
 		break;
 	case TC_ACT_SHOT:
 		action = filter_res;
-		qstats_drop_inc(this_cpu_ptr(prog->common.cpu_qstats));
+		prog->tcf_qstats.drops++;
 		break;
 	case TC_ACT_UNSPEC:
 		action = prog->tcf_action;
@@ -86,6 +87,7 @@ static int tcf_bpf(struct sk_buff *skb, const struct tc_action *act,
 		break;
 	}
 
+	spin_unlock(&prog->tcf_lock);
 	return action;
 }
 
@@ -261,10 +263,7 @@ static void tcf_bpf_prog_fill_cfg(const struct tcf_bpf *prog,
 				  struct tcf_bpf_cfg *cfg)
 {
 	cfg->is_ebpf = tcf_bpf_is_ebpf(prog);
-	/* updates to prog->filter are prevented, since it's called either
-	 * with rtnl lock or during final cleanup in rcu callback
-	 */
-	cfg->filter = rcu_dereference_protected(prog->filter, 1);
+	cfg->filter = prog->filter;
 
 	cfg->bpf_ops = prog->bpf_ops;
 	cfg->bpf_name = prog->bpf_name;
@@ -279,7 +278,7 @@ static int tcf_bpf_init(struct net *net, struct nlattr *nla,
 	struct tc_act_bpf *parm;
 	struct tcf_bpf *prog;
 	bool is_bpf, is_ebpf;
-	int ret, res = 0;
+	int ret;
 
 	if (!nla)
 		return -EINVAL;
@@ -288,47 +287,45 @@ static int tcf_bpf_init(struct net *net, struct nlattr *nla,
 	if (ret < 0)
 		return ret;
 
-	if (!tb[TCA_ACT_BPF_PARMS])
-		return -EINVAL;
-
-	parm = nla_data(tb[TCA_ACT_BPF_PARMS]);
-
-	if (!tcf_hash_check(parm->index, act, bind)) {
-		ret = tcf_hash_create(parm->index, est, act,
-				      sizeof(*prog), bind, true);
-		if (ret < 0)
-			return ret;
-
-		res = ACT_P_CREATED;
-	} else {
-		/* Don't override defaults. */
-		if (bind)
-			return 0;
-
-		tcf_hash_release(act, bind);
-		if (!replace)
-			return -EEXIST;
-	}
-
 	is_bpf = tb[TCA_ACT_BPF_OPS_LEN] && tb[TCA_ACT_BPF_OPS];
 	is_ebpf = tb[TCA_ACT_BPF_FD];
 
-	if ((!is_bpf && !is_ebpf) || (is_bpf && is_ebpf)) {
-		ret = -EINVAL;
-		goto out;
-	}
+	if ((!is_bpf && !is_ebpf) || (is_bpf && is_ebpf) ||
+	    !tb[TCA_ACT_BPF_PARMS])
+		return -EINVAL;
+
+	parm = nla_data(tb[TCA_ACT_BPF_PARMS]);
 
 	memset(&cfg, 0, sizeof(cfg));
 
 	ret = is_bpf ? tcf_bpf_init_from_ops(tb, &cfg) :
 		       tcf_bpf_init_from_efd(tb, &cfg);
 	if (ret < 0)
-		goto out;
+		return ret;
+
+	if (!tcf_hash_check(parm->index, act, bind)) {
+		ret = tcf_hash_create(parm->index, est, act,
+				      sizeof(*prog), bind);
+		if (ret < 0)
+			goto destroy_fp;
+
+		ret = ACT_P_CREATED;
+	} else {
+		/* Don't override defaults. */
+		if (bind)
+			goto destroy_fp;
+
+		tcf_hash_release(act, bind);
+		if (!replace) {
+			ret = -EEXIST;
+			goto destroy_fp;
+		}
+	}
 
 	prog = to_bpf(act);
-	ASSERT_RTNL();
+	spin_lock_bh(&prog->tcf_lock);
 
-	if (res != ACT_P_CREATED)
+	if (ret != ACT_P_CREATED)
 		tcf_bpf_prog_fill_cfg(prog, &old);
 
 	prog->bpf_ops = cfg.bpf_ops;
@@ -340,21 +337,19 @@ static int tcf_bpf_init(struct net *net, struct nlattr *nla,
 		prog->bpf_fd = cfg.bpf_fd;
 
 	prog->tcf_action = parm->action;
-	rcu_assign_pointer(prog->filter, cfg.filter);
+	prog->filter = cfg.filter;
 
-	if (res == ACT_P_CREATED) {
+	spin_unlock_bh(&prog->tcf_lock);
+
+	if (ret == ACT_P_CREATED)
 		tcf_hash_insert(act);
-	} else {
-		/* make sure the program being replaced is no longer executing */
-		synchronize_rcu();
+	else
 		tcf_bpf_cfg_cleanup(&old);
-	}
 
-	return res;
-out:
-	if (res == ACT_P_CREATED)
-		tcf_hash_cleanup(act, est);
+	return ret;
 
+destroy_fp:
+	tcf_bpf_cfg_cleanup(&cfg);
 	return ret;
 }
 

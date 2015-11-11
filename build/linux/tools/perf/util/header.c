@@ -923,13 +923,17 @@ static void print_cmdline(struct perf_header *ph, int fd __maybe_unused,
 			  FILE *fp)
 {
 	int nr, i;
+	char *str;
 
 	nr = ph->env.nr_cmdline;
+	str = ph->env.cmdline;
 
 	fprintf(fp, "# cmdline : ");
 
-	for (i = 0; i < nr; i++)
-		fprintf(fp, "%s ", ph->env.cmdline_argv[i]);
+	for (i = 0; i < nr; i++) {
+		fprintf(fp, "%s ", str);
+		str += strlen(str) + 1;
+	}
 	fputc('\n', fp);
 }
 
@@ -1537,13 +1541,14 @@ process_event_desc(struct perf_file_section *section __maybe_unused,
 	return 0;
 }
 
-static int process_cmdline(struct perf_file_section *section,
+static int process_cmdline(struct perf_file_section *section __maybe_unused,
 			   struct perf_header *ph, int fd,
 			   void *data __maybe_unused)
 {
 	ssize_t ret;
-	char *str, *cmdline = NULL, **argv = NULL;
-	u32 nr, i, len = 0;
+	char *str;
+	u32 nr, i;
+	struct strbuf sb;
 
 	ret = readn(fd, &nr, sizeof(nr));
 	if (ret != sizeof(nr))
@@ -1553,32 +1558,22 @@ static int process_cmdline(struct perf_file_section *section,
 		nr = bswap_32(nr);
 
 	ph->env.nr_cmdline = nr;
-
-	cmdline = zalloc(section->size + nr + 1);
-	if (!cmdline)
-		return -1;
-
-	argv = zalloc(sizeof(char *) * (nr + 1));
-	if (!argv)
-		goto error;
+	strbuf_init(&sb, 128);
 
 	for (i = 0; i < nr; i++) {
 		str = do_read_string(fd, ph);
 		if (!str)
 			goto error;
 
-		argv[i] = cmdline + len;
-		memcpy(argv[i], str, strlen(str) + 1);
-		len += strlen(str) + 1;
+		/* include a NULL character at the end */
+		strbuf_add(&sb, str, strlen(str) + 1);
 		free(str);
 	}
-	ph->env.cmdline = cmdline;
-	ph->env.cmdline_argv = (const char **) argv;
+	ph->env.cmdline = strbuf_detach(&sb, NULL);
 	return 0;
 
 error:
-	free(argv);
-	free(cmdline);
+	strbuf_release(&sb);
 	return -1;
 }
 
@@ -2514,7 +2509,6 @@ int perf_session__read_header(struct perf_session *session)
 	if (session->evlist == NULL)
 		return -ENOMEM;
 
-	session->evlist->env = &header->env;
 	if (perf_data_file__is_pipe(file))
 		return perf_header__read_pipe(session);
 

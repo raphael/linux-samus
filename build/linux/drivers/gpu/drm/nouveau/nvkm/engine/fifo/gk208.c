@@ -22,25 +22,15 @@
  * Authors: Ben Skeggs
  */
 #include "gk104.h"
-#include "changk104.h"
 
-static const struct nvkm_fifo_func
-gk208_fifo = {
-	.dtor = gk104_fifo_dtor,
-	.oneinit = gk104_fifo_oneinit,
-	.init = gk104_fifo_init,
-	.fini = gk104_fifo_fini,
-	.intr = gk104_fifo_intr,
-	.uevent_init = gk104_fifo_uevent_init,
-	.uevent_fini = gk104_fifo_uevent_fini,
-	.chan = {
-		&gk104_fifo_gpfifo_oclass,
-		NULL
+struct nvkm_oclass *
+gk208_fifo_oclass = &(struct gk104_fifo_impl) {
+	.base.handle = NV_ENGINE(FIFO, 0x08),
+	.base.ofuncs = &(struct nvkm_ofuncs) {
+		.ctor = gk104_fifo_ctor,
+		.dtor = gk104_fifo_dtor,
+		.init = gk104_fifo_init,
+		.fini = _nvkm_fifo_fini,
 	},
-};
-
-int
-gk208_fifo_new(struct nvkm_device *device, int index, struct nvkm_fifo **pfifo)
-{
-	return gk104_fifo_new_(&gk208_fifo, device, index, 1024, pfifo);
-}
+	.channels = 1024,
+}.base;

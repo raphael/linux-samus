@@ -45,7 +45,7 @@ static u32 src_to_ns(struct src_sel *s, u8 src, u32 ns)
 static u8 clk_rcg_get_parent(struct clk_hw *hw)
 {
 	struct clk_rcg *rcg = to_clk_rcg(hw);
-	int num_parents = clk_hw_get_num_parents(hw);
+	int num_parents = __clk_get_num_parents(hw->clk);
 	u32 ns;
 	int i, ret;
 
@@ -59,7 +59,7 @@ static u8 clk_rcg_get_parent(struct clk_hw *hw)
 
 err:
 	pr_debug("%s: Clock %s has invalid parent, using default.\n",
-		 __func__, clk_hw_get_name(hw));
+		 __func__, __clk_get_name(hw->clk));
 	return 0;
 }
 
@@ -72,7 +72,7 @@ static int reg_to_bank(struct clk_dyn_rcg *rcg, u32 bank)
 static u8 clk_dyn_rcg_get_parent(struct clk_hw *hw)
 {
 	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
-	int num_parents = clk_hw_get_num_parents(hw);
+	int num_parents = __clk_get_num_parents(hw->clk);
 	u32 ns, reg;
 	int bank;
 	int i, ret;
@@ -95,7 +95,7 @@ static u8 clk_dyn_rcg_get_parent(struct clk_hw *hw)
 
 err:
 	pr_debug("%s: Clock %s has invalid parent, using default.\n",
-		 __func__, clk_hw_get_name(hw));
+		 __func__, __clk_get_name(hw->clk));
 	return 0;
 }
 
@@ -404,12 +404,14 @@ clk_dyn_rcg_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 	return calc_rate(parent_rate, m, n, mode, pre_div);
 }
 
-static int _freq_tbl_determine_rate(struct clk_hw *hw, const struct freq_tbl *f,
-		struct clk_rate_request *req,
+static long _freq_tbl_determine_rate(struct clk_hw *hw,
+		const struct freq_tbl *f, unsigned long rate,
+		unsigned long min_rate, unsigned long max_rate,
+		unsigned long *p_rate, struct clk_hw **p_hw,
 		const struct parent_map *parent_map)
 {
-	unsigned long clk_flags, rate = req->rate;
-	struct clk_hw *p;
+	unsigned long clk_flags;
+	struct clk *p;
 	int index;
 
 	f = qcom_find_freq(f, rate);
@@ -420,8 +422,8 @@ static int _freq_tbl_determine_rate(struct clk_hw *hw, const struct freq_tbl *f,
 	if (index < 0)
 		return index;
 
-	clk_flags = clk_hw_get_flags(hw);
-	p = clk_hw_get_parent_by_index(hw, index);
+	clk_flags = __clk_get_flags(hw->clk);
+	p = clk_get_parent_by_index(hw->clk, index);
 	if (clk_flags & CLK_SET_RATE_PARENT) {
 		rate = rate * f->pre_div;
 		if (f->n) {
@@ -431,26 +433,27 @@ static int _freq_tbl_determine_rate(struct clk_hw *hw, const struct freq_tbl *f,
 			rate = tmp;
 		}
 	} else {
-		rate =  clk_hw_get_rate(p);
+		rate =  __clk_get_rate(p);
 	}
-	req->best_parent_hw = p;
-	req->best_parent_rate = rate;
-	req->rate = f->freq;
+	*p_hw = __clk_get_hw(p);
+	*p_rate = rate;
 
-	return 0;
+	return f->freq;
 }
 
-static int clk_rcg_determine_rate(struct clk_hw *hw,
-				  struct clk_rate_request *req)
+static long clk_rcg_determine_rate(struct clk_hw *hw, unsigned long rate,
+		unsigned long min_rate, unsigned long max_rate,
+		unsigned long *p_rate, struct clk_hw **p)
 {
 	struct clk_rcg *rcg = to_clk_rcg(hw);
 
-	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, req,
-					rcg->s.parent_map);
+	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, min_rate,
+			max_rate, p_rate, p, rcg->s.parent_map);
 }
 
-static int clk_dyn_rcg_determine_rate(struct clk_hw *hw,
-				      struct clk_rate_request *req)
+static long clk_dyn_rcg_determine_rate(struct clk_hw *hw, unsigned long rate,
+		unsigned long min_rate, unsigned long max_rate,
+		unsigned long *p_rate, struct clk_hw **p)
 {
 	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
 	u32 reg;
@@ -461,22 +464,24 @@ static int clk_dyn_rcg_determine_rate(struct clk_hw *hw,
 	bank = reg_to_bank(rcg, reg);
 	s = &rcg->s[bank];
 
-	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, req, s->parent_map);
+	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, min_rate,
+			max_rate, p_rate, p, s->parent_map);
 }
 
-static int clk_rcg_bypass_determine_rate(struct clk_hw *hw,
-					 struct clk_rate_request *req)
+static long clk_rcg_bypass_determine_rate(struct clk_hw *hw, unsigned long rate,
+		unsigned long min_rate, unsigned long max_rate,
+		unsigned long *p_rate, struct clk_hw **p_hw)
 {
 	struct clk_rcg *rcg = to_clk_rcg(hw);
 	const struct freq_tbl *f = rcg->freq_tbl;
-	struct clk_hw *p;
+	struct clk *p;
 	int index = qcom_find_src_index(hw, rcg->s.parent_map, f->src);
 
-	req->best_parent_hw = p = clk_hw_get_parent_by_index(hw, index);
-	req->best_parent_rate = clk_hw_round_rate(p, req->rate);
-	req->rate = req->best_parent_rate;
+	p = clk_get_parent_by_index(hw->clk, index);
+	*p_hw = __clk_get_hw(p);
+	*p_rate = __clk_round_rate(p, rate);
 
-	return 0;
+	return *p_rate;
 }
 
 static int __clk_rcg_set_rate(struct clk_rcg *rcg, const struct freq_tbl *f)

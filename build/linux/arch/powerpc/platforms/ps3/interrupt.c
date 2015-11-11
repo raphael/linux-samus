@@ -678,8 +678,7 @@ static int ps3_host_map(struct irq_domain *h, unsigned int virq,
 	return 0;
 }
 
-static int ps3_host_match(struct irq_domain *h, struct device_node *np,
-			  enum irq_domain_bus_token bus_token)
+static int ps3_host_match(struct irq_domain *h, struct device_node *np)
 {
 	/* Match all */
 	return 1;

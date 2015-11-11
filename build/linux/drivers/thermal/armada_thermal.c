@@ -155,7 +155,7 @@ static bool armada_is_valid(struct armada_thermal_priv *priv)
 }
 
 static int armada_get_temp(struct thermal_zone_device *thermal,
-			  int *temp)
+			  unsigned long *temp)
 {
 	struct armada_thermal_priv *priv = thermal->devdata;
 	unsigned long reg;

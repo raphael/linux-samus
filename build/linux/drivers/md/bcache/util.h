@@ -4,7 +4,6 @@
 
 #include <linux/blkdev.h>
 #include <linux/errno.h>
-#include <linux/blkdev.h>
 #include <linux/kernel.h>
 #include <linux/llist.h>
 #include <linux/ratelimit.h>
@@ -571,10 +570,10 @@ static inline sector_t bdev_sectors(struct block_device *bdev)
 	return bdev->bd_inode->i_size >> 9;
 }
 
-#define closure_bio_submit(bio, cl)					\
+#define closure_bio_submit(bio, cl, dev)				\
 do {									\
 	closure_get(cl);						\
-	generic_make_request(bio);					\
+	bch_generic_make_request(bio, &(dev)->bio_split_hook);		\
 } while (0)
 
 uint64_t bch_crc64_update(uint64_t, const void *, size_t);

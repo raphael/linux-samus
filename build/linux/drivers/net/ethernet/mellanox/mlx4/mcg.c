@@ -1184,11 +1184,10 @@ out:
 	if (prot == MLX4_PROT_ETH) {
 		/* manage the steering entry for promisc mode */
 		if (new_entry)
-			err = new_steering_entry(dev, port, steer,
-						 index, qp->qpn);
+			new_steering_entry(dev, port, steer, index, qp->qpn);
 		else
-			err = existing_steering_entry(dev, port, steer,
-						      index, qp->qpn);
+			existing_steering_entry(dev, port, steer,
+						index, qp->qpn);
 	}
 	if (err && link && index != -1) {
 		if (index < dev->caps.num_mgms)

@@ -9,7 +9,7 @@
  * Software is furnished to do so, subject to the following conditions:
  *
  * The above copyright notice and this permission notice shall be included in
- * all copies or substantial busions of the Software.
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -21,7 +21,7 @@
  *
  * Authors: Ben Skeggs
  */
-#include "bus.h"
+#include "priv.h"
 
 #ifdef CONFIG_NOUVEAU_I2C_INTERNAL
 #define T_TIMEOUT  2200000
@@ -29,188 +29,205 @@
 #define T_HOLD     5000
 
 static inline void
-nvkm_i2c_drive_scl(struct nvkm_i2c_bus *bus, int state)
+i2c_drive_scl(struct nvkm_i2c_port *port, int state)
 {
-	bus->func->drive_scl(bus, state);
+	port->func->drive_scl(port, state);
 }
 
 static inline void
-nvkm_i2c_drive_sda(struct nvkm_i2c_bus *bus, int state)
+i2c_drive_sda(struct nvkm_i2c_port *port, int state)
 {
-	bus->func->drive_sda(bus, state);
+	port->func->drive_sda(port, state);
 }
 
 static inline int
-nvkm_i2c_sense_scl(struct nvkm_i2c_bus *bus)
+i2c_sense_scl(struct nvkm_i2c_port *port)
 {
-	return bus->func->sense_scl(bus);
+	return port->func->sense_scl(port);
 }
 
 static inline int
-nvkm_i2c_sense_sda(struct nvkm_i2c_bus *bus)
+i2c_sense_sda(struct nvkm_i2c_port *port)
 {
-	return bus->func->sense_sda(bus);
+	return port->func->sense_sda(port);
 }
 
 static void
-nvkm_i2c_delay(struct nvkm_i2c_bus *bus, u32 nsec)
+i2c_delay(struct nvkm_i2c_port *port, u32 nsec)
 {
 	udelay((nsec + 500) / 1000);
 }
 
 static bool
-nvkm_i2c_raise_scl(struct nvkm_i2c_bus *bus)
+i2c_raise_scl(struct nvkm_i2c_port *port)
 {
 	u32 timeout = T_TIMEOUT / T_RISEFALL;
 
-	nvkm_i2c_drive_scl(bus, 1);
+	i2c_drive_scl(port, 1);
 	do {
-		nvkm_i2c_delay(bus, T_RISEFALL);
-	} while (!nvkm_i2c_sense_scl(bus) && --timeout);
+		i2c_delay(port, T_RISEFALL);
+	} while (!i2c_sense_scl(port) && --timeout);
 
 	return timeout != 0;
 }
 
 static int
-i2c_start(struct nvkm_i2c_bus *bus)
+i2c_start(struct nvkm_i2c_port *port)
 {
 	int ret = 0;
 
-	if (!nvkm_i2c_sense_scl(bus) ||
-	    !nvkm_i2c_sense_sda(bus)) {
-		nvkm_i2c_drive_scl(bus, 0);
-		nvkm_i2c_drive_sda(bus, 1);
-		if (!nvkm_i2c_raise_scl(bus))
+	if (!i2c_sense_scl(port) ||
+	    !i2c_sense_sda(port)) {
+		i2c_drive_scl(port, 0);
+		i2c_drive_sda(port, 1);
+		if (!i2c_raise_scl(port))
 			ret = -EBUSY;
 	}
 
-	nvkm_i2c_drive_sda(bus, 0);
-	nvkm_i2c_delay(bus, T_HOLD);
-	nvkm_i2c_drive_scl(bus, 0);
-	nvkm_i2c_delay(bus, T_HOLD);
+	i2c_drive_sda(port, 0);
+	i2c_delay(port, T_HOLD);
+	i2c_drive_scl(port, 0);
+	i2c_delay(port, T_HOLD);
 	return ret;
 }
 
 static void
-i2c_stop(struct nvkm_i2c_bus *bus)
+i2c_stop(struct nvkm_i2c_port *port)
 {
-	nvkm_i2c_drive_scl(bus, 0);
-	nvkm_i2c_drive_sda(bus, 0);
-	nvkm_i2c_delay(bus, T_RISEFALL);
+	i2c_drive_scl(port, 0);
+	i2c_drive_sda(port, 0);
+	i2c_delay(port, T_RISEFALL);
 
-	nvkm_i2c_drive_scl(bus, 1);
-	nvkm_i2c_delay(bus, T_HOLD);
-	nvkm_i2c_drive_sda(bus, 1);
-	nvkm_i2c_delay(bus, T_HOLD);
+	i2c_drive_scl(port, 1);
+	i2c_delay(port, T_HOLD);
+	i2c_drive_sda(port, 1);
+	i2c_delay(port, T_HOLD);
 }
 
 static int
-i2c_bitw(struct nvkm_i2c_bus *bus, int sda)
+i2c_bitw(struct nvkm_i2c_port *port, int sda)
 {
-	nvkm_i2c_drive_sda(bus, sda);
-	nvkm_i2c_delay(bus, T_RISEFALL);
+	i2c_drive_sda(port, sda);
+	i2c_delay(port, T_RISEFALL);
 
-	if (!nvkm_i2c_raise_scl(bus))
+	if (!i2c_raise_scl(port))
 		return -ETIMEDOUT;
-	nvkm_i2c_delay(bus, T_HOLD);
+	i2c_delay(port, T_HOLD);
 
-	nvkm_i2c_drive_scl(bus, 0);
-	nvkm_i2c_delay(bus, T_HOLD);
+	i2c_drive_scl(port, 0);
+	i2c_delay(port, T_HOLD);
 	return 0;
 }
 
 static int
-i2c_bitr(struct nvkm_i2c_bus *bus)
+i2c_bitr(struct nvkm_i2c_port *port)
 {
 	int sda;
 
-	nvkm_i2c_drive_sda(bus, 1);
-	nvkm_i2c_delay(bus, T_RISEFALL);
+	i2c_drive_sda(port, 1);
+	i2c_delay(port, T_RISEFALL);
 
-	if (!nvkm_i2c_raise_scl(bus))
+	if (!i2c_raise_scl(port))
 		return -ETIMEDOUT;
-	nvkm_i2c_delay(bus, T_HOLD);
+	i2c_delay(port, T_HOLD);
 
-	sda = nvkm_i2c_sense_sda(bus);
+	sda = i2c_sense_sda(port);
 
-	nvkm_i2c_drive_scl(bus, 0);
-	nvkm_i2c_delay(bus, T_HOLD);
+	i2c_drive_scl(port, 0);
+	i2c_delay(port, T_HOLD);
 	return sda;
 }
 
 static int
-nvkm_i2c_get_byte(struct nvkm_i2c_bus *bus, u8 *byte, bool last)
+i2c_get_byte(struct nvkm_i2c_port *port, u8 *byte, bool last)
 {
 	int i, bit;
 
 	*byte = 0;
 	for (i = 7; i >= 0; i--) {
-		bit = i2c_bitr(bus);
+		bit = i2c_bitr(port);
 		if (bit < 0)
 			return bit;
 		*byte |= bit << i;
 	}
 
-	return i2c_bitw(bus, last ? 1 : 0);
+	return i2c_bitw(port, last ? 1 : 0);
 }
 
 static int
-nvkm_i2c_put_byte(struct nvkm_i2c_bus *bus, u8 byte)
+i2c_put_byte(struct nvkm_i2c_port *port, u8 byte)
 {
 	int i, ret;
 	for (i = 7; i >= 0; i--) {
-		ret = i2c_bitw(bus, !!(byte & (1 << i)));
+		ret = i2c_bitw(port, !!(byte & (1 << i)));
 		if (ret < 0)
 			return ret;
 	}
 
-	ret = i2c_bitr(bus);
+	ret = i2c_bitr(port);
 	if (ret == 1) /* nack */
 		ret = -EIO;
 	return ret;
 }
 
 static int
-i2c_addr(struct nvkm_i2c_bus *bus, struct i2c_msg *msg)
+i2c_addr(struct nvkm_i2c_port *port, struct i2c_msg *msg)
 {
 	u32 addr = msg->addr << 1;
 	if (msg->flags & I2C_M_RD)
 		addr |= 1;
-	return nvkm_i2c_put_byte(bus, addr);
+	return i2c_put_byte(port, addr);
 }
 
-int
-nvkm_i2c_bit_xfer(struct nvkm_i2c_bus *bus, struct i2c_msg *msgs, int num)
+static int
+i2c_bit_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
+	struct nvkm_i2c_port *port = adap->algo_data;
 	struct i2c_msg *msg = msgs;
 	int ret = 0, mcnt = num;
+
+	ret = nvkm_i2c(port)->acquire(port, nsecs_to_jiffies(T_TIMEOUT));
+	if (ret)
+		return ret;
 
 	while (!ret && mcnt--) {
 		u8 remaining = msg->len;
 		u8 *ptr = msg->buf;
 
-		ret = i2c_start(bus);
+		ret = i2c_start(port);
 		if (ret == 0)
-			ret = i2c_addr(bus, msg);
+			ret = i2c_addr(port, msg);
 
 		if (msg->flags & I2C_M_RD) {
 			while (!ret && remaining--)
-				ret = nvkm_i2c_get_byte(bus, ptr++, !remaining);
+				ret = i2c_get_byte(port, ptr++, !remaining);
 		} else {
 			while (!ret && remaining--)
-				ret = nvkm_i2c_put_byte(bus, *ptr++);
+				ret = i2c_put_byte(port, *ptr++);
 		}
 
 		msg++;
 	}
 
-	i2c_stop(bus);
+	i2c_stop(port);
+	nvkm_i2c(port)->release(port);
 	return (ret < 0) ? ret : num;
 }
 #else
-int
-nvkm_i2c_bit_xfer(struct nvkm_i2c_bus *bus, struct i2c_msg *msgs, int num)
+static int
+i2c_bit_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
 	return -ENODEV;
 }
 #endif
+
+static u32
+i2c_bit_func(struct i2c_adapter *adap)
+{
+	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
+}
+
+const struct i2c_algorithm nvkm_i2c_bit_algo = {
+	.master_xfer = i2c_bit_xfer,
+	.functionality = i2c_bit_func
+};

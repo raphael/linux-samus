@@ -86,7 +86,6 @@
 			reg = <0xfcfe0000 0x18>;
 			clocks = <&extal_clk>, <&usb_x1_clk>;
 			clock-output-names = "pll", "i", "g";
-			#power-domain-cells = <0>;
 		};
 
 		/* MSTP clocks */
@@ -158,7 +157,6 @@
 			     <0 189 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp4_clks R7S72100_CLK_SCIF0>;
 		clock-names = "sci_ick";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -171,7 +169,6 @@
 			     <0 193 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp4_clks R7S72100_CLK_SCIF1>;
 		clock-names = "sci_ick";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -184,7 +181,6 @@
 			     <0 197 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp4_clks R7S72100_CLK_SCIF2>;
 		clock-names = "sci_ick";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -197,7 +193,6 @@
 			     <0 201 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp4_clks R7S72100_CLK_SCIF3>;
 		clock-names = "sci_ick";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -210,7 +205,6 @@
 			     <0 205 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp4_clks R7S72100_CLK_SCIF4>;
 		clock-names = "sci_ick";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -223,7 +217,6 @@
 			     <0 209 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp4_clks R7S72100_CLK_SCIF5>;
 		clock-names = "sci_ick";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -236,7 +229,6 @@
 			     <0 213 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp4_clks R7S72100_CLK_SCIF6>;
 		clock-names = "sci_ick";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -249,7 +241,6 @@
 			     <0 217 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp4_clks R7S72100_CLK_SCIF7>;
 		clock-names = "sci_ick";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -261,7 +252,6 @@
 			     <0 240 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "error", "rx", "tx";
 		clocks = <&mstp10_clks R7S72100_CLK_SPI0>;
-		power-domains = <&cpg_clocks>;
 		num-cs = <1>;
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -276,7 +266,6 @@
 			     <0 243 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "error", "rx", "tx";
 		clocks = <&mstp10_clks R7S72100_CLK_SPI1>;
-		power-domains = <&cpg_clocks>;
 		num-cs = <1>;
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -291,7 +280,6 @@
 			     <0 246 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "error", "rx", "tx";
 		clocks = <&mstp10_clks R7S72100_CLK_SPI2>;
-		power-domains = <&cpg_clocks>;
 		num-cs = <1>;
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -306,7 +294,6 @@
 			     <0 249 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "error", "rx", "tx";
 		clocks = <&mstp10_clks R7S72100_CLK_SPI3>;
-		power-domains = <&cpg_clocks>;
 		num-cs = <1>;
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -321,7 +308,6 @@
 			     <0 252 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "error", "rx", "tx";
 		clocks = <&mstp10_clks R7S72100_CLK_SPI4>;
-		power-domains = <&cpg_clocks>;
 		num-cs = <1>;
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -352,7 +338,6 @@
 			     <0 164 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp9_clks R7S72100_CLK_I2C0>;
 		clock-frequency = <100000>;
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -371,7 +356,6 @@
 			     <0 172 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp9_clks R7S72100_CLK_I2C1>;
 		clock-frequency = <100000>;
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -390,7 +374,6 @@
 			     <0 180 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp9_clks R7S72100_CLK_I2C2>;
 		clock-frequency = <100000>;
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -409,7 +392,6 @@
 			     <0 188 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp9_clks R7S72100_CLK_I2C3>;
 		clock-frequency = <100000>;
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 
@@ -420,7 +402,6 @@
 		interrupt-names = "tgi0a";
 		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
 		clock-names = "fck";
-		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
 };

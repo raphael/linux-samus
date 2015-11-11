@@ -71,7 +71,7 @@ acpi_status acpi_enable(void)
 
 	/* ACPI tables must be present */
 
-	if (acpi_gbl_fadt_index == ACPI_INVALID_TABLE_INDEX) {
+	if (!acpi_tb_tables_loaded()) {
 		return_ACPI_STATUS(AE_NO_ACPI_TABLES);
 	}
 

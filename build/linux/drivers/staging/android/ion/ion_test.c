@@ -269,8 +269,7 @@ static int ion_test_remove(struct platform_device *pdev)
 	if (!testdev)
 		return -ENODATA;
 
-	misc_deregister(&testdev->misc);
-	return 0;
+	return misc_deregister(&testdev->misc);
 }
 
 static struct platform_device *ion_test_pdev;

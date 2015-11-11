@@ -3175,8 +3175,6 @@ static int mvneta_probe(struct platform_device *pdev)
 		struct phy_device *phy = of_phy_find_device(dn);
 
 		mvneta_fixed_link_update(pp, phy);
-
-		put_device(&phy->dev);
 	}
 
 	return 0;

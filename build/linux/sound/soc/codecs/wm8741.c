@@ -61,6 +61,25 @@ static const struct reg_default wm8741_reg_defaults[] = {
 	{ 32, 0x0002 },     /* R32 - ADDITONAL_CONTROL_1 */
 };
 
+static bool wm8741_readable(struct device *dev, unsigned int reg)
+{
+	switch (reg) {
+	case WM8741_DACLLSB_ATTENUATION:
+	case WM8741_DACLMSB_ATTENUATION:
+	case WM8741_DACRLSB_ATTENUATION:
+	case WM8741_DACRMSB_ATTENUATION:
+	case WM8741_VOLUME_CONTROL:
+	case WM8741_FORMAT_CONTROL:
+	case WM8741_FILTER_CONTROL:
+	case WM8741_MODE_CONTROL_1:
+	case WM8741_MODE_CONTROL_2:
+	case WM8741_ADDITIONAL_CONTROL_1:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static int wm8741_reset(struct snd_soc_codec *codec)
 {
 	return snd_soc_write(codec, WM8741_RESET, 0);
@@ -259,38 +278,51 @@ static int wm8741_set_dai_sysclk(struct snd_soc_dai *codec_dai,
 	switch (freq) {
 	case 0:
 		wm8741->sysclk_constraints = NULL;
-		break;
+		wm8741->sysclk = freq;
+		return 0;
+
 	case 11289600:
 		wm8741->sysclk_constraints = &constraints_11289;
-		break;
+		wm8741->sysclk = freq;
+		return 0;
+
 	case 12288000:
 		wm8741->sysclk_constraints = &constraints_12288;
-		break;
+		wm8741->sysclk = freq;
+		return 0;
+
 	case 16384000:
 		wm8741->sysclk_constraints = &constraints_16384;
-		break;
+		wm8741->sysclk = freq;
+		return 0;
+
 	case 16934400:
 		wm8741->sysclk_constraints = &constraints_16934;
-		break;
+		wm8741->sysclk = freq;
+		return 0;
+
 	case 18432000:
 		wm8741->sysclk_constraints = &constraints_18432;
-		break;
+		wm8741->sysclk = freq;
+		return 0;
+
 	case 22579200:
 	case 33868800:
 		wm8741->sysclk_constraints = &constraints_22579;
-		break;
+		wm8741->sysclk = freq;
+		return 0;
+
 	case 24576000:
 		wm8741->sysclk_constraints = &constraints_24576;
-		break;
+		wm8741->sysclk = freq;
+		return 0;
+
 	case 36864000:
 		wm8741->sysclk_constraints = &constraints_36864;
-		break;
-	default:
-		return -EINVAL;
+		wm8741->sysclk = freq;
+		return 0;
 	}
-
-	wm8741->sysclk = freq;
-	return 0;
+	return -EINVAL;
 }
 
 static int wm8741_set_dai_fmt(struct snd_soc_dai *codec_dai,
@@ -522,6 +554,8 @@ static const struct regmap_config wm8741_regmap = {
 	.reg_defaults = wm8741_reg_defaults,
 	.num_reg_defaults = ARRAY_SIZE(wm8741_reg_defaults),
 	.cache_type = REGCACHE_RBTREE,
+
+	.readable_reg = wm8741_readable,
 };
 
 static int wm8741_set_pdata(struct device *dev, struct wm8741_priv *wm8741)
@@ -599,6 +633,7 @@ MODULE_DEVICE_TABLE(i2c, wm8741_i2c_id);
 static struct i2c_driver wm8741_i2c_driver = {
 	.driver = {
 		.name = "wm8741",
+		.owner = THIS_MODULE,
 		.of_match_table = wm8741_of_match,
 	},
 	.probe =    wm8741_i2c_probe,

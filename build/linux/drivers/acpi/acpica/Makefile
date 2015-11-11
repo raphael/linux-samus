@@ -11,7 +11,6 @@ obj-y	+= acpi.o
 acpi-y :=		\
 	dsargs.o	\
 	dscontrol.o	\
-	dsdebug.o	\
 	dsfield.o	\
 	dsinit.o	\
 	dsmethod.o	\
@@ -165,7 +164,6 @@ acpi-y +=		\
 	utmath.o	\
 	utmisc.o	\
 	utmutex.o	\
-	utnonansi.o	\
 	utobject.o	\
 	utosi.o		\
 	utownerid.o	\

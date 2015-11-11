@@ -90,7 +90,6 @@ static void aead_put_sgl(struct sock *sk)
 		put_page(sg_page(sg + i));
 		sg_assign_page(sg + i, NULL);
 	}
-	sg_init_table(sg, ALG_MAX_PAGES);
 	sgl->cur = 0;
 	ctx->used = 0;
 	ctx->more = 0;
@@ -515,7 +514,8 @@ static struct proto_ops algif_aead_ops = {
 
 static void *aead_bind(const char *name, u32 type, u32 mask)
 {
-	return crypto_alloc_aead(name, type, mask);
+	return crypto_alloc_aead(name, type | CRYPTO_ALG_AEAD_NEW,
+				 mask | CRYPTO_ALG_AEAD_NEW);
 }
 
 static void aead_release(void *private)

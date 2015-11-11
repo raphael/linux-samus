@@ -476,12 +476,13 @@ static void __lpc_get_mac(struct netdata_local *pldat, u8 *mac)
 	mac[5] = tmp >> 8;
 }
 
-static void __lpc_eth_clock_enable(struct netdata_local *pldat, bool enable)
+static void __lpc_eth_clock_enable(struct netdata_local *pldat,
+				   bool enable)
 {
 	if (enable)
-		clk_prepare_enable(pldat->clk);
+		clk_enable(pldat->clk);
 	else
-		clk_disable_unprepare(pldat->clk);
+		clk_disable(pldat->clk);
 }
 
 static void __lpc_params_setup(struct netdata_local *pldat)
@@ -1493,7 +1494,7 @@ err_out_free_irq:
 err_out_iounmap:
 	iounmap(pldat->net_base);
 err_out_disable_clocks:
-	clk_disable_unprepare(pldat->clk);
+	clk_disable(pldat->clk);
 	clk_put(pldat->clk);
 err_out_free_dev:
 	free_netdev(ndev);
@@ -1518,7 +1519,7 @@ static int lpc_eth_drv_remove(struct platform_device *pdev)
 	iounmap(pldat->net_base);
 	mdiobus_unregister(pldat->mii_bus);
 	mdiobus_free(pldat->mii_bus);
-	clk_disable_unprepare(pldat->clk);
+	clk_disable(pldat->clk);
 	clk_put(pldat->clk);
 	free_netdev(ndev);
 
@@ -1539,7 +1540,7 @@ static int lpc_eth_drv_suspend(struct platform_device *pdev,
 		if (netif_running(ndev)) {
 			netif_device_detach(ndev);
 			__lpc_eth_shutdown(pldat);
-			clk_disable_unprepare(pldat->clk);
+			clk_disable(pldat->clk);
 
 			/*
 			 * Reset again now clock is disable to be sure

@@ -1137,9 +1137,13 @@ static int mxuport_port_probe(struct usb_serial_port *port)
 		return err;
 
 	/* Set interface (RS-232) */
-	return mxuport_send_ctrl_urb(serial, RQ_VENDOR_SET_INTERFACE,
-				     MX_INT_RS232,
-				     port->port_number);
+	err = mxuport_send_ctrl_urb(serial, RQ_VENDOR_SET_INTERFACE,
+				    MX_INT_RS232,
+				    port->port_number);
+	if (err)
+		return err;
+
+	return 0;
 }
 
 static int mxuport_alloc_write_urb(struct usb_serial *serial,

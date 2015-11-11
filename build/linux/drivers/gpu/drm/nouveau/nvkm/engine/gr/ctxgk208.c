@@ -530,8 +530,17 @@ gk208_grctx_pack_ppc[] = {
  * PGRAPH context implementation
  ******************************************************************************/
 
-const struct gf100_grctx_func
-gk208_grctx = {
+struct nvkm_oclass *
+gk208_grctx_oclass = &(struct gf100_grctx_oclass) {
+	.base.handle = NV_ENGCTX(GR, 0x08),
+	.base.ofuncs = &(struct nvkm_ofuncs) {
+		.ctor = gf100_gr_context_ctor,
+		.dtor = gf100_gr_context_dtor,
+		.init = _nvkm_gr_context_init,
+		.fini = _nvkm_gr_context_fini,
+		.rd32 = _nvkm_gr_context_rd32,
+		.wr32 = _nvkm_gr_context_wr32,
+	},
 	.main  = gk104_grctx_generate_main,
 	.unkn  = gk104_grctx_generate_unkn,
 	.hub   = gk208_grctx_pack_hub,
@@ -552,4 +561,4 @@ gk208_grctx = {
 	.attrib_nr = 0x218,
 	.alpha_nr_max = 0x7ff,
 	.alpha_nr = 0x648,
-};
+}.base;

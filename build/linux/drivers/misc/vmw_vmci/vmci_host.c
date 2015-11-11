@@ -1031,9 +1031,14 @@ int __init vmci_host_init(void)
 
 void __exit vmci_host_exit(void)
 {
+	int error;
+
 	vmci_host_device_initialized = false;
 
-	misc_deregister(&vmci_host_miscdev);
+	error = misc_deregister(&vmci_host_miscdev);
+	if (error)
+		pr_warn("Error unregistering character device: %d\n", error);
+
 	vmci_ctx_destroy(host_context);
 	vmci_qp_broker_exit();
 

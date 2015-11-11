@@ -21,7 +21,6 @@
 #include <linux/regmap.h>
 #include <linux/clk.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/of_net.h>
 
 #include "stmmac_platform.h"
@@ -129,11 +128,6 @@ struct sti_dwmac {
 	struct device *dev;
 	struct regmap *regmap;
 	u32 speed;
-	void (*fix_retime_src)(void *priv, unsigned int speed);
-};
-
-struct sti_dwmac_of_data {
-	void (*fix_retime_src)(void *priv, unsigned int speed);
 };
 
 static u32 phy_intf_sels[] = {
@@ -228,9 +222,8 @@ static void stid127_fix_retime_src(void *priv, u32 spd)
 	regmap_update_bits(dwmac->regmap, reg, STID127_RETIME_SRC_MASK, val);
 }
 
-static int sti_dwmac_init(struct platform_device *pdev, void *priv)
+static void sti_dwmac_ctrl_init(struct sti_dwmac *dwmac)
 {
-	struct sti_dwmac *dwmac = priv;
 	struct regmap *regmap = dwmac->regmap;
 	int iface = dwmac->interface;
 	struct device *dev = dwmac->dev;
@@ -248,8 +241,28 @@ static int sti_dwmac_init(struct platform_device *pdev, void *priv)
 
 	val = (iface == PHY_INTERFACE_MODE_REVMII) ? 0 : ENMII;
 	regmap_update_bits(regmap, reg, ENMII_MASK, val);
+}
 
-	dwmac->fix_retime_src(priv, dwmac->speed);
+static int stix4xx_init(struct platform_device *pdev, void *priv)
+{
+	struct sti_dwmac *dwmac = priv;
+	u32 spd = dwmac->speed;
+
+	sti_dwmac_ctrl_init(dwmac);
+
+	stih4xx_fix_retime_src(priv, spd);
+
+	return 0;
+}
+
+static int stid127_init(struct platform_device *pdev, void *priv)
+{
+	struct sti_dwmac *dwmac = priv;
+	u32 spd = dwmac->speed;
+
+	sti_dwmac_ctrl_init(dwmac);
+
+	stid127_fix_retime_src(priv, spd);
 
 	return 0;
 }
@@ -321,58 +334,36 @@ static int sti_dwmac_parse_data(struct sti_dwmac *dwmac,
 	return 0;
 }
 
-static int sti_dwmac_probe(struct platform_device *pdev)
+static void *sti_dwmac_setup(struct platform_device *pdev)
 {
-	struct plat_stmmacenet_data *plat_dat;
-	const struct sti_dwmac_of_data *data;
-	struct stmmac_resources stmmac_res;
 	struct sti_dwmac *dwmac;
 	int ret;
 
-	data = of_device_get_match_data(&pdev->dev);
-	if (!data) {
-		dev_err(&pdev->dev, "No OF match data provided\n");
-		return -EINVAL;
-	}
-
-	ret = stmmac_get_platform_resources(pdev, &stmmac_res);
-	if (ret)
-		return ret;
-
-	plat_dat = stmmac_probe_config_dt(pdev, &stmmac_res.mac);
-	if (IS_ERR(plat_dat))
-		return PTR_ERR(plat_dat);
-
 	dwmac = devm_kzalloc(&pdev->dev, sizeof(*dwmac), GFP_KERNEL);
 	if (!dwmac)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	ret = sti_dwmac_parse_data(dwmac, pdev);
 	if (ret) {
 		dev_err(&pdev->dev, "Unable to parse OF data\n");
-		return ret;
+		return ERR_PTR(ret);
 	}
 
-	dwmac->fix_retime_src = data->fix_retime_src;
-
-	plat_dat->bsp_priv = dwmac;
-	plat_dat->init = sti_dwmac_init;
-	plat_dat->exit = sti_dwmac_exit;
-	plat_dat->fix_mac_speed = data->fix_retime_src;
-
-	ret = sti_dwmac_init(pdev, plat_dat->bsp_priv);
-	if (ret)
-		return ret;
-
-	return stmmac_dvr_probe(&pdev->dev, plat_dat, &stmmac_res);
+	return dwmac;
 }
 
-static const struct sti_dwmac_of_data stih4xx_dwmac_data = {
-	.fix_retime_src = stih4xx_fix_retime_src,
+static const struct stmmac_of_data stih4xx_dwmac_data = {
+	.fix_mac_speed = stih4xx_fix_retime_src,
+	.setup = sti_dwmac_setup,
+	.init = stix4xx_init,
+	.exit = sti_dwmac_exit,
 };
 
-static const struct sti_dwmac_of_data stid127_dwmac_data = {
-	.fix_retime_src = stid127_fix_retime_src,
+static const struct stmmac_of_data stid127_dwmac_data = {
+	.fix_mac_speed = stid127_fix_retime_src,
+	.setup = sti_dwmac_setup,
+	.init = stid127_init,
+	.exit = sti_dwmac_exit,
 };
 
 static const struct of_device_id sti_dwmac_match[] = {
@@ -385,7 +376,7 @@ static const struct of_device_id sti_dwmac_match[] = {
 MODULE_DEVICE_TABLE(of, sti_dwmac_match);
 
 static struct platform_driver sti_dwmac_driver = {
-	.probe  = sti_dwmac_probe,
+	.probe  = stmmac_pltfr_probe,
 	.remove = stmmac_pltfr_remove,
 	.driver = {
 		.name           = "sti-dwmac",

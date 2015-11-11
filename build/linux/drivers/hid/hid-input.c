@@ -1166,11 +1166,8 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 
 	input_event(input, usage->type, usage->code, value);
 
-	if ((field->flags & HID_MAIN_ITEM_RELATIVE) &&
-	    usage->type == EV_KEY && value) {
-		input_sync(input);
+	if ((field->flags & HID_MAIN_ITEM_RELATIVE) && (usage->type == EV_KEY))
 		input_event(input, usage->type, usage->code, 0);
-	}
 }
 
 void hidinput_report_event(struct hid_device *hid, struct hid_report *report)

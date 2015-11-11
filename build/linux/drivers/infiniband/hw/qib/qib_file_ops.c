@@ -908,7 +908,7 @@ static int qib_file_vma_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	return 0;
 }
 
-static const struct vm_operations_struct qib_file_vm_ops = {
+static struct vm_operations_struct qib_file_vm_ops = {
 	.fault = qib_file_vma_fault,
 };
 

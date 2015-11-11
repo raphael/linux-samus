@@ -155,7 +155,7 @@ static int sa1100_gpio_irqdomain_map(struct irq_domain *d,
 {
 	irq_set_chip_and_handler(irq, &sa1100_gpio_irq_chip,
 				 handle_edge_irq);
-	irq_set_noprobe(irq);
+	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 
 	return 0;
 }
@@ -172,9 +172,10 @@ static struct irq_domain *sa1100_gpio_irqdomain;
  * irq_controller_lock held, and IRQs disabled.  Decode the IRQ
  * and call the handler.
  */
-static void sa1100_gpio_handler(struct irq_desc *desc)
+static void
+sa1100_gpio_handler(unsigned int irq, struct irq_desc *desc)
 {
-	unsigned int irq, mask;
+	unsigned int mask;
 
 	mask = GEDR;
 	do {

@@ -894,6 +894,7 @@ MODULE_DEVICE_TABLE(i2c, msp_id);
 
 static struct i2c_driver msp_driver = {
 	.driver = {
+		.owner	= THIS_MODULE,
 		.name	= "msp3400",
 		.pm	= &msp3400_pm_ops,
 	},

@@ -485,7 +485,11 @@ static int dsps_musb_init(struct musb *musb)
 		dsps_writeb(musb->mregs, MUSB_BABBLE_CTL, val);
 	}
 
-	return dsps_musb_dbg_init(musb, glue);
+	ret = dsps_musb_dbg_init(musb, glue);
+	if (ret)
+		return ret;
+
+	return 0;
 }
 
 static int dsps_musb_exit(struct musb *musb)

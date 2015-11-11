@@ -660,7 +660,7 @@ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
 	return kvmppc_core_pending_dec(vcpu);
 }
 
-static enum hrtimer_restart kvmppc_decrementer_wakeup(struct hrtimer *timer)
+enum hrtimer_restart kvmppc_decrementer_wakeup(struct hrtimer *timer)
 {
 	struct kvm_vcpu *vcpu;
 

@@ -66,7 +66,8 @@
 #include <linux/spinlock.h>		/* For spin_lock/spin_unlock/... */
 #include <linux/uaccess.h>		/* For copy_to_user/put_user/... */
 #include <linux/io.h>			/* For inb/outb/... */
-#include <linux/platform_data/itco_wdt.h>
+#include <linux/mfd/core.h>
+#include <linux/mfd/lpc_ich.h>
 
 #include "iTCO_vendor.h"
 
@@ -145,67 +146,59 @@ static inline unsigned int ticks_to_seconds(int ticks)
 	return iTCO_wdt_private.iTCO_version == 3 ? ticks : (ticks * 6) / 10;
 }
 
-static inline u32 no_reboot_bit(void)
-{
-	u32 enable_bit;
-
-	switch (iTCO_wdt_private.iTCO_version) {
-	case 3:
-		enable_bit = 0x00000010;
-		break;
-	case 2:
-		enable_bit = 0x00000020;
-		break;
-	case 4:
-	case 1:
-	default:
-		enable_bit = 0x00000002;
-		break;
-	}
-
-	return enable_bit;
-}
-
 static void iTCO_wdt_set_NO_REBOOT_bit(void)
 {
 	u32 val32;
 
 	/* Set the NO_REBOOT bit: this disables reboots */
-	if (iTCO_wdt_private.iTCO_version >= 2) {
+	if (iTCO_wdt_private.iTCO_version == 3) {
 		val32 = readl(iTCO_wdt_private.gcs_pmc);
-		val32 |= no_reboot_bit();
+		val32 |= 0x00000010;
+		writel(val32, iTCO_wdt_private.gcs_pmc);
+	} else if (iTCO_wdt_private.iTCO_version == 2) {
+		val32 = readl(iTCO_wdt_private.gcs_pmc);
+		val32 |= 0x00000020;
 		writel(val32, iTCO_wdt_private.gcs_pmc);
 	} else if (iTCO_wdt_private.iTCO_version == 1) {
 		pci_read_config_dword(iTCO_wdt_private.pdev, 0xd4, &val32);
-		val32 |= no_reboot_bit();
+		val32 |= 0x00000002;
 		pci_write_config_dword(iTCO_wdt_private.pdev, 0xd4, val32);
 	}
 }
 
 static int iTCO_wdt_unset_NO_REBOOT_bit(void)
 {
-	u32 enable_bit = no_reboot_bit();
-	u32 val32 = 0;
+	int ret = 0;
+	u32 val32;
 
 	/* Unset the NO_REBOOT bit: this enables reboots */
-	if (iTCO_wdt_private.iTCO_version >= 2) {
+	if (iTCO_wdt_private.iTCO_version == 3) {
 		val32 = readl(iTCO_wdt_private.gcs_pmc);
-		val32 &= ~enable_bit;
+		val32 &= 0xffffffef;
 		writel(val32, iTCO_wdt_private.gcs_pmc);
 
 		val32 = readl(iTCO_wdt_private.gcs_pmc);
+		if (val32 & 0x00000010)
+			ret = -EIO;
+	} else if (iTCO_wdt_private.iTCO_version == 2) {
+		val32 = readl(iTCO_wdt_private.gcs_pmc);
+		val32 &= 0xffffffdf;
+		writel(val32, iTCO_wdt_private.gcs_pmc);
+
+		val32 = readl(iTCO_wdt_private.gcs_pmc);
+		if (val32 & 0x00000020)
+			ret = -EIO;
 	} else if (iTCO_wdt_private.iTCO_version == 1) {
 		pci_read_config_dword(iTCO_wdt_private.pdev, 0xd4, &val32);
-		val32 &= ~enable_bit;
+		val32 &= 0xfffffffd;
 		pci_write_config_dword(iTCO_wdt_private.pdev, 0xd4, val32);
 
 		pci_read_config_dword(iTCO_wdt_private.pdev, 0xd4, &val32);
+		if (val32 & 0x00000002)
+			ret = -EIO;
 	}
 
-	if (val32 & enable_bit)
-		return -EIO;
-
-	return 0;
+	return ret; /* returns: 0 = OK, -EIO = Error */
 }
 
 static int iTCO_wdt_start(struct watchdog_device *wd_dev)
@@ -425,9 +418,9 @@ static int iTCO_wdt_probe(struct platform_device *dev)
 {
 	int ret = -ENODEV;
 	unsigned long val32;
-	struct itco_wdt_platform_data *pdata = dev_get_platdata(&dev->dev);
+	struct lpc_ich_info *ich_info = dev_get_platdata(&dev->dev);
 
-	if (!pdata)
+	if (!ich_info)
 		goto out;
 
 	spin_lock_init(&iTCO_wdt_private.io_lock);
@@ -442,7 +435,7 @@ static int iTCO_wdt_probe(struct platform_device *dev)
 	if (!iTCO_wdt_private.smi_res)
 		goto out;
 
-	iTCO_wdt_private.iTCO_version = pdata->version;
+	iTCO_wdt_private.iTCO_version = ich_info->iTCO_version;
 	iTCO_wdt_private.dev = dev;
 	iTCO_wdt_private.pdev = to_pci_dev(dev->dev.parent);
 
@@ -508,24 +501,15 @@ static int iTCO_wdt_probe(struct platform_device *dev)
 	}
 
 	pr_info("Found a %s TCO device (Version=%d, TCOBASE=0x%04llx)\n",
-		pdata->name, pdata->version, (u64)TCOBASE);
+		ich_info->name, ich_info->iTCO_version, (u64)TCOBASE);
 
 	/* Clear out the (probably old) status */
-	switch (iTCO_wdt_private.iTCO_version) {
-	case 4:
-		outw(0x0008, TCO1_STS);	/* Clear the Time Out Status bit */
-		outw(0x0002, TCO2_STS);	/* Clear SECOND_TO_STS bit */
-		break;
-	case 3:
+	if (iTCO_wdt_private.iTCO_version == 3) {
 		outl(0x20008, TCO1_STS);
-		break;
-	case 2:
-	case 1:
-	default:
+	} else {
 		outw(0x0008, TCO1_STS);	/* Clear the Time Out Status bit */
 		outw(0x0002, TCO2_STS);	/* Clear SECOND_TO_STS bit */
 		outw(0x0004, TCO2_STS);	/* Clear BOOT_STS bit */
-		break;
 	}
 
 	iTCO_wdt_watchdog_dev.bootstatus = 0;

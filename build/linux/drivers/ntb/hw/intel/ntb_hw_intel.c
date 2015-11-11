@@ -190,17 +190,14 @@ static inline int pdev_is_xeon(struct pci_dev *pdev)
 	case PCI_DEVICE_ID_INTEL_NTB_SS_SNB:
 	case PCI_DEVICE_ID_INTEL_NTB_SS_IVT:
 	case PCI_DEVICE_ID_INTEL_NTB_SS_HSX:
-	case PCI_DEVICE_ID_INTEL_NTB_SS_BDX:
 	case PCI_DEVICE_ID_INTEL_NTB_PS_JSF:
 	case PCI_DEVICE_ID_INTEL_NTB_PS_SNB:
 	case PCI_DEVICE_ID_INTEL_NTB_PS_IVT:
 	case PCI_DEVICE_ID_INTEL_NTB_PS_HSX:
-	case PCI_DEVICE_ID_INTEL_NTB_PS_BDX:
 	case PCI_DEVICE_ID_INTEL_NTB_B2B_JSF:
 	case PCI_DEVICE_ID_INTEL_NTB_B2B_SNB:
 	case PCI_DEVICE_ID_INTEL_NTB_B2B_IVT:
 	case PCI_DEVICE_ID_INTEL_NTB_B2B_HSX:
-	case PCI_DEVICE_ID_INTEL_NTB_B2B_BDX:
 		return 1;
 	}
 	return 0;
@@ -240,7 +237,7 @@ static inline int ndev_ignore_unsafe(struct intel_ntb_dev *ndev,
 
 static int ndev_mw_to_bar(struct intel_ntb_dev *ndev, int idx)
 {
-	if (idx < 0 || idx >= ndev->mw_count)
+	if (idx < 0 || idx > ndev->mw_count)
 		return -EINVAL;
 	return ndev->reg->mw_bar[idx];
 }
@@ -575,13 +572,10 @@ static ssize_t ndev_debugfs_read(struct file *filp, char __user *ubuf,
 			 "Connection Topology -\t%s\n",
 			 ntb_topo_string(ndev->ntb.topo));
 
-	if (ndev->b2b_idx != UINT_MAX) {
-		off += scnprintf(buf + off, buf_size - off,
-				 "B2B MW Idx -\t\t%u\n", ndev->b2b_idx);
-		off += scnprintf(buf + off, buf_size - off,
-				 "B2B Offset -\t\t%#lx\n", ndev->b2b_off);
-	}
-
+	off += scnprintf(buf + off, buf_size - off,
+			 "B2B Offset -\t\t%#lx\n", ndev->b2b_off);
+	off += scnprintf(buf + off, buf_size - off,
+			 "B2B MW Idx -\t\t%d\n", ndev->b2b_idx);
 	off += scnprintf(buf + off, buf_size - off,
 			 "BAR4 Split -\t\t%s\n",
 			 ndev->bar4_split ? "yes" : "no");
@@ -1490,7 +1484,7 @@ static int xeon_setup_b2b_mw(struct intel_ntb_dev *ndev,
 	pdev = ndev_pdev(ndev);
 	mmio = ndev->self_mmio;
 
-	if (ndev->b2b_idx == UINT_MAX) {
+	if (ndev->b2b_idx >= ndev->mw_count) {
 		dev_dbg(ndev_dev(ndev), "not using b2b mw\n");
 		b2b_bar = 0;
 		ndev->b2b_off = 0;
@@ -1782,13 +1776,6 @@ static int xeon_init_ntb(struct intel_ntb_dev *ndev)
 			else
 				ndev->b2b_idx = b2b_mw_idx;
 
-			if (ndev->b2b_idx >= ndev->mw_count) {
-				dev_dbg(ndev_dev(ndev),
-					"b2b_mw_idx %d invalid for mw_count %u\n",
-					b2b_mw_idx, ndev->mw_count);
-				return -EINVAL;
-			}
-
 			dev_dbg(ndev_dev(ndev),
 				"setting up b2b mw idx %d means %d\n",
 				b2b_mw_idx, ndev->b2b_idx);
@@ -1856,9 +1843,6 @@ static int xeon_init_dev(struct intel_ntb_dev *ndev)
 	case PCI_DEVICE_ID_INTEL_NTB_SS_HSX:
 	case PCI_DEVICE_ID_INTEL_NTB_PS_HSX:
 	case PCI_DEVICE_ID_INTEL_NTB_B2B_HSX:
-	case PCI_DEVICE_ID_INTEL_NTB_SS_BDX:
-	case PCI_DEVICE_ID_INTEL_NTB_PS_BDX:
-	case PCI_DEVICE_ID_INTEL_NTB_B2B_BDX:
 		ndev->hwerr_flags |= NTB_HWERR_SDOORBELL_LOCKUP;
 		break;
 	}
@@ -1873,9 +1857,6 @@ static int xeon_init_dev(struct intel_ntb_dev *ndev)
 	case PCI_DEVICE_ID_INTEL_NTB_SS_HSX:
 	case PCI_DEVICE_ID_INTEL_NTB_PS_HSX:
 	case PCI_DEVICE_ID_INTEL_NTB_B2B_HSX:
-	case PCI_DEVICE_ID_INTEL_NTB_SS_BDX:
-	case PCI_DEVICE_ID_INTEL_NTB_PS_BDX:
-	case PCI_DEVICE_ID_INTEL_NTB_B2B_BDX:
 		ndev->hwerr_flags |= NTB_HWERR_SB01BASE_LOCKUP;
 		break;
 	}
@@ -1897,9 +1878,6 @@ static int xeon_init_dev(struct intel_ntb_dev *ndev)
 	case PCI_DEVICE_ID_INTEL_NTB_SS_HSX:
 	case PCI_DEVICE_ID_INTEL_NTB_PS_HSX:
 	case PCI_DEVICE_ID_INTEL_NTB_B2B_HSX:
-	case PCI_DEVICE_ID_INTEL_NTB_SS_BDX:
-	case PCI_DEVICE_ID_INTEL_NTB_PS_BDX:
-	case PCI_DEVICE_ID_INTEL_NTB_B2B_BDX:
 		ndev->hwerr_flags |= NTB_HWERR_B2BDOORBELL_BIT14;
 		break;
 	}
@@ -2018,7 +1996,7 @@ static inline void ndev_init_struct(struct intel_ntb_dev *ndev,
 	ndev->ntb.ops = &intel_ntb_ops;
 
 	ndev->b2b_off = 0;
-	ndev->b2b_idx = UINT_MAX;
+	ndev->b2b_idx = INT_MAX;
 
 	ndev->bar4_split = 0;
 
@@ -2256,17 +2234,14 @@ static const struct pci_device_id intel_ntb_pci_tbl[] = {
 	{PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_NTB_B2B_SNB)},
 	{PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_NTB_B2B_IVT)},
 	{PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_NTB_B2B_HSX)},
-	{PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_NTB_B2B_BDX)},
 	{PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_NTB_PS_JSF)},
 	{PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_NTB_PS_SNB)},
 	{PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_NTB_PS_IVT)},
 	{PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_NTB_PS_HSX)},
-	{PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_NTB_PS_BDX)},
 	{PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_NTB_SS_JSF)},
 	{PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_NTB_SS_SNB)},
 	{PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_NTB_SS_IVT)},
 	{PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_NTB_SS_HSX)},
-	{PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_NTB_SS_BDX)},
 	{0}
 };
 MODULE_DEVICE_TABLE(pci, intel_ntb_pci_tbl);

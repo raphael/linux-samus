@@ -301,26 +301,8 @@ int ath10k_wow_op_resume(struct ieee80211_hw *hw)
 		ath10k_warn(ar, "failed to wakeup from wow: %d\n", ret);
 
 exit:
-	if (ret) {
-		switch (ar->state) {
-		case ATH10K_STATE_ON:
-			ar->state = ATH10K_STATE_RESTARTING;
-			ret = 1;
-			break;
-		case ATH10K_STATE_OFF:
-		case ATH10K_STATE_RESTARTING:
-		case ATH10K_STATE_RESTARTED:
-		case ATH10K_STATE_UTF:
-		case ATH10K_STATE_WEDGED:
-			ath10k_warn(ar, "encountered unexpected device state %d on resume, cannot recover\n",
-				    ar->state);
-			ret = -EIO;
-			break;
-		}
-	}
-
 	mutex_unlock(&ar->conf_mutex);
-	return ret;
+	return ret ? 1 : 0;
 }
 
 int ath10k_wow_init(struct ath10k *ar)

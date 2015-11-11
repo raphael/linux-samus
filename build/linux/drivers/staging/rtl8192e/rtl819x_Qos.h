@@ -96,6 +96,11 @@ struct octet_string {
 	u16 Length;
 };
 
+enum ack_policy {
+	eAckPlc0_ACK		= 0x00,
+	eAckPlc1_NoACK		= 0x01,
+};
+
 #define AC0_BE	0
 #define AC1_BK	1
 #define AC2_VI	2

@@ -79,7 +79,6 @@ static int xfrm6_tunnel_check_size(struct sk_buff *skb)
 
 	if (!skb->ignore_df && skb->len > mtu) {
 		skb->dev = dst->dev;
-		skb->protocol = htons(ETH_P_IPV6);
 
 		if (xfrm6_local_dontfrag(skb))
 			xfrm6_local_rxpmtu(skb, mtu);
@@ -137,7 +136,6 @@ static int __xfrm6_output(struct sock *sk, struct sk_buff *skb)
 	struct dst_entry *dst = skb_dst(skb);
 	struct xfrm_state *x = dst->xfrm;
 	int mtu;
-	bool toobig;
 
 #ifdef CONFIG_NETFILTER
 	if (!x) {
@@ -146,29 +144,25 @@ static int __xfrm6_output(struct sock *sk, struct sk_buff *skb)
 	}
 #endif
 
-	if (x->props.mode != XFRM_MODE_TUNNEL)
-		goto skip_frag;
-
 	if (skb->protocol == htons(ETH_P_IPV6))
 		mtu = ip6_skb_dst_mtu(skb);
 	else
 		mtu = dst_mtu(skb_dst(skb));
 
-	toobig = skb->len > mtu && !skb_is_gso(skb);
-
-	if (toobig && xfrm6_local_dontfrag(skb)) {
+	if (skb->len > mtu && xfrm6_local_dontfrag(skb)) {
 		xfrm6_local_rxpmtu(skb, mtu);
 		return -EMSGSIZE;
-	} else if (!skb->ignore_df && toobig && skb->sk) {
+	} else if (!skb->ignore_df && skb->len > mtu && skb->sk) {
 		xfrm_local_error(skb, mtu);
 		return -EMSGSIZE;
 	}
 
-	if (toobig || dst_allfrag(skb_dst(skb)))
+	if (x->props.mode == XFRM_MODE_TUNNEL &&
+	    ((skb->len > mtu && !skb_is_gso(skb)) ||
+		dst_allfrag(skb_dst(skb)))) {
 		return ip6_fragment(sk, skb,
 				    x->outer_mode->afinfo->output_finish);
-
-skip_frag:
+	}
 	return x->outer_mode->afinfo->output_finish(sk, skb);
 }
 

@@ -116,7 +116,7 @@ bl_submit_bio(int rw, struct bio *bio)
 
 static struct bio *
 bl_alloc_init_bio(int npg, struct block_device *bdev, sector_t disk_sector,
-		bio_end_io_t end_io, struct parallel_io *par)
+		void (*end_io)(struct bio *, int err), struct parallel_io *par)
 {
 	struct bio *bio;
 
@@ -139,7 +139,8 @@ bl_alloc_init_bio(int npg, struct block_device *bdev, sector_t disk_sector,
 static struct bio *
 do_add_page_to_bio(struct bio *bio, int npg, int rw, sector_t isect,
 		struct page *page, struct pnfs_block_dev_map *map,
-		struct pnfs_block_extent *be, bio_end_io_t end_io,
+		struct pnfs_block_extent *be,
+		void (*end_io)(struct bio *, int err),
 		struct parallel_io *par, unsigned int offset, int *len)
 {
 	struct pnfs_block_dev *dev =
@@ -182,11 +183,11 @@ retry:
 	return bio;
 }
 
-static void bl_end_io_read(struct bio *bio)
+static void bl_end_io_read(struct bio *bio, int err)
 {
 	struct parallel_io *par = bio->bi_private;
 
-	if (bio->bi_error) {
+	if (err) {
 		struct nfs_pgio_header *header = par->data;
 
 		if (!header->pnfs_error)
@@ -315,12 +316,13 @@ out:
 	return PNFS_ATTEMPTED;
 }
 
-static void bl_end_io_write(struct bio *bio)
+static void bl_end_io_write(struct bio *bio, int err)
 {
 	struct parallel_io *par = bio->bi_private;
+	const int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	struct nfs_pgio_header *header = par->data;
 
-	if (bio->bi_error) {
+	if (!uptodate) {
 		if (!header->pnfs_error)
 			header->pnfs_error = -EIO;
 		pnfs_set_lo_fail(header->lseg);

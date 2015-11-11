@@ -492,51 +492,40 @@ int __weak page_is_ram(unsigned long pfn)
 }
 EXPORT_SYMBOL_GPL(page_is_ram);
 
-/**
- * region_intersects() - determine intersection of region with known resources
- * @start: region start address
- * @size: size of region
- * @name: name of resource (in iomem_resource)
+/*
+ * Search for a resouce entry that fully contains the specified region.
+ * If found, return 1 if it is RAM, 0 if not.
+ * If not found, or region is not fully contained, return -1
  *
- * Check if the specified region partially overlaps or fully eclipses a
- * resource identified by @name.  Return REGION_DISJOINT if the region
- * does not overlap @name, return REGION_MIXED if the region overlaps
- * @type and another resource, and return REGION_INTERSECTS if the
- * region overlaps @type and no other defined resource. Note, that
- * REGION_INTERSECTS is also returned in the case when the specified
- * region overlaps RAM and undefined memory holes.
- *
- * region_intersect() is used by memory remapping functions to ensure
- * the user is not remapping RAM and is a vast speed up over walking
- * through the resource table page by page.
+ * Used by the ioremap functions to ensure the user is not remapping RAM and is
+ * a vast speed up over walking through the resource table page by page.
  */
-int region_intersects(resource_size_t start, size_t size, const char *name)
+int region_is_ram(resource_size_t start, unsigned long size)
 {
-	unsigned long flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-	resource_size_t end = start + size - 1;
-	int type = 0; int other = 0;
 	struct resource *p;
+	resource_size_t end = start + size - 1;
+	unsigned long flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+	const char *name = "System RAM";
+	int ret = -1;
 
 	read_lock(&resource_lock);
 	for (p = iomem_resource.child; p ; p = p->sibling) {
-		bool is_type = strcmp(p->name, name) == 0 && p->flags == flags;
+		if (p->end < start)
+			continue;
 
-		if (start >= p->start && start <= p->end)
-			is_type ? type++ : other++;
-		if (end >= p->start && end <= p->end)
-			is_type ? type++ : other++;
-		if (p->start >= start && p->end <= end)
-			is_type ? type++ : other++;
+		if (p->start <= start && end <= p->end) {
+			/* resource fully contains region */
+			if ((p->flags != flags) || strcmp(p->name, name))
+				ret = 0;
+			else
+				ret = 1;
+			break;
+		}
+		if (end < p->start)
+			break;	/* not found */
 	}
 	read_unlock(&resource_lock);
-
-	if (other == 0)
-		return type ? REGION_INTERSECTS : REGION_DISJOINT;
-
-	if (type)
-		return REGION_MIXED;
-
-	return REGION_DISJOINT;
+	return ret;
 }
 
 void __weak arch_remove_reservations(struct resource *avail)

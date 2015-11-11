@@ -123,8 +123,7 @@ static int __init rcar_gen2_regulator_quirk(void)
 	u32 mon;
 
 	if (!of_machine_is_compatible("renesas,koelsch") &&
-	    !of_machine_is_compatible("renesas,lager") &&
-	    !of_machine_is_compatible("renesas,gose"))
+	    !of_machine_is_compatible("renesas,lager"))
 		return -ENODEV;
 
 	irqc = ioremap(IRQC_BASE, PAGE_SIZE);

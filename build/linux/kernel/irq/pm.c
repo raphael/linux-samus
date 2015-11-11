@@ -68,7 +68,7 @@ void irq_pm_remove_action(struct irq_desc *desc, struct irqaction *action)
 		desc->cond_suspend_depth--;
 }
 
-static bool suspend_device_irq(struct irq_desc *desc)
+static bool suspend_device_irq(struct irq_desc *desc, int irq)
 {
 	if (!desc->action || desc->no_suspend_depth)
 		return false;
@@ -85,7 +85,7 @@ static bool suspend_device_irq(struct irq_desc *desc)
 	}
 
 	desc->istate |= IRQS_SUSPENDED;
-	__disable_irq(desc);
+	__disable_irq(desc, irq);
 
 	/*
 	 * Hardware which has no wakeup source configuration facility
@@ -126,7 +126,7 @@ void suspend_device_irqs(void)
 		if (irq_settings_is_nested_thread(desc))
 			continue;
 		raw_spin_lock_irqsave(&desc->lock, flags);
-		sync = suspend_device_irq(desc);
+		sync = suspend_device_irq(desc, irq);
 		raw_spin_unlock_irqrestore(&desc->lock, flags);
 
 		if (sync)
@@ -135,7 +135,7 @@ void suspend_device_irqs(void)
 }
 EXPORT_SYMBOL_GPL(suspend_device_irqs);
 
-static void resume_irq(struct irq_desc *desc)
+static void resume_irq(struct irq_desc *desc, int irq)
 {
 	irqd_clear(&desc->irq_data, IRQD_WAKEUP_ARMED);
 
@@ -150,7 +150,7 @@ static void resume_irq(struct irq_desc *desc)
 	desc->depth++;
 resume:
 	desc->istate &= ~IRQS_SUSPENDED;
-	__enable_irq(desc);
+	__enable_irq(desc, irq);
 }
 
 static void resume_irqs(bool want_early)
@@ -169,7 +169,7 @@ static void resume_irqs(bool want_early)
 			continue;
 
 		raw_spin_lock_irqsave(&desc->lock, flags);
-		resume_irq(desc);
+		resume_irq(desc, irq);
 		raw_spin_unlock_irqrestore(&desc->lock, flags);
 	}
 }

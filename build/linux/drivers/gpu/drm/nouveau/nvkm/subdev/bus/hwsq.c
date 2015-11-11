@@ -21,10 +21,10 @@
  *
  * Authors: Ben Skeggs <bskeggs@redhat.com>
  */
-#include "priv.h"
+#include <subdev/bus.h>
 
 struct nvkm_hwsq {
-	struct nvkm_subdev *subdev;
+	struct nvkm_bus *pbus;
 	u32 addr;
 	u32 data;
 	struct {
@@ -41,13 +41,13 @@ hwsq_cmd(struct nvkm_hwsq *hwsq, int size, u8 data[])
 }
 
 int
-nvkm_hwsq_init(struct nvkm_subdev *subdev, struct nvkm_hwsq **phwsq)
+nvkm_hwsq_init(struct nvkm_bus *pbus, struct nvkm_hwsq **phwsq)
 {
 	struct nvkm_hwsq *hwsq;
 
 	hwsq = *phwsq = kmalloc(sizeof(*hwsq), GFP_KERNEL);
 	if (hwsq) {
-		hwsq->subdev = subdev;
+		hwsq->pbus = pbus;
 		hwsq->addr = ~0;
 		hwsq->data = ~0;
 		memset(hwsq->c.data, 0x7f, sizeof(hwsq->c.data));
@@ -63,23 +63,21 @@ nvkm_hwsq_fini(struct nvkm_hwsq **phwsq, bool exec)
 	struct nvkm_hwsq *hwsq = *phwsq;
 	int ret = 0, i;
 	if (hwsq) {
-		struct nvkm_subdev *subdev = hwsq->subdev;
-		struct nvkm_bus *bus = subdev->device->bus;
+		struct nvkm_bus *pbus = hwsq->pbus;
 		hwsq->c.size = (hwsq->c.size + 4) / 4;
-		if (hwsq->c.size <= bus->func->hwsq_size) {
+		if (hwsq->c.size <= pbus->hwsq_size) {
 			if (exec)
-				ret = bus->func->hwsq_exec(bus,
-							   (u32 *)hwsq->c.data,
-								  hwsq->c.size);
+				ret = pbus->hwsq_exec(pbus, (u32 *)hwsq->c.data,
+						      hwsq->c.size);
 			if (ret)
-				nvkm_error(subdev, "hwsq exec failed: %d\n", ret);
+				nv_error(pbus, "hwsq exec failed: %d\n", ret);
 		} else {
-			nvkm_error(subdev, "hwsq ucode too large\n");
+			nv_error(pbus, "hwsq ucode too large\n");
 			ret = -ENOSPC;
 		}
 
 		for (i = 0; ret && i < hwsq->c.size; i++)
-			nvkm_error(subdev, "\t%08x\n", ((u32 *)hwsq->c.data)[i]);
+			nv_error(pbus, "\t0x%08x\n", ((u32 *)hwsq->c.data)[i]);
 
 		*phwsq = NULL;
 		kfree(hwsq);
@@ -90,7 +88,7 @@ nvkm_hwsq_fini(struct nvkm_hwsq **phwsq, bool exec)
 void
 nvkm_hwsq_wr32(struct nvkm_hwsq *hwsq, u32 addr, u32 data)
 {
-	nvkm_debug(hwsq->subdev, "R[%06x] = %08x\n", addr, data);
+	nv_debug(hwsq->pbus, "R[%06x] = 0x%08x\n", addr, data);
 
 	if (hwsq->data != data) {
 		if ((data & 0xffff0000) != (hwsq->data & 0xffff0000)) {
@@ -115,7 +113,7 @@ nvkm_hwsq_wr32(struct nvkm_hwsq *hwsq, u32 addr, u32 data)
 void
 nvkm_hwsq_setf(struct nvkm_hwsq *hwsq, u8 flag, int data)
 {
-	nvkm_debug(hwsq->subdev, " FLAG[%02x] = %d\n", flag, data);
+	nv_debug(hwsq->pbus, " FLAG[%02x] = %d\n", flag, data);
 	flag += 0x80;
 	if (data >= 0)
 		flag += 0x20;
@@ -127,7 +125,7 @@ nvkm_hwsq_setf(struct nvkm_hwsq *hwsq, u8 flag, int data)
 void
 nvkm_hwsq_wait(struct nvkm_hwsq *hwsq, u8 flag, u8 data)
 {
-	nvkm_debug(hwsq->subdev, " WAIT[%02x] = %d\n", flag, data);
+	nv_debug(hwsq->pbus, " WAIT[%02x] = %d\n", flag, data);
 	hwsq_cmd(hwsq, 3, (u8[]){ 0x5f, flag, data });
 }
 
@@ -140,6 +138,6 @@ nvkm_hwsq_nsec(struct nvkm_hwsq *hwsq, u32 nsec)
 		shift++;
 	}
 
-	nvkm_debug(hwsq->subdev, "    DELAY = %d ns\n", nsec);
+	nv_debug(hwsq->pbus, "    DELAY = %d ns\n", nsec);
 	hwsq_cmd(hwsq, 1, (u8[]){ 0x00 | (shift << 2) | usec });
 }

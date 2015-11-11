@@ -28,6 +28,10 @@
 #include <subdev/bios/dcb.h>
 #include <subdev/bios/mxm.h>
 
+struct nv50_mxm_priv {
+	struct nvkm_mxm base;
+};
+
 struct context {
 	u32 *outp;
 	struct mxms_odev desc;
@@ -49,7 +53,7 @@ mxm_match_tmds_partner(struct nvkm_mxm *mxm, u8 *data, void *info)
 static bool
 mxm_match_dcb(struct nvkm_mxm *mxm, u8 *data, void *info)
 {
-	struct nvkm_bios *bios = mxm->subdev.device->bios;
+	struct nvkm_bios *bios = nvkm_bios(mxm);
 	struct context *ctx = info;
 	u64 desc = *(u64 *)data;
 
@@ -103,8 +107,8 @@ mxm_dcb_sanitise_entry(struct nvkm_bios *bios, void *data, int idx, u16 pdcb)
 	 * if one isn't found, disable it.
 	 */
 	if (mxms_foreach(mxm, 0x01, mxm_match_dcb, &ctx)) {
-		nvkm_debug(&mxm->subdev, "disable %d: %08x %08x\n",
-			   idx, ctx.outp[0], ctx.outp[1]);
+		nv_debug(mxm, "disable %d: 0x%08x 0x%08x\n",
+			idx, ctx.outp[0], ctx.outp[1]);
 		ctx.outp[0] |= 0x0000000f;
 		return 0;
 	}
@@ -176,22 +180,20 @@ mxm_dcb_sanitise_entry(struct nvkm_bios *bios, void *data, int idx, u16 pdcb)
 static bool
 mxm_show_unmatched(struct nvkm_mxm *mxm, u8 *data, void *info)
 {
-	struct nvkm_subdev *subdev = &mxm->subdev;
 	u64 desc = *(u64 *)data;
 	if ((desc & 0xf0) != 0xf0)
-		nvkm_info(subdev, "unmatched output device %016llx\n", desc);
+		nv_info(mxm, "unmatched output device 0x%016llx\n", desc);
 	return true;
 }
 
 static void
 mxm_dcb_sanitise(struct nvkm_mxm *mxm)
 {
-	struct nvkm_subdev *subdev = &mxm->subdev;
-	struct nvkm_bios *bios = subdev->device->bios;
+	struct nvkm_bios *bios = nvkm_bios(mxm);
 	u8  ver, hdr, cnt, len;
 	u16 dcb = dcb_table(bios, &ver, &hdr, &cnt, &len);
 	if (dcb == 0x0000 || ver != 0x40) {
-		nvkm_debug(subdev, "unsupported DCB version\n");
+		nv_debug(mxm, "unsupported DCB version\n");
 		return;
 	}
 
@@ -199,20 +201,31 @@ mxm_dcb_sanitise(struct nvkm_mxm *mxm)
 	mxms_foreach(mxm, 0x01, mxm_show_unmatched, NULL);
 }
 
-int
-nv50_mxm_new(struct nvkm_device *device, int index, struct nvkm_subdev **pmxm)
+static int
+nv50_mxm_ctor(struct nvkm_object *parent, struct nvkm_object *engine,
+	      struct nvkm_oclass *oclass, void *data, u32 size,
+	      struct nvkm_object **pobject)
 {
-	struct nvkm_mxm *mxm;
+	struct nv50_mxm_priv *priv;
 	int ret;
 
-	ret = nvkm_mxm_new_(device, index, &mxm);
-	if (mxm)
-		*pmxm = &mxm->subdev;
+	ret = nvkm_mxm_create(parent, engine, oclass, &priv);
+	*pobject = nv_object(priv);
 	if (ret)
 		return ret;
 
-	if (mxm->action & MXM_SANITISE_DCB)
-		mxm_dcb_sanitise(mxm);
-
+	if (priv->base.action & MXM_SANITISE_DCB)
+		mxm_dcb_sanitise(&priv->base);
 	return 0;
 }
+
+struct nvkm_oclass
+nv50_mxm_oclass = {
+	.handle = NV_SUBDEV(MXM, 0x50),
+	.ofuncs = &(struct nvkm_ofuncs) {
+		.ctor = nv50_mxm_ctor,
+		.dtor = _nvkm_mxm_dtor,
+		.init = _nvkm_mxm_init,
+		.fini = _nvkm_mxm_fini,
+	},
+};

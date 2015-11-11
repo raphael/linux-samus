@@ -73,12 +73,7 @@ static inline int mlx5_cmd_exec_check_status(struct mlx5_core_dev *dev, u32 *in,
 					     int in_size, u32 *out,
 					     int out_size)
 {
-	int err;
-
-	err = mlx5_cmd_exec(dev, in, in_size, out, out_size);
-	if (err)
-		return err;
-
+	mlx5_cmd_exec(dev, in, in_size, out, out_size);
 	return mlx5_cmd_status_to_err((struct mlx5_outbox_hdr *)out);
 }
 

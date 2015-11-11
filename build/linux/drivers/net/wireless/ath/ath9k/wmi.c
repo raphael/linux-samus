@@ -299,8 +299,7 @@ int ath9k_wmi_cmd(struct wmi *wmi, enum wmi_cmd_id cmd_id,
 		       sizeof(struct wmi_cmd_hdr);
 	struct sk_buff *skb;
 	u8 *data;
-	unsigned long time_left;
-	int ret = 0;
+	int time_left, ret = 0;
 
 	if (ah->ah_flags & AH_UNPLUGGED)
 		return 0;

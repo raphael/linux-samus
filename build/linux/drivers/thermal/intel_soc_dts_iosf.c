@@ -80,7 +80,7 @@ err_ret:
 }
 
 static int sys_get_trip_temp(struct thermal_zone_device *tzd, int trip,
-			     int *temp)
+			     unsigned long *temp)
 {
 	int status;
 	u32 out;
@@ -106,7 +106,7 @@ static int sys_get_trip_temp(struct thermal_zone_device *tzd, int trip,
 }
 
 static int update_trip_temp(struct intel_soc_dts_sensor_entry *dts,
-			    int thres_index, int temp,
+			    int thres_index, unsigned long temp,
 			    enum thermal_trip_type trip_type)
 {
 	int status;
@@ -196,7 +196,7 @@ err_restore_ptps:
 }
 
 static int sys_set_trip_temp(struct thermal_zone_device *tzd, int trip,
-			     int temp)
+			     unsigned long temp)
 {
 	struct intel_soc_dts_sensor_entry *dts = tzd->devdata;
 	struct intel_soc_dts_sensors *sensors = dts->sensors;
@@ -226,7 +226,7 @@ static int sys_get_trip_type(struct thermal_zone_device *tzd,
 }
 
 static int sys_get_curr_temp(struct thermal_zone_device *tzd,
-			     int *temp)
+			     unsigned long *temp)
 {
 	int status;
 	u32 out;

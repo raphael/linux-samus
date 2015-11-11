@@ -17,9 +17,8 @@ enum io_pgtable_fmt {
  *
  * @tlb_flush_all: Synchronously invalidate the entire TLB context.
  * @tlb_add_flush: Queue up a TLB invalidation for a virtual address range.
- * @tlb_sync:      Ensure any queued TLB invalidation has taken effect, and
- *                 any corresponding page table updates are visible to the
- *                 IOMMU.
+ * @tlb_sync:      Ensure any queue TLB invalidation has taken effect.
+ * @flush_pgtable: Ensure page table updates are visible to the IOMMU.
  *
  * Note that these can all be called in atomic context and must therefore
  * not block.
@@ -29,6 +28,7 @@ struct iommu_gather_ops {
 	void (*tlb_add_flush)(unsigned long iova, size_t size, bool leaf,
 			      void *cookie);
 	void (*tlb_sync)(void *cookie);
+	void (*flush_pgtable)(void *ptr, size_t size, void *cookie);
 };
 
 /**
@@ -41,8 +41,6 @@ struct iommu_gather_ops {
  * @ias:           Input address (iova) size, in bits.
  * @oas:           Output address (paddr) size, in bits.
  * @tlb:           TLB management callbacks for this set of tables.
- * @iommu_dev:     The device representing the DMA configuration for the
- *                 page table walker.
  */
 struct io_pgtable_cfg {
 	#define IO_PGTABLE_QUIRK_ARM_NS	(1 << 0)	/* Set NS bit in PTEs */
@@ -51,7 +49,6 @@ struct io_pgtable_cfg {
 	unsigned int			ias;
 	unsigned int			oas;
 	const struct iommu_gather_ops	*tlb;
-	struct device			*iommu_dev;
 
 	/* Low-level data specific to the table format */
 	union {
@@ -142,10 +139,5 @@ struct io_pgtable_init_fns {
 	struct io_pgtable *(*alloc)(struct io_pgtable_cfg *cfg, void *cookie);
 	void (*free)(struct io_pgtable *iop);
 };
-
-extern struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s1_init_fns;
-extern struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s2_init_fns;
-extern struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s1_init_fns;
-extern struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns;
 
 #endif /* __IO_PGTABLE_H */

@@ -834,7 +834,7 @@ static int arasan_cf_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	acdev->clk = devm_clk_get(&pdev->dev, NULL);
+	acdev->clk = clk_get(&pdev->dev, NULL);
 	if (IS_ERR(acdev->clk)) {
 		dev_warn(&pdev->dev, "Clock not found\n");
 		return PTR_ERR(acdev->clk);
@@ -843,8 +843,9 @@ static int arasan_cf_probe(struct platform_device *pdev)
 	/* allocate host */
 	host = ata_host_alloc(&pdev->dev, 1);
 	if (!host) {
+		ret = -ENOMEM;
 		dev_warn(&pdev->dev, "alloc host fail\n");
-		return -ENOMEM;
+		goto free_clk;
 	}
 
 	ap = host->ports[0];
@@ -893,7 +894,7 @@ static int arasan_cf_probe(struct platform_device *pdev)
 
 	ret = cf_init(acdev);
 	if (ret)
-		return ret;
+		goto free_clk;
 
 	cf_card_detect(acdev, 0);
 
@@ -903,7 +904,8 @@ static int arasan_cf_probe(struct platform_device *pdev)
 		return 0;
 
 	cf_exit(acdev);
-
+free_clk:
+	clk_put(acdev->clk);
 	return ret;
 }
 
@@ -914,6 +916,7 @@ static int arasan_cf_remove(struct platform_device *pdev)
 
 	ata_host_detach(host);
 	cf_exit(acdev);
+	clk_put(acdev->clk);
 
 	return 0;
 }

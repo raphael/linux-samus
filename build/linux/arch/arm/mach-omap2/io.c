@@ -37,6 +37,7 @@
 #include "clock.h"
 #include "clock2xxx.h"
 #include "clock3xxx.h"
+#include "clock44xx.h"
 #include "omap-pm.h"
 #include "sdrc.h"
 #include "control.h"
@@ -235,7 +236,7 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
 };
 #endif
 
-#ifdef CONFIG_SOC_OMAP5
+#if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
 static struct map_desc omap54xx_io_desc[] __initdata = {
 	{
 		.virtual	= L3_54XX_VIRT,
@@ -259,53 +260,6 @@ static struct map_desc omap54xx_io_desc[] __initdata = {
 		.virtual	= L4_PER_54XX_VIRT,
 		.pfn		= __phys_to_pfn(L4_PER_54XX_PHYS),
 		.length		= L4_PER_54XX_SIZE,
-		.type		= MT_DEVICE,
-	},
-};
-#endif
-
-#ifdef CONFIG_SOC_DRA7XX
-static struct map_desc dra7xx_io_desc[] __initdata = {
-	{
-		.virtual	= L4_CFG_MPU_DRA7XX_VIRT,
-		.pfn		= __phys_to_pfn(L4_CFG_MPU_DRA7XX_PHYS),
-		.length		= L4_CFG_MPU_DRA7XX_SIZE,
-		.type		= MT_DEVICE,
-	},
-	{
-		.virtual	= L3_MAIN_SN_DRA7XX_VIRT,
-		.pfn		= __phys_to_pfn(L3_MAIN_SN_DRA7XX_PHYS),
-		.length		= L3_MAIN_SN_DRA7XX_SIZE,
-		.type		= MT_DEVICE,
-	},
-	{
-		.virtual	= L4_PER1_DRA7XX_VIRT,
-		.pfn		= __phys_to_pfn(L4_PER1_DRA7XX_PHYS),
-		.length		= L4_PER1_DRA7XX_SIZE,
-		.type		= MT_DEVICE,
-	},
-	{
-		.virtual	= L4_PER2_DRA7XX_VIRT,
-		.pfn		= __phys_to_pfn(L4_PER2_DRA7XX_PHYS),
-		.length		= L4_PER2_DRA7XX_SIZE,
-		.type		= MT_DEVICE,
-	},
-	{
-		.virtual	= L4_PER3_DRA7XX_VIRT,
-		.pfn		= __phys_to_pfn(L4_PER3_DRA7XX_PHYS),
-		.length		= L4_PER3_DRA7XX_SIZE,
-		.type		= MT_DEVICE,
-	},
-	{
-		.virtual	= L4_CFG_DRA7XX_VIRT,
-		.pfn		= __phys_to_pfn(L4_CFG_DRA7XX_PHYS),
-		.length		= L4_CFG_DRA7XX_SIZE,
-		.type		= MT_DEVICE,
-	},
-	{
-		.virtual	= L4_WKUP_DRA7XX_VIRT,
-		.pfn		= __phys_to_pfn(L4_WKUP_DRA7XX_PHYS),
-		.length		= L4_WKUP_DRA7XX_SIZE,
 		.type		= MT_DEVICE,
 	},
 };
@@ -352,22 +306,13 @@ void __init am33xx_map_io(void)
 void __init omap4_map_io(void)
 {
 	iotable_init(omap44xx_io_desc, ARRAY_SIZE(omap44xx_io_desc));
-	omap_barriers_init();
 }
 #endif
 
-#ifdef CONFIG_SOC_OMAP5
+#if defined(CONFIG_SOC_OMAP5) ||  defined(CONFIG_SOC_DRA7XX)
 void __init omap5_map_io(void)
 {
 	iotable_init(omap54xx_io_desc, ARRAY_SIZE(omap54xx_io_desc));
-	omap_barriers_init();
-}
-#endif
-
-#ifdef CONFIG_SOC_DRA7XX
-void __init dra7xx_map_io(void)
-{
-	iotable_init(dra7xx_io_desc, ARRAY_SIZE(dra7xx_io_desc));
 }
 #endif
 /*
@@ -609,11 +554,11 @@ void __init ti814x_init_early(void)
 	omap2_prcm_base_init();
 	omap3xxx_voltagedomains_init();
 	omap3xxx_powerdomains_init();
-	ti814x_clockdomains_init();
-	dm814x_hwmod_init();
+	ti81xx_clockdomains_init();
+	ti81xx_hwmod_init();
 	omap_hwmod_init_postsetup();
 	if (of_have_populated_dt())
-		omap_clk_soc_init = dm814x_dt_clk_init;
+		omap_clk_soc_init = ti81xx_dt_clk_init;
 }
 
 void __init ti816x_init_early(void)
@@ -626,11 +571,11 @@ void __init ti816x_init_early(void)
 	omap2_prcm_base_init();
 	omap3xxx_voltagedomains_init();
 	omap3xxx_powerdomains_init();
-	ti816x_clockdomains_init();
-	dm816x_hwmod_init();
+	ti81xx_clockdomains_init();
+	ti81xx_hwmod_init();
 	omap_hwmod_init_postsetup();
 	if (of_have_populated_dt())
-		omap_clk_soc_init = dm816x_dt_clk_init;
+		omap_clk_soc_init = ti81xx_dt_clk_init;
 }
 #endif
 
@@ -676,7 +621,6 @@ void __init am43xx_init_early(void)
 void __init am43xx_init_late(void)
 {
 	omap_common_late_init();
-	omap2_clk_enable_autoidle_all();
 }
 #endif
 
@@ -778,8 +722,6 @@ int __init omap_clk_init(void)
 		return 0;
 
 	ti_clk_init_features();
-
-	omap2_clk_setup_ll_ops();
 
 	if (of_have_populated_dt()) {
 		ret = omap_control_init();

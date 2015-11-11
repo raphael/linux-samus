@@ -672,12 +672,8 @@ int amdgpu_atombios_get_clock_info(struct amdgpu_device *adev)
 		/* disp clock */
 		adev->clock.default_dispclk =
 			le32_to_cpu(firmware_info->info_21.ulDefaultDispEngineClkFreq);
-		/* set a reasonable default for DP */
-		if (adev->clock.default_dispclk < 53900) {
-			DRM_INFO("Changing default dispclk from %dMhz to 600Mhz\n",
-				 adev->clock.default_dispclk / 100);
-			adev->clock.default_dispclk = 60000;
-		}
+		if (adev->clock.default_dispclk == 0)
+			adev->clock.default_dispclk = 54000; /* 540 Mhz */
 		adev->clock.dp_extclk =
 			le16_to_cpu(firmware_info->info_21.usUniphyDPModeExtClkFreq);
 		adev->clock.current_dispclk = adev->clock.default_dispclk;
@@ -901,7 +897,7 @@ bool amdgpu_atombios_get_asic_ss_info(struct amdgpu_device *adev,
 					if ((id == ASIC_INTERNAL_ENGINE_SS) ||
 					    (id == ASIC_INTERNAL_MEMORY_SS))
 						ss->rate /= 100;
-					if (adev->flags & AMD_IS_APU)
+					if (adev->flags & AMDGPU_IS_APU)
 						amdgpu_atombios_get_igp_ss_overrides(adev, ss, id);
 					return true;
 				}
@@ -1062,7 +1058,7 @@ void amdgpu_atombios_set_memory_clock(struct amdgpu_device *adev,
 	SET_MEMORY_CLOCK_PS_ALLOCATION args;
 	int index = GetIndexIntoMasterTable(COMMAND, SetMemoryClock);
 
-	if (adev->flags & AMD_IS_APU)
+	if (adev->flags & AMDGPU_IS_APU)
 		return;
 
 	args.ulTargetMemoryClock = cpu_to_le32(mem_clock);	/* 10 khz */

@@ -30,11 +30,8 @@
 /*
  * Tables translating between page_cache_type_t and pte encoding.
  *
- * The default values are defined statically as minimal supported mode;
- * WC and WT fall back to UC-.  pat_init() updates these values to support
- * more cache modes, WC and WT, when it is safe to do so.  See pat_init()
- * for the details.  Note, __early_ioremap() used during early boot-time
- * takes pgprot_t (pte encoding) and does not use these tables.
+ * Minimal supported modes are defined statically, they are modified
+ * during bootup if more supported cache modes are available.
  *
  *   Index into __cachemode2pte_tbl[] is the cachemode.
  *

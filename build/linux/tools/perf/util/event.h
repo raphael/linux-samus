@@ -134,8 +134,7 @@ struct branch_flags {
 	u64 predicted:1;
 	u64 in_tx:1;
 	u64 abort:1;
-	u64 cycles:16;
-	u64 reserved:44;
+	u64 reserved:60;
 };
 
 struct branch_entry {
@@ -349,12 +348,6 @@ struct itrace_start_event {
 	u32 pid, tid;
 };
 
-struct context_switch_event {
-	struct perf_event_header header;
-	u32 next_prev_pid;
-	u32 next_prev_tid;
-};
-
 union perf_event {
 	struct perf_event_header	header;
 	struct mmap_event		mmap;
@@ -376,7 +369,6 @@ union perf_event {
 	struct auxtrace_error_event	auxtrace_error;
 	struct aux_event		aux;
 	struct itrace_start_event	itrace_start;
-	struct context_switch_event	context_switch;
 };
 
 void perf_event__print_totals(void);
@@ -426,10 +418,6 @@ int perf_event__process_itrace_start(struct perf_tool *tool,
 				     union perf_event *event,
 				     struct perf_sample *sample,
 				     struct machine *machine);
-int perf_event__process_switch(struct perf_tool *tool,
-			       union perf_event *event,
-			       struct perf_sample *sample,
-			       struct machine *machine);
 int perf_event__process_mmap(struct perf_tool *tool,
 			     union perf_event *event,
 			     struct perf_sample *sample,
@@ -492,7 +480,6 @@ size_t perf_event__fprintf_mmap2(union perf_event *event, FILE *fp);
 size_t perf_event__fprintf_task(union perf_event *event, FILE *fp);
 size_t perf_event__fprintf_aux(union perf_event *event, FILE *fp);
 size_t perf_event__fprintf_itrace_start(union perf_event *event, FILE *fp);
-size_t perf_event__fprintf_switch(union perf_event *event, FILE *fp);
 size_t perf_event__fprintf(union perf_event *event, FILE *fp);
 
 u64 kallsyms__get_function_start(const char *kallsyms_filename,

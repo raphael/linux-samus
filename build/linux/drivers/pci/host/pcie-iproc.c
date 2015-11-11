@@ -58,17 +58,9 @@
 #define SYS_RC_INTX_EN               0x330
 #define SYS_RC_INTX_MASK             0xf
 
-static inline struct iproc_pcie *iproc_data(struct pci_bus *bus)
+static inline struct iproc_pcie *sys_to_pcie(struct pci_sys_data *sys)
 {
-	struct iproc_pcie *pcie;
-#ifdef CONFIG_ARM
-	struct pci_sys_data *sys = bus->sysdata;
-
-	pcie = sys->private_data;
-#else
-	pcie = bus->sysdata;
-#endif
-	return pcie;
+	return sys->private_data;
 }
 
 /**
@@ -79,7 +71,8 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
 					    unsigned int devfn,
 					    int where)
 {
-	struct iproc_pcie *pcie = iproc_data(bus);
+	struct pci_sys_data *sys = bus->sysdata;
+	struct iproc_pcie *pcie = sys_to_pcie(sys);
 	unsigned slot = PCI_SLOT(devfn);
 	unsigned fn = PCI_FUNC(devfn);
 	unsigned busno = bus->number;
@@ -193,34 +186,32 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
 int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
 {
 	int ret;
-	void *sysdata;
 	struct pci_bus *bus;
 
 	if (!pcie || !pcie->dev || !pcie->base)
 		return -EINVAL;
 
-	ret = phy_init(pcie->phy);
-	if (ret) {
-		dev_err(pcie->dev, "unable to initialize PCIe PHY\n");
-		return ret;
-	}
+	if (pcie->phy) {
+		ret = phy_init(pcie->phy);
+		if (ret) {
+			dev_err(pcie->dev, "unable to initialize PCIe PHY\n");
+			return ret;
+		}
 
-	ret = phy_power_on(pcie->phy);
-	if (ret) {
-		dev_err(pcie->dev, "unable to power on PCIe PHY\n");
-		goto err_exit_phy;
+		ret = phy_power_on(pcie->phy);
+		if (ret) {
+			dev_err(pcie->dev, "unable to power on PCIe PHY\n");
+			goto err_exit_phy;
+		}
+
 	}
 
 	iproc_pcie_reset(pcie);
 
-#ifdef CONFIG_ARM
 	pcie->sysdata.private_data = pcie;
-	sysdata = &pcie->sysdata;
-#else
-	sysdata = pcie;
-#endif
 
-	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops, sysdata, res);
+	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
+				  &pcie->sysdata, res);
 	if (!bus) {
 		dev_err(pcie->dev, "unable to create PCI root bus\n");
 		ret = -ENOMEM;
@@ -238,9 +229,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
 
 	pci_scan_child_bus(bus);
 	pci_assign_unassigned_bus_resources(bus);
-#ifdef CONFIG_ARM
 	pci_fixup_irqs(pci_common_swizzle, pcie->map_irq);
-#endif
 	pci_bus_add_devices(bus);
 
 	return 0;
@@ -250,9 +239,12 @@ err_rm_root_bus:
 	pci_remove_root_bus(bus);
 
 err_power_off_phy:
-	phy_power_off(pcie->phy);
+	if (pcie->phy)
+		phy_power_off(pcie->phy);
 err_exit_phy:
-	phy_exit(pcie->phy);
+	if (pcie->phy)
+		phy_exit(pcie->phy);
+
 	return ret;
 }
 EXPORT_SYMBOL(iproc_pcie_setup);
@@ -262,8 +254,10 @@ int iproc_pcie_remove(struct iproc_pcie *pcie)
 	pci_stop_root_bus(pcie->root_bus);
 	pci_remove_root_bus(pcie->root_bus);
 
-	phy_power_off(pcie->phy);
-	phy_exit(pcie->phy);
+	if (pcie->phy) {
+		phy_power_off(pcie->phy);
+		phy_exit(pcie->phy);
+	}
 
 	return 0;
 }

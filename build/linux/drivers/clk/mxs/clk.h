@@ -12,8 +12,7 @@
 #ifndef __MXS_CLK_H
 #define __MXS_CLK_H
 
-struct clk;
-
+#include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/spinlock.h>
 

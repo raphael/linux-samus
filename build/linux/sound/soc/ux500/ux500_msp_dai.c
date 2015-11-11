@@ -773,22 +773,20 @@ static int ux500_msp_drv_probe(struct platform_device *pdev)
 	}
 	prcmu_qos_add_requirement(PRCMU_QOS_APE_OPP, (char *)pdev->name, 50);
 
-	drvdata->pclk = devm_clk_get(&pdev->dev, "apb_pclk");
+	drvdata->pclk = clk_get(&pdev->dev, "apb_pclk");
 	if (IS_ERR(drvdata->pclk)) {
 		ret = (int)PTR_ERR(drvdata->pclk);
-		dev_err(&pdev->dev,
-			"%s: ERROR: devm_clk_get of pclk failed (%d)!\n",
+		dev_err(&pdev->dev, "%s: ERROR: clk_get of pclk failed (%d)!\n",
 			__func__, ret);
-		return ret;
+		goto err_pclk;
 	}
 
-	drvdata->clk = devm_clk_get(&pdev->dev, NULL);
+	drvdata->clk = clk_get(&pdev->dev, NULL);
 	if (IS_ERR(drvdata->clk)) {
 		ret = (int)PTR_ERR(drvdata->clk);
-		dev_err(&pdev->dev,
-			"%s: ERROR: devm_clk_get failed (%d)!\n",
+		dev_err(&pdev->dev, "%s: ERROR: clk_get failed (%d)!\n",
 			__func__, ret);
-		return ret;
+		goto err_clk;
 	}
 
 	ret = ux500_msp_i2s_init_msp(pdev, &drvdata->msp,
@@ -797,7 +795,7 @@ static int ux500_msp_drv_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev,
 			"%s: ERROR: Failed to init MSP-struct (%d)!",
 			__func__, ret);
-		return ret;
+		goto err_init_msp;
 	}
 	dev_set_drvdata(&pdev->dev, drvdata);
 
@@ -806,7 +804,7 @@ static int ux500_msp_drv_probe(struct platform_device *pdev)
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Error: %s: Failed to register MSP%d!\n",
 			__func__, drvdata->msp->id);
-		return ret;
+		goto err_init_msp;
 	}
 
 	ret = ux500_pcm_register_platform(pdev);
@@ -821,6 +819,13 @@ static int ux500_msp_drv_probe(struct platform_device *pdev)
 
 err_reg_plat:
 	snd_soc_unregister_component(&pdev->dev);
+err_init_msp:
+	clk_put(drvdata->clk);
+err_clk:
+	clk_put(drvdata->pclk);
+err_pclk:
+	devm_regulator_put(drvdata->reg_vape);
+
 	return ret;
 }
 
@@ -832,7 +837,11 @@ static int ux500_msp_drv_remove(struct platform_device *pdev)
 
 	snd_soc_unregister_component(&pdev->dev);
 
+	devm_regulator_put(drvdata->reg_vape);
 	prcmu_qos_remove_requirement(PRCMU_QOS_APE_OPP, "ux500_msp_i2s");
+
+	clk_put(drvdata->clk);
+	clk_put(drvdata->pclk);
 
 	ux500_msp_i2s_cleanup_msp(pdev, drvdata->msp);
 

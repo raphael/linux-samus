@@ -22,7 +22,7 @@
  * Authors: Ben Skeggs <bskeggs@redhat.com>
  * 	    Roy Spliet <rspliet@eclipso.eu>
  */
-#include "ram.h"
+#include "priv.h"
 
 struct ramxlat {
 	int id;
@@ -42,9 +42,9 @@ ramxlat(const struct ramxlat *xlat, int id)
 
 static const struct ramxlat
 ramgddr3_cl_lo[] = {
-	{ 5, 5 }, { 7, 7 }, { 8, 0 }, { 9, 1 }, { 10, 2 }, { 11, 3 }, { 12, 8 },
+	{ 7, 7 }, { 8, 0 }, { 9, 1 }, { 10, 2 }, { 11, 3 },
 	/* the below are mentioned in some, but not all, gddr3 docs */
-	{ 13, 9 }, { 14, 6 },
+	{ 12, 4 }, { 13, 5 }, { 14, 6 },
 	/* XXX: Per Samsung docs, are these used? They overlap with Qimonda */
 	/* { 4, 4 }, { 5, 5 }, { 6, 6 }, { 12, 8 }, { 13, 9 }, { 14, 10 },
 	 * { 15, 11 }, */
@@ -61,25 +61,24 @@ ramgddr3_cl_hi[] = {
 static const struct ramxlat
 ramgddr3_wr_lo[] = {
 	{ 5, 2 }, { 7, 4 }, { 8, 5 }, { 9, 6 }, { 10, 7 },
-	{ 11, 0 }, { 13 , 1 },
+	{ 11, 0 },
 	/* the below are mentioned in some, but not all, gddr3 docs */
-	{ 4, 1 }, { 6, 3 }, { 12, 1 },
+	{ 4, 1 }, { 6, 3 }, { 12, 1 }, { 13 , 2 },
 	{ -1 }
 };
 
 int
 nvkm_gddr3_calc(struct nvkm_ram *ram)
 {
-	int CL, WR, CWL, DLL = 0, ODT = 0, RON, hi;
+	int CL, WR, CWL, DLL = 0, ODT = 0, hi;
 
 	switch (ram->next->bios.timing_ver) {
 	case 0x10:
 		CWL = ram->next->bios.timing_10_CWL;
 		CL  = ram->next->bios.timing_10_CL;
 		WR  = ram->next->bios.timing_10_WR;
-		DLL = !ram->next->bios.ramcfg_DLLoff;
+		DLL = !ram->next->bios.ramcfg_10_DLLoff;
 		ODT = ram->next->bios.timing_10_ODT;
-		RON = ram->next->bios.ramcfg_RON;
 		break;
 	case 0x20:
 		CWL = (ram->next->bios.timing[1] & 0x00000f80) >> 7;
@@ -90,7 +89,6 @@ nvkm_gddr3_calc(struct nvkm_ram *ram)
 		ODT =  (ram->mr[1] & 0x004) >> 2 |
 		       (ram->mr[1] & 0x040) >> 5 |
 		       (ram->mr[1] & 0x200) >> 7;
-		RON = !(ram->mr[1] & 0x300) >> 8;
 		break;
 	default:
 		return -ENOSYS;
@@ -109,7 +107,7 @@ nvkm_gddr3_calc(struct nvkm_ram *ram)
 
 	ram->mr[1] &= ~0x3fc;
 	ram->mr[1] |= (ODT & 0x03) << 2;
-	ram->mr[1] |= (RON & 0x03) << 8;
+	ram->mr[1] |= (ODT & 0x03) << 8;
 	ram->mr[1] |= (WR  & 0x03) << 4;
 	ram->mr[1] |= (WR  & 0x04) << 5;
 	ram->mr[1] |= !DLL << 6;

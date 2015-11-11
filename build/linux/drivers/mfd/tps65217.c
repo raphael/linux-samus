@@ -156,7 +156,6 @@ static const struct of_device_id tps65217_of_match[] = {
 	{ .compatible = "ti,tps65217", .data = (void *)TPS65217 },
 	{ /* sentinel */ },
 };
-MODULE_DEVICE_TABLE(of, tps65217_of_match);
 
 static int tps65217_probe(struct i2c_client *client,
 				const struct i2c_device_id *ids)
@@ -249,6 +248,7 @@ MODULE_DEVICE_TABLE(i2c, tps65217_id_table);
 static struct i2c_driver tps65217_driver = {
 	.driver		= {
 		.name	= "tps65217",
+		.owner	= THIS_MODULE,
 		.of_match_table = tps65217_of_match,
 	},
 	.id_table	= tps65217_id_table,

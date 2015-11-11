@@ -711,7 +711,7 @@ static void acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
 #endif
 }
 
-int acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, int *pcpu)
+static int _acpi_map_lsapic(acpi_handle handle, int physid, int *pcpu)
 {
 	int cpu;
 
@@ -726,6 +726,12 @@ int acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, int *pcpu)
 
 	*pcpu = cpu;
 	return 0;
+}
+
+/* wrapper to silence section mismatch warning */
+int __ref acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, int *pcpu)
+{
+	return _acpi_map_lsapic(handle, physid, pcpu);
 }
 EXPORT_SYMBOL(acpi_map_cpu);
 

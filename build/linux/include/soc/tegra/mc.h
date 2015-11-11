@@ -51,6 +51,11 @@ struct tegra_smmu_swgroup {
 	unsigned int reg;
 };
 
+struct tegra_smmu_ops {
+	void (*flush_dcache)(struct page *page, unsigned long offset,
+			     size_t size);
+};
+
 struct tegra_smmu_soc {
 	const struct tegra_mc_client *clients;
 	unsigned int num_clients;
@@ -63,6 +68,8 @@ struct tegra_smmu_soc {
 
 	unsigned int num_tlb_lines;
 	unsigned int num_asids;
+
+	const struct tegra_smmu_ops *ops;
 };
 
 struct tegra_mc;
@@ -95,8 +102,6 @@ struct tegra_mc_soc {
 
 	unsigned int num_address_bits;
 	unsigned int atom_size;
-
-	u8 client_id_mask;
 
 	const struct tegra_smmu_soc *smmu;
 };

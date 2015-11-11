@@ -300,6 +300,7 @@ static struct i2c_driver pca954x_driver = {
 	.driver		= {
 		.name	= "pca954x",
 		.pm	= &pca954x_pm,
+		.owner	= THIS_MODULE,
 	},
 	.probe		= pca954x_probe,
 	.remove		= pca954x_remove,

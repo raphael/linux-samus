@@ -62,6 +62,7 @@
 #define ALUA_OPTIMIZE_STPG		1
 
 struct alua_dh_data {
+	struct scsi_dh_data	dh_data;
 	int			group_id;
 	int			rel_port;
 	int			tpgs;
@@ -84,6 +85,11 @@ struct alua_dh_data {
 
 static char print_alua_state(int);
 static int alua_check_sense(struct scsi_device *, struct scsi_sense_hdr *);
+
+static inline struct alua_dh_data *get_alua_data(struct scsi_device *sdev)
+{
+	return container_of(sdev->scsi_dh_data, struct alua_dh_data, dh_data);
+}
 
 static int realloc_buffer(struct alua_dh_data *h, unsigned len)
 {
@@ -702,7 +708,7 @@ out:
  */
 static int alua_set_params(struct scsi_device *sdev, const char *params)
 {
-	struct alua_dh_data *h = sdev->handler_data;
+	struct alua_dh_data *h = get_alua_data(sdev);
 	unsigned int optimize = 0, argc;
 	const char *p = params;
 	int result = SCSI_DH_OK;
@@ -740,7 +746,7 @@ MODULE_PARM_DESC(optimize_stpg, "Allow use of a non-optimized path, rather than 
 static int alua_activate(struct scsi_device *sdev,
 			activate_complete fn, void *data)
 {
-	struct alua_dh_data *h = sdev->handler_data;
+	struct alua_dh_data *h = get_alua_data(sdev);
 	int err = SCSI_DH_OK;
 	int stpg = 0;
 
@@ -798,7 +804,7 @@ out:
  */
 static int alua_prep_fn(struct scsi_device *sdev, struct request *req)
 {
-	struct alua_dh_data *h = sdev->handler_data;
+	struct alua_dh_data *h = get_alua_data(sdev);
 	int ret = BLKPREP_OK;
 
 	if (h->state == TPGS_STATE_TRANSITIONING)
@@ -813,18 +819,23 @@ static int alua_prep_fn(struct scsi_device *sdev, struct request *req)
 
 }
 
+static bool alua_match(struct scsi_device *sdev)
+{
+	return (scsi_device_tpgs(sdev) != 0);
+}
+
 /*
  * alua_bus_attach - Attach device handler
  * @sdev: device to be attached to
  */
-static int alua_bus_attach(struct scsi_device *sdev)
+static struct scsi_dh_data *alua_bus_attach(struct scsi_device *sdev)
 {
 	struct alua_dh_data *h;
 	int err;
 
 	h = kzalloc(sizeof(*h) , GFP_KERNEL);
 	if (!h)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 	h->tpgs = TPGS_MODE_UNINITIALIZED;
 	h->state = TPGS_STATE_OPTIMIZED;
 	h->group_id = -1;
@@ -837,11 +848,11 @@ static int alua_bus_attach(struct scsi_device *sdev)
 	if (err != SCSI_DH_OK && err != SCSI_DH_DEV_OFFLINED)
 		goto failed;
 
-	sdev->handler_data = h;
-	return 0;
+	sdev_printk(KERN_NOTICE, sdev, "%s: Attached\n", ALUA_DH_NAME);
+	return &h->dh_data;
 failed:
 	kfree(h);
-	return -EINVAL;
+	return ERR_PTR(-EINVAL);
 }
 
 /*
@@ -850,11 +861,10 @@ failed:
  */
 static void alua_bus_detach(struct scsi_device *sdev)
 {
-	struct alua_dh_data *h = sdev->handler_data;
+	struct alua_dh_data *h = get_alua_data(sdev);
 
 	if (h->buff && h->inq != h->buff)
 		kfree(h->buff);
-	sdev->handler_data = NULL;
 	kfree(h);
 }
 
@@ -867,6 +877,7 @@ static struct scsi_device_handler alua_dh = {
 	.check_sense = alua_check_sense,
 	.activate = alua_activate,
 	.set_params = alua_set_params,
+	.match = alua_match,
 };
 
 static int __init alua_init(void)

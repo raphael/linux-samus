@@ -32,7 +32,7 @@
     |       score: | TODO |
     |          sh: | TODO |
     |       sparc: | TODO |
-    |        tile: |  ok  |
+    |        tile: | TODO |
     |          um: | TODO |
     |   unicore32: | TODO |
     |         x86: |  ok  |

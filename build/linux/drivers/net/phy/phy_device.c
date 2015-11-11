@@ -156,8 +156,8 @@ struct phy_device *phy_device_create(struct mii_bus *bus, int addr, int phy_id,
 
 	/* We allocate the device, and initialize the default values */
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-	if (!dev)
-		return ERR_PTR(-ENOMEM);
+	if (NULL == dev)
+		return (struct phy_device *)PTR_ERR((void *)-ENOMEM);
 
 	dev->dev.release = phy_device_release;
 
@@ -178,7 +178,7 @@ struct phy_device *phy_device_create(struct mii_bus *bus, int addr, int phy_id,
 	dev->bus = bus;
 	dev->dev.parent = &bus->dev;
 	dev->dev.bus = &mdio_bus_type;
-	dev->irq = bus->irq ? bus->irq[addr] : PHY_POLL;
+	dev->irq = bus->irq != NULL ? bus->irq[addr] : PHY_POLL;
 	dev_set_name(&dev->dev, PHY_ID_FMT, bus->id, addr);
 
 	dev->state = PHY_DOWN;
@@ -384,24 +384,6 @@ int phy_device_register(struct phy_device *phydev)
 EXPORT_SYMBOL(phy_device_register);
 
 /**
- * phy_device_remove - Remove a previously registered phy device from the MDIO bus
- * @phydev: phy_device structure to remove
- *
- * This doesn't free the phy_device itself, it merely reverses the effects
- * of phy_device_register(). Use phy_device_free() to free the device
- * after calling this function.
- */
-void phy_device_remove(struct phy_device *phydev)
-{
-	struct mii_bus *bus = phydev->bus;
-	int addr = phydev->addr;
-
-	device_del(&phydev->dev);
-	bus->phy_map[addr] = NULL;
-}
-EXPORT_SYMBOL(phy_device_remove);
-
-/**
  * phy_find_first - finds the first PHY device on the bus
  * @bus: the target MII bus
  */
@@ -596,26 +578,18 @@ EXPORT_SYMBOL(phy_init_hw);
  *     generic driver is used.  The phy_device is given a ptr to
  *     the attaching device, and given a callback for link status
  *     change.  The phy_device is returned to the attaching driver.
- *     This function takes a reference on the phy device.
  */
 int phy_attach_direct(struct net_device *dev, struct phy_device *phydev,
 		      u32 flags, phy_interface_t interface)
 {
-	struct mii_bus *bus = phydev->bus;
 	struct device *d = &phydev->dev;
+	struct module *bus_module;
 	int err;
-
-	if (!try_module_get(bus->owner)) {
-		dev_err(&dev->dev, "failed to get the bus module\n");
-		return -EIO;
-	}
-
-	get_device(d);
 
 	/* Assume that if there is no driver, that it doesn't
 	 * exist, and we should use the genphy driver.
 	 */
-	if (!d->driver) {
+	if (NULL == d->driver) {
 		if (phydev->is_c45)
 			d->driver = &genphy_driver[GENPHY_DRV_10G].driver;
 		else
@@ -626,13 +600,20 @@ int phy_attach_direct(struct net_device *dev, struct phy_device *phydev,
 			err = device_bind_driver(d);
 
 		if (err)
-			goto error;
+			return err;
 	}
 
 	if (phydev->attached_dev) {
 		dev_err(&dev->dev, "PHY already attached\n");
-		err = -EBUSY;
-		goto error;
+		return -EBUSY;
+	}
+
+	/* Increment the bus module reference count */
+	bus_module = phydev->bus->dev.driver ?
+		     phydev->bus->dev.driver->owner : NULL;
+	if (!try_module_get(bus_module)) {
+		dev_err(&dev->dev, "failed to get the bus module\n");
+		return -EIO;
 	}
 
 	phydev->attached_dev = dev;
@@ -654,11 +635,6 @@ int phy_attach_direct(struct net_device *dev, struct phy_device *phydev,
 	else
 		phy_resume(phydev);
 
-	return err;
-
-error:
-	put_device(d);
-	module_put(bus->owner);
 	return err;
 }
 EXPORT_SYMBOL(phy_attach_direct);
@@ -701,14 +677,13 @@ EXPORT_SYMBOL(phy_attach);
 /**
  * phy_detach - detach a PHY device from its network device
  * @phydev: target phy_device struct
- *
- * This detaches the phy device from its network device and the phy
- * driver, and drops the reference count taken in phy_attach_direct().
  */
 void phy_detach(struct phy_device *phydev)
 {
-	struct mii_bus *bus;
 	int i;
+
+	if (phydev->bus->dev.driver)
+		module_put(phydev->bus->dev.driver->owner);
 
 	phydev->attached_dev->phydev = NULL;
 	phydev->attached_dev = NULL;
@@ -725,15 +700,6 @@ void phy_detach(struct phy_device *phydev)
 			break;
 		}
 	}
-
-	/*
-	 * The phydev might go away on the put_device() below, so avoid
-	 * a use-after-free bug by reading the underlying bus first.
-	 */
-	bus = phydev->bus;
-
-	put_device(&phydev->dev);
-	module_put(bus->owner);
 }
 EXPORT_SYMBOL(phy_detach);
 

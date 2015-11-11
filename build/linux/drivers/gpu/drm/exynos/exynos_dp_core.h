@@ -147,10 +147,11 @@ struct link_train {
 };
 
 struct exynos_dp_device {
-	struct drm_encoder	encoder;
+	struct exynos_drm_display display;
 	struct device		*dev;
 	struct drm_device	*drm_dev;
 	struct drm_connector	connector;
+	struct drm_encoder	*encoder;
 	struct drm_panel	*panel;
 	struct drm_bridge	*bridge;
 	struct clk		*clock;

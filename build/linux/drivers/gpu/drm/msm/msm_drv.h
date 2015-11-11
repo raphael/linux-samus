@@ -30,7 +30,6 @@
 #include <linux/list.h>
 #include <linux/iommu.h>
 #include <linux/types.h>
-#include <linux/of_graph.h>
 #include <asm/sizes.h>
 
 #ifndef CONFIG_OF
@@ -63,19 +62,6 @@ struct msm_file_private {
 	 * the context's page-tables here.
 	 */
 	int dummy;
-};
-
-enum msm_mdp_plane_property {
-	PLANE_PROP_ZPOS,
-	PLANE_PROP_ALPHA,
-	PLANE_PROP_PREMULTIPLIED,
-	PLANE_PROP_MAX_NUM
-};
-
-struct msm_vblank_ctrl {
-	struct work_struct work;
-	struct list_head event_list;
-	spinlock_t lock;
 };
 
 struct msm_drm_private {
@@ -142,9 +128,6 @@ struct msm_drm_private {
 	unsigned int num_connectors;
 	struct drm_connector *connectors[8];
 
-	/* Properties */
-	struct drm_property *plane_property[PLANE_PROP_MAX_NUM];
-
 	/* VRAM carveout, used when no IOMMU: */
 	struct {
 		unsigned long size;
@@ -154,8 +137,6 @@ struct msm_drm_private {
 		 */
 		struct drm_mm mm;
 	} vram;
-
-	struct msm_vblank_ctrl vblank_ctrl;
 };
 
 struct msm_format {

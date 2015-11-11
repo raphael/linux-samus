@@ -16,7 +16,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/slab.h>
 #include <linux/io.h>

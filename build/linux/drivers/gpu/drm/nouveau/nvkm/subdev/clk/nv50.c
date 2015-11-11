@@ -25,39 +25,38 @@
 #include "pll.h"
 #include "seq.h"
 
+#include <core/device.h>
 #include <subdev/bios.h>
 #include <subdev/bios/pll.h>
 
 static u32
-read_div(struct nv50_clk *clk)
+read_div(struct nv50_clk_priv *priv)
 {
-	struct nvkm_device *device = clk->base.subdev.device;
-	switch (device->chipset) {
+	switch (nv_device(priv)->chipset) {
 	case 0x50: /* it exists, but only has bit 31, not the dividers.. */
 	case 0x84:
 	case 0x86:
 	case 0x98:
 	case 0xa0:
-		return nvkm_rd32(device, 0x004700);
+		return nv_rd32(priv, 0x004700);
 	case 0x92:
 	case 0x94:
 	case 0x96:
-		return nvkm_rd32(device, 0x004800);
+		return nv_rd32(priv, 0x004800);
 	default:
 		return 0x00000000;
 	}
 }
 
 static u32
-read_pll_src(struct nv50_clk *clk, u32 base)
+read_pll_src(struct nv50_clk_priv *priv, u32 base)
 {
-	struct nvkm_subdev *subdev = &clk->base.subdev;
-	struct nvkm_device *device = subdev->device;
-	u32 coef, ref = nvkm_clk_read(&clk->base, nv_clk_src_crystal);
-	u32 rsel = nvkm_rd32(device, 0x00e18c);
+	struct nvkm_clk *clk = &priv->base;
+	u32 coef, ref = clk->read(clk, nv_clk_src_crystal);
+	u32 rsel = nv_rd32(priv, 0x00e18c);
 	int P, N, M, id;
 
-	switch (device->chipset) {
+	switch (nv_device(priv)->chipset) {
 	case 0x50:
 	case 0xa0:
 		switch (base) {
@@ -66,11 +65,11 @@ read_pll_src(struct nv50_clk *clk, u32 base)
 		case 0x4008: id = !!(rsel & 0x00000008); break;
 		case 0x4030: id = 0; break;
 		default:
-			nvkm_error(subdev, "ref: bad pll %06x\n", base);
+			nv_error(priv, "ref: bad pll 0x%06x\n", base);
 			return 0;
 		}
 
-		coef = nvkm_rd32(device, 0x00e81c + (id * 0x0c));
+		coef = nv_rd32(priv, 0x00e81c + (id * 0x0c));
 		ref *=  (coef & 0x01000000) ? 2 : 4;
 		P    =  (coef & 0x00070000) >> 16;
 		N    = ((coef & 0x0000ff00) >> 8) + 1;
@@ -79,7 +78,7 @@ read_pll_src(struct nv50_clk *clk, u32 base)
 	case 0x84:
 	case 0x86:
 	case 0x92:
-		coef = nvkm_rd32(device, 0x00e81c);
+		coef = nv_rd32(priv, 0x00e81c);
 		P    = (coef & 0x00070000) >> 16;
 		N    = (coef & 0x0000ff00) >> 8;
 		M    = (coef & 0x000000ff) >> 0;
@@ -87,26 +86,26 @@ read_pll_src(struct nv50_clk *clk, u32 base)
 	case 0x94:
 	case 0x96:
 	case 0x98:
-		rsel = nvkm_rd32(device, 0x00c050);
+		rsel = nv_rd32(priv, 0x00c050);
 		switch (base) {
 		case 0x4020: rsel = (rsel & 0x00000003) >> 0; break;
 		case 0x4008: rsel = (rsel & 0x0000000c) >> 2; break;
 		case 0x4028: rsel = (rsel & 0x00001800) >> 11; break;
 		case 0x4030: rsel = 3; break;
 		default:
-			nvkm_error(subdev, "ref: bad pll %06x\n", base);
+			nv_error(priv, "ref: bad pll 0x%06x\n", base);
 			return 0;
 		}
 
 		switch (rsel) {
 		case 0: id = 1; break;
-		case 1: return nvkm_clk_read(&clk->base, nv_clk_src_crystal);
-		case 2: return nvkm_clk_read(&clk->base, nv_clk_src_href);
+		case 1: return clk->read(clk, nv_clk_src_crystal);
+		case 2: return clk->read(clk, nv_clk_src_href);
 		case 3: id = 0; break;
 		}
 
-		coef =  nvkm_rd32(device, 0x00e81c + (id * 0x28));
-		P    = (nvkm_rd32(device, 0x00e824 + (id * 0x28)) >> 16) & 7;
+		coef =  nv_rd32(priv, 0x00e81c + (id * 0x28));
+		P    = (nv_rd32(priv, 0x00e824 + (id * 0x28)) >> 16) & 7;
 		P   += (coef & 0x00070000) >> 16;
 		N    = (coef & 0x0000ff00) >> 8;
 		M    = (coef & 0x000000ff) >> 0;
@@ -122,11 +121,10 @@ read_pll_src(struct nv50_clk *clk, u32 base)
 }
 
 static u32
-read_pll_ref(struct nv50_clk *clk, u32 base)
+read_pll_ref(struct nv50_clk_priv *priv, u32 base)
 {
-	struct nvkm_subdev *subdev = &clk->base.subdev;
-	struct nvkm_device *device = subdev->device;
-	u32 src, mast = nvkm_rd32(device, 0x00c040);
+	struct nvkm_clk *clk = &priv->base;
+	u32 src, mast = nv_rd32(priv, 0x00c040);
 
 	switch (base) {
 	case 0x004028:
@@ -142,33 +140,33 @@ read_pll_ref(struct nv50_clk *clk, u32 base)
 		src = !!(mast & 0x02000000);
 		break;
 	case 0x00e810:
-		return nvkm_clk_read(&clk->base, nv_clk_src_crystal);
+		return clk->read(clk, nv_clk_src_crystal);
 	default:
-		nvkm_error(subdev, "bad pll %06x\n", base);
+		nv_error(priv, "bad pll 0x%06x\n", base);
 		return 0;
 	}
 
 	if (src)
-		return nvkm_clk_read(&clk->base, nv_clk_src_href);
+		return clk->read(clk, nv_clk_src_href);
 
-	return read_pll_src(clk, base);
+	return read_pll_src(priv, base);
 }
 
 static u32
-read_pll(struct nv50_clk *clk, u32 base)
+read_pll(struct nv50_clk_priv *priv, u32 base)
 {
-	struct nvkm_device *device = clk->base.subdev.device;
-	u32 mast = nvkm_rd32(device, 0x00c040);
-	u32 ctrl = nvkm_rd32(device, base + 0);
-	u32 coef = nvkm_rd32(device, base + 4);
-	u32 ref = read_pll_ref(clk, base);
+	struct nvkm_clk *clk = &priv->base;
+	u32 mast = nv_rd32(priv, 0x00c040);
+	u32 ctrl = nv_rd32(priv, base + 0);
+	u32 coef = nv_rd32(priv, base + 4);
+	u32 ref = read_pll_ref(priv, base);
 	u32 freq = 0;
 	int N1, N2, M1, M2;
 
 	if (base == 0x004028 && (mast & 0x00100000)) {
 		/* wtf, appears to only disable post-divider on gt200 */
-		if (device->chipset != 0xa0)
-			return nvkm_clk_read(&clk->base, nv_clk_src_dom6);
+		if (nv_device(priv)->chipset != 0xa0)
+			return clk->read(clk, nv_clk_src_dom6);
 	}
 
 	N2 = (coef & 0xff000000) >> 24;
@@ -188,73 +186,71 @@ read_pll(struct nv50_clk *clk, u32 base)
 	return freq;
 }
 
-int
-nv50_clk_read(struct nvkm_clk *base, enum nv_clk_src src)
+static int
+nv50_clk_read(struct nvkm_clk *clk, enum nv_clk_src src)
 {
-	struct nv50_clk *clk = nv50_clk(base);
-	struct nvkm_subdev *subdev = &clk->base.subdev;
-	struct nvkm_device *device = subdev->device;
-	u32 mast = nvkm_rd32(device, 0x00c040);
+	struct nv50_clk_priv *priv = (void *)clk;
+	u32 mast = nv_rd32(priv, 0x00c040);
 	u32 P = 0;
 
 	switch (src) {
 	case nv_clk_src_crystal:
-		return device->crystal;
+		return nv_device(priv)->crystal;
 	case nv_clk_src_href:
 		return 100000; /* PCIE reference clock */
 	case nv_clk_src_hclk:
-		return div_u64((u64)nvkm_clk_read(&clk->base, nv_clk_src_href) * 27778, 10000);
+		return div_u64((u64)clk->read(clk, nv_clk_src_href) * 27778, 10000);
 	case nv_clk_src_hclkm3:
-		return nvkm_clk_read(&clk->base, nv_clk_src_hclk) * 3;
+		return clk->read(clk, nv_clk_src_hclk) * 3;
 	case nv_clk_src_hclkm3d2:
-		return nvkm_clk_read(&clk->base, nv_clk_src_hclk) * 3 / 2;
+		return clk->read(clk, nv_clk_src_hclk) * 3 / 2;
 	case nv_clk_src_host:
 		switch (mast & 0x30000000) {
-		case 0x00000000: return nvkm_clk_read(&clk->base, nv_clk_src_href);
+		case 0x00000000: return clk->read(clk, nv_clk_src_href);
 		case 0x10000000: break;
 		case 0x20000000: /* !0x50 */
-		case 0x30000000: return nvkm_clk_read(&clk->base, nv_clk_src_hclk);
+		case 0x30000000: return clk->read(clk, nv_clk_src_hclk);
 		}
 		break;
 	case nv_clk_src_core:
 		if (!(mast & 0x00100000))
-			P = (nvkm_rd32(device, 0x004028) & 0x00070000) >> 16;
+			P = (nv_rd32(priv, 0x004028) & 0x00070000) >> 16;
 		switch (mast & 0x00000003) {
-		case 0x00000000: return nvkm_clk_read(&clk->base, nv_clk_src_crystal) >> P;
-		case 0x00000001: return nvkm_clk_read(&clk->base, nv_clk_src_dom6);
-		case 0x00000002: return read_pll(clk, 0x004020) >> P;
-		case 0x00000003: return read_pll(clk, 0x004028) >> P;
+		case 0x00000000: return clk->read(clk, nv_clk_src_crystal) >> P;
+		case 0x00000001: return clk->read(clk, nv_clk_src_dom6);
+		case 0x00000002: return read_pll(priv, 0x004020) >> P;
+		case 0x00000003: return read_pll(priv, 0x004028) >> P;
 		}
 		break;
 	case nv_clk_src_shader:
-		P = (nvkm_rd32(device, 0x004020) & 0x00070000) >> 16;
+		P = (nv_rd32(priv, 0x004020) & 0x00070000) >> 16;
 		switch (mast & 0x00000030) {
 		case 0x00000000:
 			if (mast & 0x00000080)
-				return nvkm_clk_read(&clk->base, nv_clk_src_host) >> P;
-			return nvkm_clk_read(&clk->base, nv_clk_src_crystal) >> P;
+				return clk->read(clk, nv_clk_src_host) >> P;
+			return clk->read(clk, nv_clk_src_crystal) >> P;
 		case 0x00000010: break;
-		case 0x00000020: return read_pll(clk, 0x004028) >> P;
-		case 0x00000030: return read_pll(clk, 0x004020) >> P;
+		case 0x00000020: return read_pll(priv, 0x004028) >> P;
+		case 0x00000030: return read_pll(priv, 0x004020) >> P;
 		}
 		break;
 	case nv_clk_src_mem:
-		P = (nvkm_rd32(device, 0x004008) & 0x00070000) >> 16;
-		if (nvkm_rd32(device, 0x004008) & 0x00000200) {
+		P = (nv_rd32(priv, 0x004008) & 0x00070000) >> 16;
+		if (nv_rd32(priv, 0x004008) & 0x00000200) {
 			switch (mast & 0x0000c000) {
 			case 0x00000000:
-				return nvkm_clk_read(&clk->base, nv_clk_src_crystal) >> P;
+				return clk->read(clk, nv_clk_src_crystal) >> P;
 			case 0x00008000:
 			case 0x0000c000:
-				return nvkm_clk_read(&clk->base, nv_clk_src_href) >> P;
+				return clk->read(clk, nv_clk_src_href) >> P;
 			}
 		} else {
-			return read_pll(clk, 0x004008) >> P;
+			return read_pll(priv, 0x004008) >> P;
 		}
 		break;
 	case nv_clk_src_vdec:
-		P = (read_div(clk) & 0x00000700) >> 8;
-		switch (device->chipset) {
+		P = (read_div(priv) & 0x00000700) >> 8;
+		switch (nv_device(priv)->chipset) {
 		case 0x84:
 		case 0x86:
 		case 0x92:
@@ -263,51 +259,51 @@ nv50_clk_read(struct nvkm_clk *base, enum nv_clk_src src)
 		case 0xa0:
 			switch (mast & 0x00000c00) {
 			case 0x00000000:
-				if (device->chipset == 0xa0) /* wtf?? */
-					return nvkm_clk_read(&clk->base, nv_clk_src_core) >> P;
-				return nvkm_clk_read(&clk->base, nv_clk_src_crystal) >> P;
+				if (nv_device(priv)->chipset == 0xa0) /* wtf?? */
+					return clk->read(clk, nv_clk_src_core) >> P;
+				return clk->read(clk, nv_clk_src_crystal) >> P;
 			case 0x00000400:
 				return 0;
 			case 0x00000800:
 				if (mast & 0x01000000)
-					return read_pll(clk, 0x004028) >> P;
-				return read_pll(clk, 0x004030) >> P;
+					return read_pll(priv, 0x004028) >> P;
+				return read_pll(priv, 0x004030) >> P;
 			case 0x00000c00:
-				return nvkm_clk_read(&clk->base, nv_clk_src_core) >> P;
+				return clk->read(clk, nv_clk_src_core) >> P;
 			}
 			break;
 		case 0x98:
 			switch (mast & 0x00000c00) {
 			case 0x00000000:
-				return nvkm_clk_read(&clk->base, nv_clk_src_core) >> P;
+				return clk->read(clk, nv_clk_src_core) >> P;
 			case 0x00000400:
 				return 0;
 			case 0x00000800:
-				return nvkm_clk_read(&clk->base, nv_clk_src_hclkm3d2) >> P;
+				return clk->read(clk, nv_clk_src_hclkm3d2) >> P;
 			case 0x00000c00:
-				return nvkm_clk_read(&clk->base, nv_clk_src_mem) >> P;
+				return clk->read(clk, nv_clk_src_mem) >> P;
 			}
 			break;
 		}
 		break;
 	case nv_clk_src_dom6:
-		switch (device->chipset) {
+		switch (nv_device(priv)->chipset) {
 		case 0x50:
 		case 0xa0:
-			return read_pll(clk, 0x00e810) >> 2;
+			return read_pll(priv, 0x00e810) >> 2;
 		case 0x84:
 		case 0x86:
 		case 0x92:
 		case 0x94:
 		case 0x96:
 		case 0x98:
-			P = (read_div(clk) & 0x00000007) >> 0;
+			P = (read_div(priv) & 0x00000007) >> 0;
 			switch (mast & 0x0c000000) {
-			case 0x00000000: return nvkm_clk_read(&clk->base, nv_clk_src_href);
+			case 0x00000000: return clk->read(clk, nv_clk_src_href);
 			case 0x04000000: break;
-			case 0x08000000: return nvkm_clk_read(&clk->base, nv_clk_src_hclk);
+			case 0x08000000: return clk->read(clk, nv_clk_src_hclk);
 			case 0x0c000000:
-				return nvkm_clk_read(&clk->base, nv_clk_src_hclkm3) >> P;
+				return clk->read(clk, nv_clk_src_hclkm3) >> P;
 			}
 			break;
 		default:
@@ -317,27 +313,27 @@ nv50_clk_read(struct nvkm_clk *base, enum nv_clk_src src)
 		break;
 	}
 
-	nvkm_debug(subdev, "unknown clock source %d %08x\n", src, mast);
+	nv_debug(priv, "unknown clock source %d 0x%08x\n", src, mast);
 	return -EINVAL;
 }
 
 static u32
-calc_pll(struct nv50_clk *clk, u32 reg, u32 idx, int *N, int *M, int *P)
+calc_pll(struct nv50_clk_priv *priv, u32 reg, u32 clk, int *N, int *M, int *P)
 {
-	struct nvkm_subdev *subdev = &clk->base.subdev;
+	struct nvkm_bios *bios = nvkm_bios(priv);
 	struct nvbios_pll pll;
 	int ret;
 
-	ret = nvbios_pll_parse(subdev->device->bios, reg, &pll);
+	ret = nvbios_pll_parse(bios, reg, &pll);
 	if (ret)
 		return 0;
 
 	pll.vco2.max_freq = 0;
-	pll.refclk = read_pll_ref(clk, reg);
+	pll.refclk = read_pll_ref(priv, reg);
 	if (!pll.refclk)
 		return 0;
 
-	return nv04_pll_calc(subdev, &pll, idx, N, M, NULL, NULL, P);
+	return nv04_pll_calc(nv_subdev(priv), &pll, clk, N, M, NULL, NULL, P);
 }
 
 static inline u32
@@ -364,13 +360,11 @@ clk_same(u32 a, u32 b)
 	return ((a / 1000) == (b / 1000));
 }
 
-int
-nv50_clk_calc(struct nvkm_clk *base, struct nvkm_cstate *cstate)
+static int
+nv50_clk_calc(struct nvkm_clk *clk, struct nvkm_cstate *cstate)
 {
-	struct nv50_clk *clk = nv50_clk(base);
-	struct nv50_clk_hwsq *hwsq = &clk->hwsq;
-	struct nvkm_subdev *subdev = &clk->base.subdev;
-	struct nvkm_device *device = subdev->device;
+	struct nv50_clk_priv *priv = (void *)clk;
+	struct nv50_clk_hwsq *hwsq = &priv->hwsq;
 	const int shader = cstate->domain[nv_clk_src_shader];
 	const int core = cstate->domain[nv_clk_src_core];
 	const int vdec = cstate->domain[nv_clk_src_vdec];
@@ -381,7 +375,7 @@ nv50_clk_calc(struct nvkm_clk *base, struct nvkm_cstate *cstate)
 	int freq, out;
 
 	/* prepare a hwsq script from which we'll perform the reclock */
-	out = clk_init(hwsq, subdev);
+	out = clk_init(hwsq, nv_subdev(clk));
 	if (out)
 		return out;
 
@@ -399,15 +393,15 @@ nv50_clk_calc(struct nvkm_clk *base, struct nvkm_cstate *cstate)
 		freq = calc_div(core, vdec, &P1);
 
 		/* see how close we can get using xpll/hclk as a source */
-		if (device->chipset != 0x98)
-			out = read_pll(clk, 0x004030);
+		if (nv_device(priv)->chipset != 0x98)
+			out = read_pll(priv, 0x004030);
 		else
-			out = nvkm_clk_read(&clk->base, nv_clk_src_hclkm3d2);
+			out = clk->read(clk, nv_clk_src_hclkm3d2);
 		out = calc_div(out, vdec, &P2);
 
 		/* select whichever gets us closest */
 		if (abs(vdec - freq) <= abs(vdec - out)) {
-			if (device->chipset != 0x98)
+			if (nv_device(priv)->chipset != 0x98)
 				mastv |= 0x00000c00;
 			divsv |= P1 << 8;
 		} else {
@@ -423,14 +417,14 @@ nv50_clk_calc(struct nvkm_clk *base, struct nvkm_cstate *cstate)
 	 * of the host clock frequency
 	 */
 	if (dom6) {
-		if (clk_same(dom6, nvkm_clk_read(&clk->base, nv_clk_src_href))) {
+		if (clk_same(dom6, clk->read(clk, nv_clk_src_href))) {
 			mastv |= 0x00000000;
 		} else
-		if (clk_same(dom6, nvkm_clk_read(&clk->base, nv_clk_src_hclk))) {
+		if (clk_same(dom6, clk->read(clk, nv_clk_src_hclk))) {
 			mastv |= 0x08000000;
 		} else {
-			freq = nvkm_clk_read(&clk->base, nv_clk_src_hclk) * 3;
-			calc_div(freq, dom6, &P1);
+			freq = clk->read(clk, nv_clk_src_hclk) * 3;
+			freq = calc_div(freq, dom6, &P1);
 
 			mastv |= 0x0c000000;
 			divsv |= P1;
@@ -450,13 +444,13 @@ nv50_clk_calc(struct nvkm_clk *base, struct nvkm_cstate *cstate)
 	/* core/shader: disconnect nvclk/sclk from their PLLs (nvclk to dom6,
 	 * sclk to hclk) before reprogramming
 	 */
-	if (device->chipset < 0x92)
+	if (nv_device(priv)->chipset < 0x92)
 		clk_mask(hwsq, mast, 0x001000b0, 0x00100080);
 	else
 		clk_mask(hwsq, mast, 0x000000b3, 0x00000081);
 
 	/* core: for the moment at least, always use nvpll */
-	freq = calc_pll(clk, 0x4028, core, &N, &M, &P1);
+	freq = calc_pll(priv, 0x4028, core, &N, &M, &P1);
 	if (freq == 0)
 		return -ERANGE;
 
@@ -474,7 +468,7 @@ nv50_clk_calc(struct nvkm_clk *base, struct nvkm_cstate *cstate)
 		clk_mask(hwsq, spll[0], 0xc03f0100, (P1 << 19) | (P1 << 16));
 		clk_mask(hwsq, mast, 0x00100033, 0x00000023);
 	} else {
-		freq = calc_pll(clk, 0x4020, shader, &N, &M, &P1);
+		freq = calc_pll(priv, 0x4020, shader, &N, &M, &P1);
 		if (freq == 0)
 			return -ERANGE;
 
@@ -491,71 +485,77 @@ nv50_clk_calc(struct nvkm_clk *base, struct nvkm_cstate *cstate)
 	return 0;
 }
 
-int
-nv50_clk_prog(struct nvkm_clk *base)
+static int
+nv50_clk_prog(struct nvkm_clk *clk)
 {
-	struct nv50_clk *clk = nv50_clk(base);
-	return clk_exec(&clk->hwsq, true);
+	struct nv50_clk_priv *priv = (void *)clk;
+	return clk_exec(&priv->hwsq, true);
 }
 
-void
-nv50_clk_tidy(struct nvkm_clk *base)
+static void
+nv50_clk_tidy(struct nvkm_clk *clk)
 {
-	struct nv50_clk *clk = nv50_clk(base);
-	clk_exec(&clk->hwsq, false);
+	struct nv50_clk_priv *priv = (void *)clk;
+	clk_exec(&priv->hwsq, false);
 }
 
 int
-nv50_clk_new_(const struct nvkm_clk_func *func, struct nvkm_device *device,
-	      int index, bool allow_reclock, struct nvkm_clk **pclk)
+nv50_clk_ctor(struct nvkm_object *parent, struct nvkm_object *engine,
+	      struct nvkm_oclass *oclass, void *data, u32 size,
+	      struct nvkm_object **pobject)
 {
-	struct nv50_clk *clk;
+	struct nv50_clk_oclass *pclass = (void *)oclass;
+	struct nv50_clk_priv *priv;
 	int ret;
 
-	if (!(clk = kzalloc(sizeof(*clk), GFP_KERNEL)))
-		return -ENOMEM;
-	ret = nvkm_clk_ctor(func, device, index, allow_reclock, &clk->base);
-	*pclk = &clk->base;
+	ret = nvkm_clk_create(parent, engine, oclass, pclass->domains,
+			      NULL, 0, false, &priv);
+	*pobject = nv_object(priv);
 	if (ret)
 		return ret;
 
-	clk->hwsq.r_fifo = hwsq_reg(0x002504);
-	clk->hwsq.r_spll[0] = hwsq_reg(0x004020);
-	clk->hwsq.r_spll[1] = hwsq_reg(0x004024);
-	clk->hwsq.r_nvpll[0] = hwsq_reg(0x004028);
-	clk->hwsq.r_nvpll[1] = hwsq_reg(0x00402c);
-	switch (device->chipset) {
+	priv->hwsq.r_fifo = hwsq_reg(0x002504);
+	priv->hwsq.r_spll[0] = hwsq_reg(0x004020);
+	priv->hwsq.r_spll[1] = hwsq_reg(0x004024);
+	priv->hwsq.r_nvpll[0] = hwsq_reg(0x004028);
+	priv->hwsq.r_nvpll[1] = hwsq_reg(0x00402c);
+	switch (nv_device(priv)->chipset) {
 	case 0x92:
 	case 0x94:
 	case 0x96:
-		clk->hwsq.r_divs = hwsq_reg(0x004800);
+		priv->hwsq.r_divs = hwsq_reg(0x004800);
 		break;
 	default:
-		clk->hwsq.r_divs = hwsq_reg(0x004700);
+		priv->hwsq.r_divs = hwsq_reg(0x004700);
 		break;
 	}
-	clk->hwsq.r_mast = hwsq_reg(0x00c040);
+	priv->hwsq.r_mast = hwsq_reg(0x00c040);
+
+	priv->base.read = nv50_clk_read;
+	priv->base.calc = nv50_clk_calc;
+	priv->base.prog = nv50_clk_prog;
+	priv->base.tidy = nv50_clk_tidy;
 	return 0;
 }
 
-static const struct nvkm_clk_func
-nv50_clk = {
-	.read = nv50_clk_read,
-	.calc = nv50_clk_calc,
-	.prog = nv50_clk_prog,
-	.tidy = nv50_clk_tidy,
-	.domains = {
-		{ nv_clk_src_crystal, 0xff },
-		{ nv_clk_src_href   , 0xff },
-		{ nv_clk_src_core   , 0xff, 0, "core", 1000 },
-		{ nv_clk_src_shader , 0xff, 0, "shader", 1000 },
-		{ nv_clk_src_mem    , 0xff, 0, "memory", 1000 },
-		{ nv_clk_src_max }
-	}
+static struct nvkm_domain
+nv50_domains[] = {
+	{ nv_clk_src_crystal, 0xff },
+	{ nv_clk_src_href   , 0xff },
+	{ nv_clk_src_core   , 0xff, 0, "core", 1000 },
+	{ nv_clk_src_shader , 0xff, 0, "shader", 1000 },
+	{ nv_clk_src_mem    , 0xff, 0, "memory", 1000 },
+	{ nv_clk_src_max }
 };
 
-int
-nv50_clk_new(struct nvkm_device *device, int index, struct nvkm_clk **pclk)
-{
-	return nv50_clk_new_(&nv50_clk, device, index, false, pclk);
-}
+struct nvkm_oclass *
+nv50_clk_oclass = &(struct nv50_clk_oclass) {
+	.base.handle = NV_SUBDEV(CLK, 0x50),
+	.base.ofuncs = &(struct nvkm_ofuncs) {
+		.ctor = nv50_clk_ctor,
+		.dtor = _nvkm_clk_dtor,
+		.init = _nvkm_clk_init,
+		.fini = _nvkm_clk_fini,
+	},
+	.domains = nv50_domains,
+}.base;

@@ -25,7 +25,6 @@
 #include <linux/sysfs.h>
 #include <linux/module.h>
 #include <linux/delay.h>
-#include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/irq.h>
 #include <linux/time.h>

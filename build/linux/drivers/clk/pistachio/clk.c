@@ -6,7 +6,6 @@
  * version 2, as published by the Free Software Foundation.
  */
 
-#include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/kernel.h>
 #include <linux/of.h>

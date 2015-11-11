@@ -12,7 +12,6 @@
 #include <linux/slab.h>
 #include <linux/cred.h>
 #include <linux/mm.h>
-#include <linux/printk.h>
 
 #include <asm/uaccess.h>
 #include <asm/page.h>
@@ -372,16 +371,16 @@ EXPORT_SYMBOL(seq_release);
  *	@esc:	set of characters that need escaping
  *
  *	Puts string into buffer, replacing each occurrence of character from
- *	@esc with usual octal escape.
- *	Use seq_has_overflowed() to check for errors.
+ *	@esc with usual octal escape.  Returns 0 in case of success, -1 - in
+ *	case of overflow.
  */
-void seq_escape(struct seq_file *m, const char *s, const char *esc)
+int seq_escape(struct seq_file *m, const char *s, const char *esc)
 {
 	char *end = m->buf + m->size;
-	char *p;
+        char *p;
 	char c;
 
-	for (p = m->buf + m->count; (c = *s) != '\0' && p < end; s++) {
+        for (p = m->buf + m->count; (c = *s) != '\0' && p < end; s++) {
 		if (!strchr(esc, c)) {
 			*p++ = c;
 			continue;
@@ -394,13 +393,14 @@ void seq_escape(struct seq_file *m, const char *s, const char *esc)
 			continue;
 		}
 		seq_set_overflow(m);
-		return;
-	}
+		return -1;
+        }
 	m->count = p - m->buf;
+        return 0;
 }
 EXPORT_SYMBOL(seq_escape);
 
-void seq_vprintf(struct seq_file *m, const char *f, va_list args)
+int seq_vprintf(struct seq_file *m, const char *f, va_list args)
 {
 	int len;
 
@@ -408,20 +408,24 @@ void seq_vprintf(struct seq_file *m, const char *f, va_list args)
 		len = vsnprintf(m->buf + m->count, m->size - m->count, f, args);
 		if (m->count + len < m->size) {
 			m->count += len;
-			return;
+			return 0;
 		}
 	}
 	seq_set_overflow(m);
+	return -1;
 }
 EXPORT_SYMBOL(seq_vprintf);
 
-void seq_printf(struct seq_file *m, const char *f, ...)
+int seq_printf(struct seq_file *m, const char *f, ...)
 {
+	int ret;
 	va_list args;
 
 	va_start(args, f);
-	seq_vprintf(m, f, args);
+	ret = seq_vprintf(m, f, args);
 	va_end(args);
+
+	return ret;
 }
 EXPORT_SYMBOL(seq_printf);
 
@@ -659,25 +663,26 @@ int seq_open_private(struct file *filp, const struct seq_operations *ops,
 }
 EXPORT_SYMBOL(seq_open_private);
 
-void seq_putc(struct seq_file *m, char c)
+int seq_putc(struct seq_file *m, char c)
 {
-	if (m->count >= m->size)
-		return;
-
-	m->buf[m->count++] = c;
+	if (m->count < m->size) {
+		m->buf[m->count++] = c;
+		return 0;
+	}
+	return -1;
 }
 EXPORT_SYMBOL(seq_putc);
 
-void seq_puts(struct seq_file *m, const char *s)
+int seq_puts(struct seq_file *m, const char *s)
 {
 	int len = strlen(s);
-
-	if (m->count + len >= m->size) {
-		seq_set_overflow(m);
-		return;
+	if (m->count + len < m->size) {
+		memcpy(m->buf + m->count, s, len);
+		m->count += len;
+		return 0;
 	}
-	memcpy(m->buf + m->count, s, len);
-	m->count += len;
+	seq_set_overflow(m);
+	return -1;
 }
 EXPORT_SYMBOL(seq_puts);
 
@@ -688,8 +693,8 @@ EXPORT_SYMBOL(seq_puts);
  * This routine is very quick when you show lots of numbers.
  * In usual cases, it will be better to use seq_printf(). It's easier to read.
  */
-void seq_put_decimal_ull(struct seq_file *m, char delimiter,
-			 unsigned long long num)
+int seq_put_decimal_ull(struct seq_file *m, char delimiter,
+			unsigned long long num)
 {
 	int len;
 
@@ -701,33 +706,35 @@ void seq_put_decimal_ull(struct seq_file *m, char delimiter,
 
 	if (num < 10) {
 		m->buf[m->count++] = num + '0';
-		return;
+		return 0;
 	}
 
 	len = num_to_str(m->buf + m->count, m->size - m->count, num);
 	if (!len)
 		goto overflow;
 	m->count += len;
-	return;
-
+	return 0;
 overflow:
 	seq_set_overflow(m);
+	return -1;
 }
 EXPORT_SYMBOL(seq_put_decimal_ull);
 
-void seq_put_decimal_ll(struct seq_file *m, char delimiter, long long num)
+int seq_put_decimal_ll(struct seq_file *m, char delimiter,
+			long long num)
 {
 	if (num < 0) {
 		if (m->count + 3 >= m->size) {
 			seq_set_overflow(m);
-			return;
+			return -1;
 		}
 		if (delimiter)
 			m->buf[m->count++] = delimiter;
 		num = -num;
 		delimiter = '-';
 	}
-	seq_put_decimal_ull(m, delimiter, num);
+	return seq_put_decimal_ull(m, delimiter, num);
+
 }
 EXPORT_SYMBOL(seq_put_decimal_ll);
 
@@ -765,47 +772,6 @@ void seq_pad(struct seq_file *m, char c)
 		seq_putc(m, c);
 }
 EXPORT_SYMBOL(seq_pad);
-
-/* A complete analogue of print_hex_dump() */
-void seq_hex_dump(struct seq_file *m, const char *prefix_str, int prefix_type,
-		  int rowsize, int groupsize, const void *buf, size_t len,
-		  bool ascii)
-{
-	const u8 *ptr = buf;
-	int i, linelen, remaining = len;
-	int ret;
-
-	if (rowsize != 16 && rowsize != 32)
-		rowsize = 16;
-
-	for (i = 0; i < len && !seq_has_overflowed(m); i += rowsize) {
-		linelen = min(remaining, rowsize);
-		remaining -= rowsize;
-
-		switch (prefix_type) {
-		case DUMP_PREFIX_ADDRESS:
-			seq_printf(m, "%s%p: ", prefix_str, ptr + i);
-			break;
-		case DUMP_PREFIX_OFFSET:
-			seq_printf(m, "%s%.8x: ", prefix_str, i);
-			break;
-		default:
-			seq_printf(m, "%s", prefix_str);
-			break;
-		}
-
-		ret = hex_dump_to_buffer(ptr + i, linelen, rowsize, groupsize,
-					 m->buf + m->count, m->size - m->count,
-					 ascii);
-		if (ret >= m->size - m->count) {
-			seq_set_overflow(m);
-		} else {
-			m->count += ret;
-			seq_putc(m, '\n');
-		}
-	}
-}
-EXPORT_SYMBOL(seq_hex_dump);
 
 struct list_head *seq_list_start(struct list_head *head, loff_t pos)
 {

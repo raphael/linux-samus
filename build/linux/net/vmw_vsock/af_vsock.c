@@ -1948,13 +1948,13 @@ int __vsock_core_init(const struct vsock_transport *t, struct module *owner)
 	err = misc_register(&vsock_device);
 	if (err) {
 		pr_err("Failed to register misc device\n");
-		goto err_reset_transport;
+		return -ENOENT;
 	}
 
 	err = proto_register(&vsock_proto, 1);	/* we want our slab */
 	if (err) {
 		pr_err("Cannot register vsock protocol\n");
-		goto err_deregister_misc;
+		goto err_misc_deregister;
 	}
 
 	err = sock_register(&vsock_family_ops);
@@ -1969,9 +1969,8 @@ int __vsock_core_init(const struct vsock_transport *t, struct module *owner)
 
 err_unregister_proto:
 	proto_unregister(&vsock_proto);
-err_deregister_misc:
+err_misc_deregister:
 	misc_deregister(&vsock_device);
-err_reset_transport:
 	transport = NULL;
 err_busy:
 	mutex_unlock(&vsock_register_mutex);

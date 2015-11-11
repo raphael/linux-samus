@@ -31,7 +31,6 @@
 #define CLK_FOUT_VPLL			4
 #define CLK_FOUT_UPLL			5
 #define CLK_FOUT_MPLL			6
-#define CLK_ARM_CLK			7
 
 /* Muxes */
 #define CLK_MOUT_MPLL_USER_L		16

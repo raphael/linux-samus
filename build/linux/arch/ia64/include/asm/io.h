@@ -435,7 +435,6 @@ static inline void __iomem * ioremap_cache (unsigned long phys_addr, unsigned lo
 {
 	return ioremap(phys_addr, size);
 }
-#define ioremap_cache ioremap_cache
 
 
 /*

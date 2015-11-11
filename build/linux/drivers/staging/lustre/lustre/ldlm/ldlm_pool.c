@@ -1422,7 +1422,7 @@ static int ldlm_pools_thread_start(void)
 		return -EALREADY;
 
 	ldlm_pools_thread = kzalloc(sizeof(*ldlm_pools_thread), GFP_NOFS);
-	if (!ldlm_pools_thread)
+	if (ldlm_pools_thread == NULL)
 		return -ENOMEM;
 
 	init_completion(&ldlm_pools_comp);
@@ -1486,10 +1486,8 @@ EXPORT_SYMBOL(ldlm_pools_init);
 
 void ldlm_pools_fini(void)
 {
-	if (ldlm_pools_thread) {
-		unregister_shrinker(&ldlm_pools_srv_shrinker);
-		unregister_shrinker(&ldlm_pools_cli_shrinker);
-	}
+	unregister_shrinker(&ldlm_pools_srv_shrinker);
+	unregister_shrinker(&ldlm_pools_cli_shrinker);
 	ldlm_pools_thread_stop();
 }
 EXPORT_SYMBOL(ldlm_pools_fini);

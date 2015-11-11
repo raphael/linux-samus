@@ -171,14 +171,14 @@ static int gfs2_check_sb(struct gfs2_sbd *sdp, int silent)
 	return -EINVAL;
 }
 
-static void end_bio_io_page(struct bio *bio)
+static void end_bio_io_page(struct bio *bio, int error)
 {
 	struct page *page = bio->bi_private;
 
-	if (!bio->bi_error)
+	if (!error)
 		SetPageUptodate(page);
 	else
-		pr_warn("error %d reading superblock\n", bio->bi_error);
+		pr_warn("error %d reading superblock\n", error);
 	unlock_page(page);
 }
 

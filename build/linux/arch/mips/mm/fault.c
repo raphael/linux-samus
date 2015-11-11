@@ -57,10 +57,12 @@ static void __kprobes __do_page_fault(struct pt_regs *regs, unsigned long write,
 
 #ifdef CONFIG_KPROBES
 	/*
-	 * This is to notify the fault handler of the kprobes.
+	 * This is to notify the fault handler of the kprobes.	The
+	 * exception code is redundant as it is also carried in REGS,
+	 * but we pass it anyhow.
 	 */
 	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, -1,
-		       current->thread.trap_nr, SIGSEGV) == NOTIFY_STOP)
+		       (regs->cp0_cause >> 2) & 0x1f, SIGSEGV) == NOTIFY_STOP)
 		return;
 #endif
 
@@ -222,7 +224,6 @@ bad_area_nosemaphore:
 			print_vma_addr(" ", regs->regs[31]);
 			pr_info("\n");
 		}
-		current->thread.trap_nr = (regs->cp0_cause >> 2) & 0x1f;
 		info.si_signo = SIGSEGV;
 		info.si_errno = 0;
 		/* info.si_code has been set above */
@@ -281,7 +282,6 @@ do_sigbus:
 		       field, (unsigned long) regs->cp0_epc,
 		       field, (unsigned long) regs->regs[31]);
 #endif
-	current->thread.trap_nr = (regs->cp0_cause >> 2) & 0x1f;
 	tsk->thread.cp0_badvaddr = address;
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;

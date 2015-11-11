@@ -175,11 +175,11 @@ static int _drbd_md_sync_page_io(struct drbd_device *device,
 	atomic_inc(&device->md_io.in_use); /* drbd_md_put_buffer() is in the completion handler */
 	device->md_io.submit_jif = jiffies;
 	if (drbd_insert_fault(device, (rw & WRITE) ? DRBD_FAULT_MD_WR : DRBD_FAULT_MD_RD))
-		bio_io_error(bio);
+		bio_endio(bio, -EIO);
 	else
 		submit_bio(rw, bio);
 	wait_until_done_or_force_detached(device, bdev, &device->md_io.done);
-	if (!bio->bi_error)
+	if (bio_flagged(bio, BIO_UPTODATE))
 		err = device->md_io.error;
 
  out:

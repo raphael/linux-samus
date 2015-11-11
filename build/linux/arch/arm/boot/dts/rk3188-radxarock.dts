@@ -48,7 +48,6 @@
 	compatible = "radxa,rock", "rockchip,rk3188";
 
 	memory {
-		device_type = "memory";
 		reg = <0x60000000 0x80000000>;
 	};
 
@@ -356,10 +355,6 @@
 };
 
 &uart3 {
-	status = "okay";
-};
-
-&usbphy {
 	status = "okay";
 };
 

@@ -22,12 +22,14 @@
  */
 #include "priv.h"
 
+#include <core/device.h>
+
 #if defined(CONFIG_ACPI) && defined(CONFIG_X86)
 int nouveau_acpi_get_bios_chunk(uint8_t *bios, int offset, int len);
-bool nouveau_acpi_rom_supported(struct device *);
+bool nouveau_acpi_rom_supported(struct pci_dev *pdev);
 #else
 static inline bool
-nouveau_acpi_rom_supported(struct device *dev)
+nouveau_acpi_rom_supported(struct pci_dev *pdev)
 {
 	return false;
 }
@@ -88,7 +90,7 @@ acpi_read_slow(void *data, u32 offset, u32 length, struct nvkm_bios *bios)
 static void *
 acpi_init(struct nvkm_bios *bios, const char *name)
 {
-	if (!nouveau_acpi_rom_supported(bios->subdev.device->dev))
+	if (!nouveau_acpi_rom_supported(nv_device(bios)->pdev))
 		return ERR_PTR(-ENODEV);
 	return NULL;
 }

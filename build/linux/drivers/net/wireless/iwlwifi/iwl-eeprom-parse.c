@@ -713,12 +713,12 @@ int iwl_init_sband_channels(struct iwl_nvm_data *data,
 	struct ieee80211_channel *chan = &data->channels[0];
 	int n = 0, idx = 0;
 
-	while (idx < n_channels && chan->band != band)
+	while (chan->band != band && idx < n_channels)
 		chan = &data->channels[++idx];
 
 	sband->channels = &data->channels[idx];
 
-	while (idx < n_channels && chan->band == band) {
+	while (chan->band == band && idx < n_channels) {
 		chan = &data->channels[++idx];
 		n++;
 	}

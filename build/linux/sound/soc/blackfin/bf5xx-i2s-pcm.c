@@ -342,8 +342,13 @@ static struct snd_soc_platform_driver bf5xx_i2s_soc_platform = {
 
 static int bfin_i2s_soc_platform_probe(struct platform_device *pdev)
 {
-	return devm_snd_soc_register_platform(&pdev->dev,
-					      &bf5xx_i2s_soc_platform);
+	return snd_soc_register_platform(&pdev->dev, &bf5xx_i2s_soc_platform);
+}
+
+static int bfin_i2s_soc_platform_remove(struct platform_device *pdev)
+{
+	snd_soc_unregister_platform(&pdev->dev);
+	return 0;
 }
 
 static struct platform_driver bfin_i2s_pcm_driver = {
@@ -352,6 +357,7 @@ static struct platform_driver bfin_i2s_pcm_driver = {
 	},
 
 	.probe = bfin_i2s_soc_platform_probe,
+	.remove = bfin_i2s_soc_platform_remove,
 };
 
 module_platform_driver(bfin_i2s_pcm_driver);

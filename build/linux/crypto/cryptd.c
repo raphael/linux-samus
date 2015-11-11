@@ -176,9 +176,10 @@ static inline void cryptd_check_internal(struct rtattr **tb, u32 *type,
 	algt = crypto_get_attr_type(tb);
 	if (IS_ERR(algt))
 		return;
-
-	*type |= algt->type & CRYPTO_ALG_INTERNAL;
-	*mask |= algt->mask & CRYPTO_ALG_INTERNAL;
+	if ((algt->type & CRYPTO_ALG_INTERNAL))
+		*type |= CRYPTO_ALG_INTERNAL;
+	if ((algt->mask & CRYPTO_ALG_INTERNAL))
+		*mask |= CRYPTO_ALG_INTERNAL;
 }
 
 static int cryptd_blkcipher_setkey(struct crypto_ablkcipher *parent,
@@ -687,18 +688,16 @@ static void cryptd_aead_crypt(struct aead_request *req,
 			int (*crypt)(struct aead_request *req))
 {
 	struct cryptd_aead_request_ctx *rctx;
-	crypto_completion_t compl;
-
 	rctx = aead_request_ctx(req);
-	compl = rctx->complete;
 
 	if (unlikely(err == -EINPROGRESS))
 		goto out;
 	aead_request_set_tfm(req, child);
 	err = crypt( req );
+	req->base.complete = rctx->complete;
 out:
 	local_bh_disable();
-	compl(&req->base, err);
+	rctx->complete(&req->base, err);
 	local_bh_enable();
 }
 
@@ -709,7 +708,7 @@ static void cryptd_aead_encrypt(struct crypto_async_request *areq, int err)
 	struct aead_request *req;
 
 	req = container_of(areq, struct aead_request, base);
-	cryptd_aead_crypt(req, child, err, crypto_aead_alg(child)->encrypt);
+	cryptd_aead_crypt(req, child, err, crypto_aead_crt(child)->encrypt);
 }
 
 static void cryptd_aead_decrypt(struct crypto_async_request *areq, int err)
@@ -719,7 +718,7 @@ static void cryptd_aead_decrypt(struct crypto_async_request *areq, int err)
 	struct aead_request *req;
 
 	req = container_of(areq, struct aead_request, base);
-	cryptd_aead_crypt(req, child, err, crypto_aead_alg(child)->decrypt);
+	cryptd_aead_crypt(req, child, err, crypto_aead_crt(child)->decrypt);
 }
 
 static int cryptd_aead_enqueue(struct aead_request *req,
@@ -757,9 +756,7 @@ static int cryptd_aead_init_tfm(struct crypto_aead *tfm)
 		return PTR_ERR(cipher);
 
 	ctx->child = cipher;
-	crypto_aead_set_reqsize(
-		tfm, max((unsigned)sizeof(struct cryptd_aead_request_ctx),
-			 crypto_aead_reqsize(cipher)));
+	crypto_aead_set_reqsize(tfm, sizeof(struct cryptd_aead_request_ctx));
 	return 0;
 }
 
@@ -778,7 +775,7 @@ static int cryptd_create_aead(struct crypto_template *tmpl,
 	struct aead_alg *alg;
 	const char *name;
 	u32 type = 0;
-	u32 mask = CRYPTO_ALG_ASYNC;
+	u32 mask = 0;
 	int err;
 
 	cryptd_check_internal(tb, &type, &mask);

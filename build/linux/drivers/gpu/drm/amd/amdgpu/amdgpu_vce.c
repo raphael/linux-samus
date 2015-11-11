@@ -48,7 +48,6 @@
 #endif
 #define FIRMWARE_TONGA		"amdgpu/tonga_vce.bin"
 #define FIRMWARE_CARRIZO	"amdgpu/carrizo_vce.bin"
-#define FIRMWARE_FIJI		"amdgpu/fiji_vce.bin"
 
 #ifdef CONFIG_DRM_AMDGPU_CIK
 MODULE_FIRMWARE(FIRMWARE_BONAIRE);
@@ -59,7 +58,6 @@ MODULE_FIRMWARE(FIRMWARE_MULLINS);
 #endif
 MODULE_FIRMWARE(FIRMWARE_TONGA);
 MODULE_FIRMWARE(FIRMWARE_CARRIZO);
-MODULE_FIRMWARE(FIRMWARE_FIJI);
 
 static void amdgpu_vce_idle_work_handler(struct work_struct *work);
 
@@ -103,9 +101,6 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
 	case CHIP_CARRIZO:
 		fw_name = FIRMWARE_CARRIZO;
 		break;
-	case CHIP_FIJI:
-		fw_name = FIRMWARE_FIJI;
-		break;
 
 	default:
 		return -EINVAL;
@@ -141,9 +136,7 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
 	/* allocate firmware, stack and heap BO */
 
 	r = amdgpu_bo_create(adev, size, PAGE_SIZE, true,
-			     AMDGPU_GEM_DOMAIN_VRAM,
-			     AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED,
-			     NULL, NULL, &adev->vce.vcpu_bo);
+			     AMDGPU_GEM_DOMAIN_VRAM, 0, NULL, &adev->vce.vcpu_bo);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to allocate VCE bo\n", r);
 		return r;
@@ -341,14 +334,6 @@ void amdgpu_vce_free_handles(struct amdgpu_device *adev, struct drm_file *filp)
 	}
 }
 
-static int amdgpu_vce_free_job(
-	struct amdgpu_job *job)
-{
-	amdgpu_ib_free(job->adev, job->ibs);
-	kfree(job->ibs);
-	return 0;
-}
-
 /**
  * amdgpu_vce_get_create_msg - generate a VCE create msg
  *
@@ -360,69 +345,59 @@ static int amdgpu_vce_free_job(
  * Open up a stream for HW test
  */
 int amdgpu_vce_get_create_msg(struct amdgpu_ring *ring, uint32_t handle,
-			      struct fence **fence)
+			      struct amdgpu_fence **fence)
 {
 	const unsigned ib_size_dw = 1024;
-	struct amdgpu_ib *ib = NULL;
-	struct fence *f = NULL;
-	struct amdgpu_device *adev = ring->adev;
+	struct amdgpu_ib ib;
 	uint64_t dummy;
 	int i, r;
 
-	ib = kzalloc(sizeof(struct amdgpu_ib), GFP_KERNEL);
-	if (!ib)
-		return -ENOMEM;
-	r = amdgpu_ib_get(ring, NULL, ib_size_dw * 4, ib);
+	r = amdgpu_ib_get(ring, NULL, ib_size_dw * 4, &ib);
 	if (r) {
 		DRM_ERROR("amdgpu: failed to get ib (%d).\n", r);
-		kfree(ib);
 		return r;
 	}
 
-	dummy = ib->gpu_addr + 1024;
+	dummy = ib.gpu_addr + 1024;
 
 	/* stitch together an VCE create msg */
-	ib->length_dw = 0;
-	ib->ptr[ib->length_dw++] = 0x0000000c; /* len */
-	ib->ptr[ib->length_dw++] = 0x00000001; /* session cmd */
-	ib->ptr[ib->length_dw++] = handle;
+	ib.length_dw = 0;
+	ib.ptr[ib.length_dw++] = 0x0000000c; /* len */
+	ib.ptr[ib.length_dw++] = 0x00000001; /* session cmd */
+	ib.ptr[ib.length_dw++] = handle;
 
-	ib->ptr[ib->length_dw++] = 0x00000030; /* len */
-	ib->ptr[ib->length_dw++] = 0x01000001; /* create cmd */
-	ib->ptr[ib->length_dw++] = 0x00000000;
-	ib->ptr[ib->length_dw++] = 0x00000042;
-	ib->ptr[ib->length_dw++] = 0x0000000a;
-	ib->ptr[ib->length_dw++] = 0x00000001;
-	ib->ptr[ib->length_dw++] = 0x00000080;
-	ib->ptr[ib->length_dw++] = 0x00000060;
-	ib->ptr[ib->length_dw++] = 0x00000100;
-	ib->ptr[ib->length_dw++] = 0x00000100;
-	ib->ptr[ib->length_dw++] = 0x0000000c;
-	ib->ptr[ib->length_dw++] = 0x00000000;
+	ib.ptr[ib.length_dw++] = 0x00000030; /* len */
+	ib.ptr[ib.length_dw++] = 0x01000001; /* create cmd */
+	ib.ptr[ib.length_dw++] = 0x00000000;
+	ib.ptr[ib.length_dw++] = 0x00000042;
+	ib.ptr[ib.length_dw++] = 0x0000000a;
+	ib.ptr[ib.length_dw++] = 0x00000001;
+	ib.ptr[ib.length_dw++] = 0x00000080;
+	ib.ptr[ib.length_dw++] = 0x00000060;
+	ib.ptr[ib.length_dw++] = 0x00000100;
+	ib.ptr[ib.length_dw++] = 0x00000100;
+	ib.ptr[ib.length_dw++] = 0x0000000c;
+	ib.ptr[ib.length_dw++] = 0x00000000;
 
-	ib->ptr[ib->length_dw++] = 0x00000014; /* len */
-	ib->ptr[ib->length_dw++] = 0x05000005; /* feedback buffer */
-	ib->ptr[ib->length_dw++] = upper_32_bits(dummy);
-	ib->ptr[ib->length_dw++] = dummy;
-	ib->ptr[ib->length_dw++] = 0x00000001;
+	ib.ptr[ib.length_dw++] = 0x00000014; /* len */
+	ib.ptr[ib.length_dw++] = 0x05000005; /* feedback buffer */
+	ib.ptr[ib.length_dw++] = upper_32_bits(dummy);
+	ib.ptr[ib.length_dw++] = dummy;
+	ib.ptr[ib.length_dw++] = 0x00000001;
 
-	for (i = ib->length_dw; i < ib_size_dw; ++i)
-		ib->ptr[i] = 0x0;
+	for (i = ib.length_dw; i < ib_size_dw; ++i)
+		ib.ptr[i] = 0x0;
 
-	r = amdgpu_sched_ib_submit_kernel_helper(adev, ring, ib, 1,
-						 &amdgpu_vce_free_job,
-						 AMDGPU_FENCE_OWNER_UNDEFINED,
-						 &f);
-	if (r)
-		goto err;
+	r = amdgpu_ib_schedule(ring->adev, 1, &ib, AMDGPU_FENCE_OWNER_UNDEFINED);
+	if (r) {
+		DRM_ERROR("amdgpu: failed to schedule ib (%d).\n", r);
+	}
+
 	if (fence)
-		*fence = fence_get(f);
-	fence_put(f);
-	if (amdgpu_enable_scheduler)
-		return 0;
-err:
-	amdgpu_ib_free(adev, ib);
-	kfree(ib);
+		*fence = amdgpu_fence_ref(ib.fence);
+
+	amdgpu_ib_free(ring->adev, &ib);
+
 	return r;
 }
 
@@ -437,59 +412,49 @@ err:
  * Close up a stream for HW test or if userspace failed to do so
  */
 int amdgpu_vce_get_destroy_msg(struct amdgpu_ring *ring, uint32_t handle,
-			       struct fence **fence)
+			       struct amdgpu_fence **fence)
 {
 	const unsigned ib_size_dw = 1024;
-	struct amdgpu_ib *ib = NULL;
-	struct fence *f = NULL;
-	struct amdgpu_device *adev = ring->adev;
+	struct amdgpu_ib ib;
 	uint64_t dummy;
 	int i, r;
 
-	ib = kzalloc(sizeof(struct amdgpu_ib), GFP_KERNEL);
-	if (!ib)
-		return -ENOMEM;
-
-	r = amdgpu_ib_get(ring, NULL, ib_size_dw * 4, ib);
+	r = amdgpu_ib_get(ring, NULL, ib_size_dw * 4, &ib);
 	if (r) {
-		kfree(ib);
 		DRM_ERROR("amdgpu: failed to get ib (%d).\n", r);
 		return r;
 	}
 
-	dummy = ib->gpu_addr + 1024;
+	dummy = ib.gpu_addr + 1024;
 
 	/* stitch together an VCE destroy msg */
-	ib->length_dw = 0;
-	ib->ptr[ib->length_dw++] = 0x0000000c; /* len */
-	ib->ptr[ib->length_dw++] = 0x00000001; /* session cmd */
-	ib->ptr[ib->length_dw++] = handle;
+	ib.length_dw = 0;
+	ib.ptr[ib.length_dw++] = 0x0000000c; /* len */
+	ib.ptr[ib.length_dw++] = 0x00000001; /* session cmd */
+	ib.ptr[ib.length_dw++] = handle;
 
-	ib->ptr[ib->length_dw++] = 0x00000014; /* len */
-	ib->ptr[ib->length_dw++] = 0x05000005; /* feedback buffer */
-	ib->ptr[ib->length_dw++] = upper_32_bits(dummy);
-	ib->ptr[ib->length_dw++] = dummy;
-	ib->ptr[ib->length_dw++] = 0x00000001;
+	ib.ptr[ib.length_dw++] = 0x00000014; /* len */
+	ib.ptr[ib.length_dw++] = 0x05000005; /* feedback buffer */
+	ib.ptr[ib.length_dw++] = upper_32_bits(dummy);
+	ib.ptr[ib.length_dw++] = dummy;
+	ib.ptr[ib.length_dw++] = 0x00000001;
 
-	ib->ptr[ib->length_dw++] = 0x00000008; /* len */
-	ib->ptr[ib->length_dw++] = 0x02000001; /* destroy cmd */
+	ib.ptr[ib.length_dw++] = 0x00000008; /* len */
+	ib.ptr[ib.length_dw++] = 0x02000001; /* destroy cmd */
 
-	for (i = ib->length_dw; i < ib_size_dw; ++i)
-		ib->ptr[i] = 0x0;
-	r = amdgpu_sched_ib_submit_kernel_helper(adev, ring, ib, 1,
-						 &amdgpu_vce_free_job,
-						 AMDGPU_FENCE_OWNER_UNDEFINED,
-						 &f);
-	if (r)
-		goto err;
+	for (i = ib.length_dw; i < ib_size_dw; ++i)
+		ib.ptr[i] = 0x0;
+
+	r = amdgpu_ib_schedule(ring->adev, 1, &ib, AMDGPU_FENCE_OWNER_UNDEFINED);
+	if (r) {
+		DRM_ERROR("amdgpu: failed to schedule ib (%d).\n", r);
+	}
+
 	if (fence)
-		*fence = fence_get(f);
-	fence_put(f);
-	if (amdgpu_enable_scheduler)
-		return 0;
-err:
-	amdgpu_ib_free(adev, ib);
-	kfree(ib);
+		*fence = amdgpu_fence_ref(ib.fence);
+
+	amdgpu_ib_free(ring->adev, &ib);
+
 	return r;
 }
 
@@ -835,12 +800,8 @@ int amdgpu_vce_ring_test_ring(struct amdgpu_ring *ring)
  */
 int amdgpu_vce_ring_test_ib(struct amdgpu_ring *ring)
 {
-	struct fence *fence = NULL;
+	struct amdgpu_fence *fence = NULL;
 	int r;
-
-	/* skip vce ring1 ib test for now, since it's not reliable */
-	if (ring == &ring->adev->vce.ring[1])
-		return 0;
 
 	r = amdgpu_vce_get_create_msg(ring, 1, NULL);
 	if (r) {
@@ -854,13 +815,13 @@ int amdgpu_vce_ring_test_ib(struct amdgpu_ring *ring)
 		goto error;
 	}
 
-	r = fence_wait(fence, false);
+	r = amdgpu_fence_wait(fence, false);
 	if (r) {
 		DRM_ERROR("amdgpu: fence wait failed (%d).\n", r);
 	} else {
 		DRM_INFO("ib test on ring %d succeeded\n", ring->idx);
 	}
 error:
-	fence_put(fence);
+	amdgpu_fence_unref(&fence);
 	return r;
 }

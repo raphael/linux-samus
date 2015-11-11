@@ -268,7 +268,7 @@ static void tcp_illinois_cong_avoid(struct sock *sk, u32 ack, u32 acked)
 		return;
 
 	/* In slow start */
-	if (tcp_in_slow_start(tp))
+	if (tp->snd_cwnd <= tp->snd_ssthresh)
 		tcp_slow_start(tp, acked);
 
 	else {

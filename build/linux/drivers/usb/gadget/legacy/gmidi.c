@@ -35,6 +35,8 @@
 #include <linux/usb/audio.h>
 #include <linux/usb/midi.h>
 
+#include "gadget_chips.h"
+
 #include "u_midi.h"
 
 /*-------------------------------------------------------------------------*/
@@ -86,10 +88,10 @@ MODULE_PARM_DESC(out_ports, "Number of MIDI output ports");
 static struct usb_device_descriptor device_desc = {
 	.bLength =		USB_DT_DEVICE_SIZE,
 	.bDescriptorType =	USB_DT_DEVICE,
-	.bcdUSB =		cpu_to_le16(0x0200),
+	.bcdUSB =		__constant_cpu_to_le16(0x0200),
 	.bDeviceClass =		USB_CLASS_PER_INTERFACE,
-	.idVendor =		cpu_to_le16(DRIVER_VENDOR_NUM),
-	.idProduct =		cpu_to_le16(DRIVER_PRODUCT_NUM),
+	.idVendor =		__constant_cpu_to_le16(DRIVER_VENDOR_NUM),
+	.idProduct =		__constant_cpu_to_le16(DRIVER_PRODUCT_NUM),
 	/* .iManufacturer =	DYNAMIC */
 	/* .iProduct =		DYNAMIC */
 	.bNumConfigurations =	1,

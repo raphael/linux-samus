@@ -21,19 +21,17 @@
  *
  * Authors: Ben Skeggs
  */
-#include "priv.h"
+#include "nv04.h"
 
-static const struct nvkm_mc_func
-gk20a_mc = {
-	.init = nv50_mc_init,
+struct nvkm_oclass *
+gk20a_mc_oclass = &(struct nvkm_mc_oclass) {
+	.base.handle = NV_SUBDEV(MC, 0xea),
+	.base.ofuncs = &(struct nvkm_ofuncs) {
+		.ctor = nv04_mc_ctor,
+		.dtor = _nvkm_mc_dtor,
+		.init = nv50_mc_init,
+		.fini = _nvkm_mc_fini,
+	},
 	.intr = gf100_mc_intr,
-	.intr_unarm = gf100_mc_intr_unarm,
-	.intr_rearm = gf100_mc_intr_rearm,
-	.intr_mask = gf100_mc_intr_mask,
-};
-
-int
-gk20a_mc_new(struct nvkm_device *device, int index, struct nvkm_mc **pmc)
-{
-	return nvkm_mc_new_(&gk20a_mc, device, index, pmc);
-}
+	.msi_rearm = nv40_mc_msi_rearm,
+}.base;

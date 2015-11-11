@@ -29,7 +29,7 @@ static int dcssblk_open(struct block_device *bdev, fmode_t mode);
 static void dcssblk_release(struct gendisk *disk, fmode_t mode);
 static void dcssblk_make_request(struct request_queue *q, struct bio *bio);
 static long dcssblk_direct_access(struct block_device *bdev, sector_t secnum,
-			 void __pmem **kaddr, unsigned long *pfn);
+				 void **kaddr, unsigned long *pfn, long size);
 
 static char dcssblk_segments[DCSSBLK_PARM_LEN] = "\0";
 
@@ -548,10 +548,10 @@ dcssblk_add_store(struct device *dev, struct device_attribute *attr, const char 
 	 */
 	num_of_segments = 0;
 	for (i = 0; (i < count && (buf[i] != '\0') && (buf[i] != '\n')); i++) {
-		for (j = i; j < count &&
-			(buf[j] != ':') &&
+		for (j = i; (buf[j] != ':') &&
 			(buf[j] != '\0') &&
-			(buf[j] != '\n'); j++) {
+			(buf[j] != '\n') &&
+			j < count; j++) {
 			local_buf[j-i] = toupper(buf[j]);
 		}
 		local_buf[j-i] = '\0';
@@ -723,7 +723,7 @@ dcssblk_remove_store(struct device *dev, struct device_attribute *attr, const ch
 	/*
 	 * parse input
 	 */
-	for (i = 0; (i < count && (*(buf+i)!='\0') && (*(buf+i)!='\n')); i++) {
+	for (i = 0; ((*(buf+i)!='\0') && (*(buf+i)!='\n') && i < count); i++) {
 		local_buf[i] = toupper(buf[i]);
 	}
 	local_buf[i] = '\0';
@@ -826,8 +826,6 @@ dcssblk_make_request(struct request_queue *q, struct bio *bio)
 	unsigned long source_addr;
 	unsigned long bytes_done;
 
-	blk_queue_split(q, &bio, q->bio_split);
-
 	bytes_done = 0;
 	dev_info = bio->bi_bdev->bd_disk->private_data;
 	if (dev_info == NULL)
@@ -873,7 +871,7 @@ dcssblk_make_request(struct request_queue *q, struct bio *bio)
 		}
 		bytes_done += bvec.bv_len;
 	}
-	bio_endio(bio);
+	bio_endio(bio, 0);
 	return;
 fail:
 	bio_io_error(bio);
@@ -881,20 +879,18 @@ fail:
 
 static long
 dcssblk_direct_access (struct block_device *bdev, sector_t secnum,
-			void __pmem **kaddr, unsigned long *pfn)
+			void **kaddr, unsigned long *pfn, long size)
 {
 	struct dcssblk_dev_info *dev_info;
 	unsigned long offset, dev_sz;
-	void *addr;
 
 	dev_info = bdev->bd_disk->private_data;
 	if (!dev_info)
 		return -ENODEV;
 	dev_sz = dev_info->end - dev_info->start;
 	offset = secnum * 512;
-	addr = (void *) (dev_info->start + offset);
-	*pfn = virt_to_phys(addr) >> PAGE_SHIFT;
-	*kaddr = (void __pmem *) addr;
+	*kaddr = (void *) (dev_info->start + offset);
+	*pfn = virt_to_phys(*kaddr) >> PAGE_SHIFT;
 
 	return dev_sz - offset;
 }
@@ -908,10 +904,10 @@ dcssblk_check_params(void)
 
 	for (i = 0; (i < DCSSBLK_PARM_LEN) && (dcssblk_segments[i] != '\0');
 	     i++) {
-		for (j = i; (j < DCSSBLK_PARM_LEN) &&
-			    (dcssblk_segments[j] != ',')  &&
+		for (j = i; (dcssblk_segments[j] != ',')  &&
 			    (dcssblk_segments[j] != '\0') &&
-			    (dcssblk_segments[j] != '('); j++)
+			    (dcssblk_segments[j] != '(')  &&
+			    (j < DCSSBLK_PARM_LEN); j++)
 		{
 			buf[j-i] = dcssblk_segments[j];
 		}

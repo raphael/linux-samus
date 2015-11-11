@@ -19,7 +19,6 @@
  */
 
 #include <linux/errno.h>
-#include <linux/err.h>
 #include <asm/unistd.h>
 #include <asm/processor.h>
 #include <asm/page.h>
@@ -151,7 +150,8 @@ END_FW_FTR_SECTION_IFSET(FW_FEATURE_SPLPAR)
 	CURRENT_THREAD_INFO(r11, r1)
 	ld	r10,TI_FLAGS(r11)
 	andi.	r11,r10,_TIF_SYSCALL_DOTRACE
-	bne	syscall_dotrace		/* does not return */
+	bne	syscall_dotrace
+.Lsyscall_dotrace_cont:
 	cmpldi	0,r0,NR_syscalls
 	bge-	syscall_enosys
 
@@ -207,7 +207,7 @@ system_call:			/* label this so stack traces look sane */
 #endif /* CONFIG_PPC_BOOK3E */
 
 	ld	r9,TI_FLAGS(r12)
-	li	r11,-MAX_ERRNO
+	li	r11,-_LAST_ERRNO
 	andi.	r0,r9,(_TIF_SYSCALL_DOTRACE|_TIF_SINGLESTEP|_TIF_USER_WORK_MASK|_TIF_PERSYSCALL_MASK)
 	bne-	syscall_exit_work
 	cmpld	r3,r11
@@ -245,34 +245,22 @@ syscall_dotrace:
 	bl	save_nvgprs
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	do_syscall_trace_enter
-
 	/*
-	 * We use the return value of do_syscall_trace_enter() as the syscall
-	 * number. If the syscall was rejected for any reason do_syscall_trace_enter()
-	 * returns an invalid syscall number and the test below against
-	 * NR_syscalls will fail.
+	 * Restore argument registers possibly just changed.
+	 * We use the return value of do_syscall_trace_enter
+	 * for the call number to look up in the table (r0).
 	 */
 	mr	r0,r3
-
-	/* Restore argument registers just clobbered and/or possibly changed. */
 	ld	r3,GPR3(r1)
 	ld	r4,GPR4(r1)
 	ld	r5,GPR5(r1)
 	ld	r6,GPR6(r1)
 	ld	r7,GPR7(r1)
 	ld	r8,GPR8(r1)
-
-	/* Repopulate r9 and r10 for the system_call path */
 	addi	r9,r1,STACK_FRAME_OVERHEAD
 	CURRENT_THREAD_INFO(r10, r1)
 	ld	r10,TI_FLAGS(r10)
-
-	cmpldi	r0,NR_syscalls
-	blt+	system_call
-
-	/* Return code is already in r3 thanks to do_syscall_trace_enter() */
-	b	.Lsyscall_exit
-
+	b	.Lsyscall_dotrace_cont
 
 syscall_enosys:
 	li	r3,-ENOSYS
@@ -289,7 +277,7 @@ syscall_exit_work:
 	beq+	0f
 	REST_NVGPRS(r1)
 	b	2f
-0:	cmpld	r3,r11		/* r11 is -MAX_ERRNO */
+0:	cmpld	r3,r11		/* r10 is -LAST_ERRNO */
 	blt+	1f
 	andi.	r0,r9,_TIF_NOERROR
 	bne-	1f

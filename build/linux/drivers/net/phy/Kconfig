@@ -14,11 +14,6 @@ if PHYLIB
 
 comment "MII PHY device drivers"
 
-config AQUANTIA_PHY
-        tristate "Drivers for the Aquantia PHYs"
-        ---help---
-          Currently supports the Aquantia AQ1202, AQ2104, AQR105, AQR405
-
 config AT803X_PHY
 	tristate "Drivers for Atheros AT803X PHYs"
 	---help---
@@ -58,11 +53,6 @@ config VITESSE_PHY
         tristate "Drivers for the Vitesse PHYs"
         ---help---
           Currently supports the vsc8244
-
-config TERANETICS_PHY
-        tristate "Drivers for the Teranetics PHYs"
-        ---help---
-          Currently supports the Teranetics TN2020
 
 config SMSC_PHY
 	tristate "Drivers for SMSC PHYs"
@@ -122,20 +112,10 @@ config MICREL_PHY
 	---help---
 	  Supports the KSZ9021, VSC8201, KS8001 PHYs.
 
-config DP83848_PHY
-	tristate "Driver for Texas Instruments DP83848 PHY"
-	---help---
-	  Supports the DP83848 PHY.
-
 config DP83867_PHY
 	tristate "Drivers for Texas Instruments DP83867 Gigabit PHY"
 	---help---
 	  Currently supports the DP83867 PHY.
-
-config MICROCHIP_PHY
-	tristate "Drivers for Microchip PHYs"
-	help
-	  Supports the LAN88XX PHYs.
 
 config FIXED_PHY
 	tristate "Driver for MDIO Bus/PHY emulation with fixed speed/link PHYs"
@@ -165,13 +145,15 @@ config MDIO_GPIO
 	  will be called mdio-gpio.
 
 config MDIO_OCTEON
-	tristate "Support for MDIO buses on Octeon and ThunderX SOCs"
-	depends on 64BIT
+	tristate "Support for MDIO buses on Octeon SOCs"
+	depends on CAVIUM_OCTEON_SOC
+	default y
 	help
 
-	  This module provides a driver for the Octeon and ThunderX MDIO
-	  busses. It is required by the Octeon and ThunderX ethernet device
-	  drivers.
+	  This module provides a driver for the Octeon MDIO busses.
+	  It is required by the Octeon Ethernet device drivers.
+
+	  If in doubt, say Y.
 
 config MDIO_SUN4I
 	tristate "Allwinner sun4i MDIO interface support"

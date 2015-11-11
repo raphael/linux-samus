@@ -107,7 +107,8 @@ static int db8500_cdev_unbind(struct thermal_zone_device *thermal,
 }
 
 /* Callback to get current temperature */
-static int db8500_sys_get_temp(struct thermal_zone_device *thermal, int *temp)
+static int db8500_sys_get_temp(struct thermal_zone_device *thermal,
+		unsigned long *temp)
 {
 	struct db8500_thermal_zone *pzone = thermal->devdata;
 
@@ -179,7 +180,7 @@ static int db8500_sys_get_trip_type(struct thermal_zone_device *thermal,
 
 /* Callback to get trip point temperature */
 static int db8500_sys_get_trip_temp(struct thermal_zone_device *thermal,
-		int trip, int *temp)
+		int trip, unsigned long *temp)
 {
 	struct db8500_thermal_zone *pzone = thermal->devdata;
 	struct db8500_thsens_platform_data *ptrips = pzone->trip_tab;
@@ -194,7 +195,7 @@ static int db8500_sys_get_trip_temp(struct thermal_zone_device *thermal,
 
 /* Callback to get critical trip point temperature */
 static int db8500_sys_get_crit_temp(struct thermal_zone_device *thermal,
-		int *temp)
+		unsigned long *temp)
 {
 	struct db8500_thermal_zone *pzone = thermal->devdata;
 	struct db8500_thsens_platform_data *ptrips = pzone->trip_tab;

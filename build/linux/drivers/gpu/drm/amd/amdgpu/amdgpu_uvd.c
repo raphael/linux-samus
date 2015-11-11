@@ -52,7 +52,6 @@
 #endif
 #define FIRMWARE_TONGA		"amdgpu/tonga_uvd.bin"
 #define FIRMWARE_CARRIZO	"amdgpu/carrizo_uvd.bin"
-#define FIRMWARE_FIJI		"amdgpu/fiji_uvd.bin"
 
 /**
  * amdgpu_uvd_cs_ctx - Command submission parser context
@@ -82,7 +81,6 @@ MODULE_FIRMWARE(FIRMWARE_MULLINS);
 #endif
 MODULE_FIRMWARE(FIRMWARE_TONGA);
 MODULE_FIRMWARE(FIRMWARE_CARRIZO);
-MODULE_FIRMWARE(FIRMWARE_FIJI);
 
 static void amdgpu_uvd_note_usage(struct amdgpu_device *adev);
 static void amdgpu_uvd_idle_work_handler(struct work_struct *work);
@@ -118,9 +116,6 @@ int amdgpu_uvd_sw_init(struct amdgpu_device *adev)
 	case CHIP_TONGA:
 		fw_name = FIRMWARE_TONGA;
 		break;
-	case CHIP_FIJI:
-		fw_name = FIRMWARE_FIJI;
-		break;
 	case CHIP_CARRIZO:
 		fw_name = FIRMWARE_CARRIZO;
 		break;
@@ -154,9 +149,7 @@ int amdgpu_uvd_sw_init(struct amdgpu_device *adev)
 	bo_size = AMDGPU_GPU_PAGE_ALIGN(le32_to_cpu(hdr->ucode_size_bytes) + 8)
 		 +  AMDGPU_UVD_STACK_SIZE + AMDGPU_UVD_HEAP_SIZE;
 	r = amdgpu_bo_create(adev, bo_size, PAGE_SIZE, true,
-			     AMDGPU_GEM_DOMAIN_VRAM,
-			     AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED,
-			     NULL, NULL, &adev->uvd.vcpu_bo);
+			     AMDGPU_GEM_DOMAIN_VRAM, 0, NULL, &adev->uvd.vcpu_bo);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to allocate UVD bo\n", r);
 		return r;
@@ -223,32 +216,31 @@ int amdgpu_uvd_sw_fini(struct amdgpu_device *adev)
 
 int amdgpu_uvd_suspend(struct amdgpu_device *adev)
 {
-	struct amdgpu_ring *ring = &adev->uvd.ring;
-	int i, r;
+	unsigned size;
+	void *ptr;
+	const struct common_firmware_header *hdr;
+	int i;
 
 	if (adev->uvd.vcpu_bo == NULL)
 		return 0;
 
-	for (i = 0; i < AMDGPU_MAX_UVD_HANDLES; ++i) {
-		uint32_t handle = atomic_read(&adev->uvd.handles[i]);
-		if (handle != 0) {
-			struct fence *fence;
+	for (i = 0; i < AMDGPU_MAX_UVD_HANDLES; ++i)
+		if (atomic_read(&adev->uvd.handles[i]))
+			break;
 
-			amdgpu_uvd_note_usage(adev);
+	if (i == AMDGPU_MAX_UVD_HANDLES)
+		return 0;
 
-			r = amdgpu_uvd_get_destroy_msg(ring, handle, &fence);
-			if (r) {
-				DRM_ERROR("Error destroying UVD (%d)!\n", r);
-				continue;
-			}
+	hdr = (const struct common_firmware_header *)adev->uvd.fw->data;
 
-			fence_wait(fence, false);
-			fence_put(fence);
+	size = amdgpu_bo_size(adev->uvd.vcpu_bo);
+	size -= le32_to_cpu(hdr->ucode_size_bytes);
 
-			adev->uvd.filp[i] = NULL;
-			atomic_set(&adev->uvd.handles[i], 0);
-		}
-	}
+	ptr = adev->uvd.cpu_addr;
+	ptr += le32_to_cpu(hdr->ucode_size_bytes);
+
+	adev->uvd.saved_bo = kmalloc(size, GFP_KERNEL);
+	memcpy(adev->uvd.saved_bo, ptr, size);
 
 	return 0;
 }
@@ -273,7 +265,12 @@ int amdgpu_uvd_resume(struct amdgpu_device *adev)
 	ptr = adev->uvd.cpu_addr;
 	ptr += le32_to_cpu(hdr->ucode_size_bytes);
 
-	memset(ptr, 0, size);
+	if (adev->uvd.saved_bo != NULL) {
+		memcpy(ptr, adev->uvd.saved_bo, size);
+		kfree(adev->uvd.saved_bo);
+		adev->uvd.saved_bo = NULL;
+	} else
+		memset(ptr, 0, size);
 
 	return 0;
 }
@@ -286,7 +283,7 @@ void amdgpu_uvd_free_handles(struct amdgpu_device *adev, struct drm_file *filp)
 	for (i = 0; i < AMDGPU_MAX_UVD_HANDLES; ++i) {
 		uint32_t handle = atomic_read(&adev->uvd.handles[i]);
 		if (handle != 0 && adev->uvd.filp[i] == filp) {
-			struct fence *fence;
+			struct amdgpu_fence *fence;
 
 			amdgpu_uvd_note_usage(adev);
 
@@ -296,8 +293,8 @@ void amdgpu_uvd_free_handles(struct amdgpu_device *adev, struct drm_file *filp)
 				continue;
 			}
 
-			fence_wait(fence, false);
-			fence_put(fence);
+			amdgpu_fence_wait(fence, false);
+			amdgpu_fence_unref(&fence);
 
 			adev->uvd.filp[i] = NULL;
 			atomic_set(&adev->uvd.handles[i], 0);
@@ -511,25 +508,28 @@ static int amdgpu_uvd_cs_msg(struct amdgpu_uvd_cs_ctx *ctx,
 {
 	struct amdgpu_device *adev = ctx->parser->adev;
 	int32_t *msg, msg_type, handle;
+	struct fence *f;
 	void *ptr;
-	long r;
-	int i;
+
+	int i, r;
 
 	if (offset & 0x3F) {
 		DRM_ERROR("UVD messages must be 64 byte aligned!\n");
 		return -EINVAL;
 	}
 
-	r = reservation_object_wait_timeout_rcu(bo->tbo.resv, true, false,
-						MAX_SCHEDULE_TIMEOUT);
-	if (r < 0) {
-		DRM_ERROR("Failed waiting for UVD message (%ld)!\n", r);
-		return r;
+	f = reservation_object_get_excl(bo->tbo.resv);
+	if (f) {
+		r = amdgpu_fence_wait((struct amdgpu_fence *)f, false);
+		if (r) {
+			DRM_ERROR("Failed waiting for UVD message (%d)!\n", r);
+			return r;
+		}
 	}
 
 	r = amdgpu_bo_kmap(bo, &ptr);
 	if (r) {
-		DRM_ERROR("Failed mapping the UVD message (%ld)!\n", r);
+		DRM_ERROR("Failed mapping the UVD message (%d)!\n", r);
 		return r;
 	}
 
@@ -818,24 +818,14 @@ int amdgpu_uvd_ring_parse_cs(struct amdgpu_cs_parser *parser, uint32_t ib_idx)
 	return 0;
 }
 
-static int amdgpu_uvd_free_job(
-	struct amdgpu_job *job)
-{
-	amdgpu_ib_free(job->adev, job->ibs);
-	kfree(job->ibs);
-	return 0;
-}
-
 static int amdgpu_uvd_send_msg(struct amdgpu_ring *ring,
 			       struct amdgpu_bo *bo,
-			       struct fence **fence)
+			       struct amdgpu_fence **fence)
 {
 	struct ttm_validate_buffer tv;
 	struct ww_acquire_ctx ticket;
 	struct list_head head;
-	struct amdgpu_ib *ib = NULL;
-	struct fence *f = NULL;
-	struct amdgpu_device *adev = ring->adev;
+	struct amdgpu_ib ib;
 	uint64_t addr;
 	int i, r;
 
@@ -857,49 +847,34 @@ static int amdgpu_uvd_send_msg(struct amdgpu_ring *ring,
 	r = ttm_bo_validate(&bo->tbo, &bo->placement, true, false);
 	if (r)
 		goto err;
-	ib = kzalloc(sizeof(struct amdgpu_ib), GFP_KERNEL);
-	if (!ib) {
-		r = -ENOMEM;
-		goto err;
-	}
-	r = amdgpu_ib_get(ring, NULL, 64, ib);
+
+	r = amdgpu_ib_get(ring, NULL, 64, &ib);
 	if (r)
-		goto err1;
+		goto err;
 
 	addr = amdgpu_bo_gpu_offset(bo);
-	ib->ptr[0] = PACKET0(mmUVD_GPCOM_VCPU_DATA0, 0);
-	ib->ptr[1] = addr;
-	ib->ptr[2] = PACKET0(mmUVD_GPCOM_VCPU_DATA1, 0);
-	ib->ptr[3] = addr >> 32;
-	ib->ptr[4] = PACKET0(mmUVD_GPCOM_VCPU_CMD, 0);
-	ib->ptr[5] = 0;
+	ib.ptr[0] = PACKET0(mmUVD_GPCOM_VCPU_DATA0, 0);
+	ib.ptr[1] = addr;
+	ib.ptr[2] = PACKET0(mmUVD_GPCOM_VCPU_DATA1, 0);
+	ib.ptr[3] = addr >> 32;
+	ib.ptr[4] = PACKET0(mmUVD_GPCOM_VCPU_CMD, 0);
+	ib.ptr[5] = 0;
 	for (i = 6; i < 16; ++i)
-		ib->ptr[i] = PACKET2(0);
-	ib->length_dw = 16;
+		ib.ptr[i] = PACKET2(0);
+	ib.length_dw = 16;
 
-	r = amdgpu_sched_ib_submit_kernel_helper(adev, ring, ib, 1,
-						 &amdgpu_uvd_free_job,
-						 AMDGPU_FENCE_OWNER_UNDEFINED,
-						 &f);
+	r = amdgpu_ib_schedule(ring->adev, 1, &ib, AMDGPU_FENCE_OWNER_UNDEFINED);
 	if (r)
-		goto err2;
-
-	ttm_eu_fence_buffer_objects(&ticket, &head, f);
+		goto err;
+	ttm_eu_fence_buffer_objects(&ticket, &head, &ib.fence->base);
 
 	if (fence)
-		*fence = fence_get(f);
-	amdgpu_bo_unref(&bo);
-	fence_put(f);
-	if (amdgpu_enable_scheduler)
-		return 0;
+		*fence = amdgpu_fence_ref(ib.fence);
 
-	amdgpu_ib_free(ring->adev, ib);
-	kfree(ib);
+	amdgpu_ib_free(ring->adev, &ib);
+	amdgpu_bo_unref(&bo);
 	return 0;
-err2:
-	amdgpu_ib_free(ring->adev, ib);
-err1:
-	kfree(ib);
+
 err:
 	ttm_eu_backoff_reservation(&ticket, &head);
 	return r;
@@ -909,7 +884,7 @@ err:
    crash the vcpu so just try to emmit a dummy create/destroy msg to
    avoid this */
 int amdgpu_uvd_get_create_msg(struct amdgpu_ring *ring, uint32_t handle,
-			      struct fence **fence)
+			      struct amdgpu_fence **fence)
 {
 	struct amdgpu_device *adev = ring->adev;
 	struct amdgpu_bo *bo;
@@ -917,9 +892,7 @@ int amdgpu_uvd_get_create_msg(struct amdgpu_ring *ring, uint32_t handle,
 	int r, i;
 
 	r = amdgpu_bo_create(adev, 1024, PAGE_SIZE, true,
-			     AMDGPU_GEM_DOMAIN_VRAM,
-			     AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED,
-			     NULL, NULL, &bo);
+			     AMDGPU_GEM_DOMAIN_VRAM, 0, NULL, &bo);
 	if (r)
 		return r;
 
@@ -958,7 +931,7 @@ int amdgpu_uvd_get_create_msg(struct amdgpu_ring *ring, uint32_t handle,
 }
 
 int amdgpu_uvd_get_destroy_msg(struct amdgpu_ring *ring, uint32_t handle,
-			       struct fence **fence)
+			       struct amdgpu_fence **fence)
 {
 	struct amdgpu_device *adev = ring->adev;
 	struct amdgpu_bo *bo;
@@ -966,9 +939,7 @@ int amdgpu_uvd_get_destroy_msg(struct amdgpu_ring *ring, uint32_t handle,
 	int r, i;
 
 	r = amdgpu_bo_create(adev, 1024, PAGE_SIZE, true,
-			     AMDGPU_GEM_DOMAIN_VRAM,
-			     AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED,
-			     NULL, NULL, &bo);
+			     AMDGPU_GEM_DOMAIN_VRAM, 0, NULL, &bo);
 	if (r)
 		return r;
 

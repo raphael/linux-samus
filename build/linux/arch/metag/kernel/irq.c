@@ -94,11 +94,13 @@ void do_IRQ(int irq, struct pt_regs *regs)
 			"MOV   D0.5,%0\n"
 			"MOV   D1Ar1,%1\n"
 			"MOV   D1RtP,%2\n"
+			"MOV   D0Ar2,%3\n"
 			"SWAP  A0StP,D0.5\n"
 			"SWAP  PC,D1RtP\n"
 			"MOV   A0StP,D0.5\n"
 			:
-			: "r" (isp), "r" (desc), "r" (desc->handle_irq)
+			: "r" (isp), "r" (irq), "r" (desc->handle_irq),
+			  "r" (desc)
 			: "memory", "cc", "D1Ar1", "D0Ar2", "D1Ar3", "D0Ar4",
 			  "D1Ar5", "D0Ar6", "D0Re0", "D1Re0", "D0.4", "D1RtP",
 			  "D0.5"
@@ -268,25 +270,23 @@ void migrate_irqs(void)
 
 	for_each_active_irq(i) {
 		struct irq_data *data = irq_get_irq_data(i);
-		struct cpumask *mask;
 		unsigned int newcpu;
 
 		if (irqd_is_per_cpu(data))
 			continue;
 
-		mask = irq_data_get_affinity_mask(data);
-		if (!cpumask_test_cpu(cpu, mask))
+		if (!cpumask_test_cpu(cpu, data->affinity))
 			continue;
 
-		newcpu = cpumask_any_and(mask, cpu_online_mask);
+		newcpu = cpumask_any_and(data->affinity, cpu_online_mask);
 
 		if (newcpu >= nr_cpu_ids) {
 			pr_info_ratelimited("IRQ%u no longer affine to CPU%u\n",
 					    i, cpu);
 
-			cpumask_setall(mask);
+			cpumask_setall(data->affinity);
 		}
-		irq_set_affinity(i, mask);
+		irq_set_affinity(i, data->affinity);
 	}
 }
 #endif /* CONFIG_HOTPLUG_CPU */

@@ -330,8 +330,7 @@ struct perf_event_attr {
 				mmap2          :  1, /* include mmap with inode data     */
 				comm_exec      :  1, /* flag comm events that are due to an exec */
 				use_clockid    :  1, /* use @clockid for time fields */
-				context_switch :  1, /* context switch data */
-				__reserved_1   : 37;
+				__reserved_1   : 38;
 
 	union {
 		__u32		wakeup_events;	  /* wakeup every n events */
@@ -573,11 +572,9 @@ struct perf_event_mmap_page {
 /*
  * PERF_RECORD_MISC_MMAP_DATA and PERF_RECORD_MISC_COMM_EXEC are used on
  * different events so can reuse the same bit position.
- * Ditto PERF_RECORD_MISC_SWITCH_OUT.
  */
 #define PERF_RECORD_MISC_MMAP_DATA		(1 << 13)
 #define PERF_RECORD_MISC_COMM_EXEC		(1 << 13)
-#define PERF_RECORD_MISC_SWITCH_OUT		(1 << 13)
 /*
  * Indicates that the content of PERF_SAMPLE_IP points to
  * the actual instruction that triggered the event. See also
@@ -821,32 +818,6 @@ enum perf_event_type {
 	 */
 	PERF_RECORD_LOST_SAMPLES		= 13,
 
-	/*
-	 * Records a context switch in or out (flagged by
-	 * PERF_RECORD_MISC_SWITCH_OUT). See also
-	 * PERF_RECORD_SWITCH_CPU_WIDE.
-	 *
-	 * struct {
-	 *	struct perf_event_header	header;
-	 *	struct sample_id		sample_id;
-	 * };
-	 */
-	PERF_RECORD_SWITCH			= 14,
-
-	/*
-	 * CPU-wide version of PERF_RECORD_SWITCH with next_prev_pid and
-	 * next_prev_tid that are the next (switching out) or previous
-	 * (switching in) pid/tid.
-	 *
-	 * struct {
-	 *	struct perf_event_header	header;
-	 *	u32				next_prev_pid;
-	 *	u32				next_prev_tid;
-	 *	struct sample_id		sample_id;
-	 * };
-	 */
-	PERF_RECORD_SWITCH_CPU_WIDE		= 15,
-
 	PERF_RECORD_MAX,			/* non-ABI */
 };
 
@@ -951,7 +922,6 @@ union perf_mem_data_src {
  *
  *     in_tx: running in a hardware transaction
  *     abort: aborting a hardware transaction
- *    cycles: cycles from last branch (or 0 if not supported)
  */
 struct perf_branch_entry {
 	__u64	from;
@@ -960,8 +930,7 @@ struct perf_branch_entry {
 		predicted:1,/* target predicted */
 		in_tx:1,    /* in transaction */
 		abort:1,    /* transaction abort */
-		cycles:16,  /* cycle count to last branch */
-		reserved:44;
+		reserved:60;
 };
 
 #endif /* _UAPI_LINUX_PERF_EVENT_H */

@@ -18,6 +18,7 @@
 #include <linux/ftrace.h>
 #include <linux/memory.h>
 #include <linux/module.h>
+#include <linux/ftrace.h>
 #include <linux/mutex.h>
 #include <linux/init.h>
 

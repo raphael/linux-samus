@@ -123,8 +123,12 @@ static int dp83867_of_init(struct phy_device *phydev)
 	if (ret)
 		return ret;
 
-	return of_property_read_u32(of_node, "ti,fifo-depth",
+	ret = of_property_read_u32(of_node, "ti,fifo-depth",
 				   &dp83867->fifo_depth);
+	if (ret)
+		return ret;
+
+	return 0;
 }
 #else
 static int dp83867_of_init(struct phy_device *phydev)

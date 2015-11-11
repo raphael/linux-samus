@@ -141,13 +141,12 @@ enum {
 /**
  * struct mt7601u_dev - adapter structure
  * @lock:		protects @wcid->tx_rate.
- * @mac_lock:		locks out mac80211's tx status and rx paths.
  * @tx_lock:		protects @tx_q and changes of MT7601U_STATE_*_STATS
- *			flags in @state.
+			flags in @state.
  * @rx_lock:		protects @rx_q.
  * @con_mon_lock:	protects @ap_bssid, @bcn_*, @avg_rssi.
  * @mutex:		ensures exclusive access from mac80211 callbacks.
- * @vendor_req_mutex:	protects @vend_buf, ensures atomicity of split writes.
+ * @vendor_req_mutex:	ensures atomicity of vendor requests.
  * @reg_atomic_mutex:	ensures atomicity of indirect register accesses
  *			(accesses to RF and BBP).
  * @hw_atomic_mutex:	ensures exclusive access to HW during critical
@@ -178,7 +177,6 @@ struct mt7601u_dev {
 	struct mt76_wcid __rcu *wcid[N_WCIDS];
 
 	spinlock_t lock;
-	spinlock_t mac_lock;
 
 	const u16 *beacon_offsets;
 
@@ -186,8 +184,6 @@ struct mt7601u_dev {
 	struct mt7601u_eeprom_params *ee;
 
 	struct mutex vendor_req_mutex;
-	void *vend_buf;
-
 	struct mutex reg_atomic_mutex;
 	struct mutex hw_atomic_mutex;
 
@@ -201,9 +197,7 @@ struct mt7601u_dev {
 
 	/* TX */
 	spinlock_t tx_lock;
-	struct tasklet_struct tx_tasklet;
 	struct mt7601u_tx_queue *tx_q;
-	struct sk_buff_head tx_skb_done;
 
 	atomic_t avg_ampdu_len;
 

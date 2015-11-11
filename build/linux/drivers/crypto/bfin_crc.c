@@ -370,7 +370,8 @@ static int bfin_crypto_crc_handle_queue(struct bfin_crypto_crc *crc,
 			sg_init_table(ctx->bufsl, nsg);
 			sg_set_buf(ctx->bufsl, ctx->buflast, ctx->buflast_len);
 			if (nsg > 1)
-				sg_chain(ctx->bufsl, nsg, req->src);
+				scatterwalk_sg_chain(ctx->bufsl, nsg,
+						req->src);
 			ctx->sg = ctx->bufsl;
 		} else
 			ctx->sg = req->src;

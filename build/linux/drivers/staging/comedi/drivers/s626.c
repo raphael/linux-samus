@@ -2852,7 +2852,11 @@ static int s626_auto_attach(struct comedi_device *dev,
 	s->insn_read	= s626_enc_insn_read;
 	s->insn_write	= s626_enc_insn_write;
 
-	return s626_initialize(dev);
+	ret = s626_initialize(dev);
+	if (ret)
+		return ret;
+
+	return 0;
 }
 
 static void s626_detach(struct comedi_device *dev)

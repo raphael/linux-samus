@@ -650,7 +650,6 @@ static __always_inline int __linearize(struct x86_emulate_ctxt *ctxt,
 	u16 sel;
 
 	la = seg_base(ctxt, addr.seg) + addr.ea;
-	*linear = la;
 	*max_size = 0;
 	switch (mode) {
 	case X86EMUL_MODE_PROT64:
@@ -694,6 +693,7 @@ static __always_inline int __linearize(struct x86_emulate_ctxt *ctxt,
 	}
 	if (insn_aligned(ctxt, size) && ((la & (size - 1)) != 0))
 		return emulate_gp(ctxt, 0);
+	*linear = la;
 	return X86EMUL_CONTINUE;
 bad:
 	if (addr.seg == VCPU_SREG_SS)

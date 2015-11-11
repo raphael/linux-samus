@@ -163,13 +163,14 @@ void bcmgenet_mii_setup(struct net_device *dev)
 	phy_print_status(phydev);
 }
 
-static int bcmgenet_fixed_phy_link_update(struct net_device *dev,
-					  struct fixed_phy_status *status)
+void bcmgenet_mii_reset(struct net_device *dev)
 {
-	if (dev && dev->phydev && status)
-		status->link = dev->phydev->link;
+	struct bcmgenet_priv *priv = netdev_priv(dev);
 
-	return 0;
+	if (priv->phydev) {
+		phy_init_hw(priv->phydev);
+		phy_start_aneg(priv->phydev);
+	}
 }
 
 void bcmgenet_phy_power_set(struct net_device *dev, bool enable)
@@ -214,6 +215,7 @@ static void bcmgenet_internal_phy_setup(struct net_device *dev)
 	reg = bcmgenet_ext_readl(priv, EXT_EXT_PWR_MGMT);
 	reg |= EXT_PWR_DN_EN_LD;
 	bcmgenet_ext_writel(priv, reg, EXT_EXT_PWR_MGMT);
+	bcmgenet_mii_reset(dev);
 }
 
 static void bcmgenet_moca_phy_setup(struct bcmgenet_priv *priv)
@@ -224,13 +226,9 @@ static void bcmgenet_moca_phy_setup(struct bcmgenet_priv *priv)
 	reg = bcmgenet_sys_readl(priv, SYS_PORT_CTRL);
 	reg |= LED_ACT_SOURCE_MAC;
 	bcmgenet_sys_writel(priv, reg, SYS_PORT_CTRL);
-
-	if (priv->hw_params->flags & GENET_HAS_MOCA_LINK_DET)
-		fixed_phy_set_link_update(priv->phydev,
-					  bcmgenet_fixed_phy_link_update);
 }
 
-int bcmgenet_mii_config(struct net_device *dev)
+int bcmgenet_mii_config(struct net_device *dev, bool init)
 {
 	struct bcmgenet_priv *priv = netdev_priv(dev);
 	struct phy_device *phydev = priv->phydev;
@@ -240,10 +238,10 @@ int bcmgenet_mii_config(struct net_device *dev)
 	u32 port_ctrl;
 	u32 reg;
 
-	priv->ext_phy = !priv->internal_phy &&
+	priv->ext_phy = !phy_is_internal(priv->phydev) &&
 			(priv->phy_interface != PHY_INTERFACE_MODE_MOCA);
 
-	if (priv->internal_phy)
+	if (phy_is_internal(priv->phydev))
 		priv->phy_interface = PHY_INTERFACE_MODE_NA;
 
 	switch (priv->phy_interface) {
@@ -261,7 +259,7 @@ int bcmgenet_mii_config(struct net_device *dev)
 
 		bcmgenet_sys_writel(priv, port_ctrl, SYS_PORT_CTRL);
 
-		if (priv->internal_phy) {
+		if (phy_is_internal(priv->phydev)) {
 			phy_name = "internal PHY";
 			bcmgenet_internal_phy_setup(dev);
 		} else if (priv->phy_interface == PHY_INTERFACE_MODE_MOCA) {
@@ -323,12 +321,13 @@ int bcmgenet_mii_config(struct net_device *dev)
 		bcmgenet_ext_writel(priv, reg, EXT_RGMII_OOB_CTRL);
 	}
 
-	dev_info_once(kdev, "configuring instance for %s\n", phy_name);
+	if (init)
+		dev_info(kdev, "configuring instance for %s\n", phy_name);
 
 	return 0;
 }
 
-int bcmgenet_mii_probe(struct net_device *dev)
+static int bcmgenet_mii_probe(struct net_device *dev)
 {
 	struct bcmgenet_priv *priv = netdev_priv(dev);
 	struct device_node *dn = priv->pdev->dev.of_node;
@@ -346,6 +345,22 @@ int bcmgenet_mii_probe(struct net_device *dev)
 	priv->old_pause = -1;
 
 	if (dn) {
+		if (priv->phydev) {
+			pr_info("PHY already attached\n");
+			return 0;
+		}
+
+		/* In the case of a fixed PHY, the DT node associated
+		 * to the PHY is the Ethernet MAC DT node.
+		 */
+		if (!priv->phy_dn && of_phy_is_fixed_link(dn)) {
+			ret = of_phy_register_fixed_link(dn);
+			if (ret)
+				return ret;
+
+			priv->phy_dn = of_node_get(dn);
+		}
+
 		phydev = of_phy_connect(dev, priv->phy_dn, bcmgenet_mii_setup,
 					phy_flags, priv->phy_interface);
 		if (!phydev) {
@@ -371,7 +386,7 @@ int bcmgenet_mii_probe(struct net_device *dev)
 	 * PHY speed which is needed for bcmgenet_mii_config() to configure
 	 * things appropriately.
 	 */
-	ret = bcmgenet_mii_config(dev);
+	ret = bcmgenet_mii_config(dev, true);
 	if (ret) {
 		phy_disconnect(priv->phydev);
 		return ret;
@@ -382,10 +397,13 @@ int bcmgenet_mii_probe(struct net_device *dev)
 	/* The internal PHY has its link interrupts routed to the
 	 * Ethernet MAC ISRs
 	 */
-	if (priv->internal_phy)
+	if (phy_is_internal(priv->phydev))
 		priv->mii_bus->irq[phydev->addr] = PHY_IGNORE_INTERRUPT;
 	else
 		priv->mii_bus->irq[phydev->addr] = PHY_POLL;
+
+	pr_info("attached PHY at address %d [%s]\n",
+		phydev->addr, phydev->drv->name);
 
 	return 0;
 }
@@ -472,10 +490,7 @@ static int bcmgenet_mii_of_init(struct bcmgenet_priv *priv)
 {
 	struct device_node *dn = priv->pdev->dev.of_node;
 	struct device *kdev = &priv->pdev->dev;
-	const char *phy_mode_str = NULL;
-	struct phy_device *phydev = NULL;
 	char *compat;
-	int phy_mode;
 	int ret;
 
 	compat = kasprintf(GFP_KERNEL, "brcm,genet-mdio-v%d", priv->version);
@@ -498,43 +513,17 @@ static int bcmgenet_mii_of_init(struct bcmgenet_priv *priv)
 	/* Fetch the PHY phandle */
 	priv->phy_dn = of_parse_phandle(dn, "phy-handle", 0);
 
-	/* In the case of a fixed PHY, the DT node associated
-	 * to the PHY is the Ethernet MAC DT node.
-	 */
-	if (!priv->phy_dn && of_phy_is_fixed_link(dn)) {
-		ret = of_phy_register_fixed_link(dn);
-		if (ret)
-			return ret;
-
-		priv->phy_dn = of_node_get(dn);
-	}
-
 	/* Get the link mode */
-	phy_mode = of_get_phy_mode(dn);
-	priv->phy_interface = phy_mode;
+	priv->phy_interface = of_get_phy_mode(dn);
 
-	/* We need to specifically look up whether this PHY interface is internal
-	 * or not *before* we even try to probe the PHY driver over MDIO as we
-	 * may have shut down the internal PHY for power saving purposes.
-	 */
-	if (phy_mode < 0) {
-		ret = of_property_read_string(dn, "phy-mode", &phy_mode_str);
-		if (ret < 0) {
-			dev_err(kdev, "invalid PHY mode property\n");
-			return ret;
-		}
+	return 0;
+}
 
-		priv->phy_interface = PHY_INTERFACE_MODE_NA;
-		if (!strcasecmp(phy_mode_str, "internal"))
-			priv->internal_phy = true;
-	}
-
-	/* Make sure we initialize MoCA PHYs with a link down */
-	if (phy_mode == PHY_INTERFACE_MODE_MOCA) {
-		phydev = of_phy_find_device(dn);
-		if (phydev)
-			phydev->link = 0;
-	}
+static int bcmgenet_fixed_phy_link_update(struct net_device *dev,
+					  struct fixed_phy_status *status)
+{
+	if (dev && dev->phydev && status)
+		status->link = dev->phydev->link;
 
 	return 0;
 }
@@ -585,15 +574,18 @@ static int bcmgenet_mii_pd_init(struct bcmgenet_priv *priv)
 			.asym_pause = 0,
 		};
 
-		phydev = fixed_phy_register(PHY_POLL, &fphy_status, -1, NULL);
+		phydev = fixed_phy_register(PHY_POLL, &fphy_status, NULL);
 		if (!phydev || IS_ERR(phydev)) {
 			dev_err(kdev, "failed to register fixed PHY device\n");
 			return -ENODEV;
 		}
 
-		/* Make sure we initialize MoCA PHYs with a link down */
-		phydev->link = 0;
-
+		if (priv->hw_params->flags & GENET_HAS_MOCA_LINK_DET) {
+			ret = fixed_phy_set_link_update(
+				phydev, bcmgenet_fixed_phy_link_update);
+			if (!ret)
+				phydev->link = 0;
+		}
 	}
 
 	priv->phydev = phydev;
@@ -623,6 +615,10 @@ int bcmgenet_mii_init(struct net_device *dev)
 
 	ret = bcmgenet_mii_bus_init(priv);
 	if (ret)
+		goto out_free;
+
+	ret = bcmgenet_mii_probe(dev);
+	if (ret)
 		goto out;
 
 	return 0;
@@ -630,6 +626,7 @@ int bcmgenet_mii_init(struct net_device *dev)
 out:
 	of_node_put(priv->phy_dn);
 	mdiobus_unregister(priv->mii_bus);
+out_free:
 	kfree(priv->mii_bus->irq);
 	mdiobus_free(priv->mii_bus);
 	return ret;

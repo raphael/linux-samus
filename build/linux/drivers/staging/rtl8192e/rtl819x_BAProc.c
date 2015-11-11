@@ -428,6 +428,7 @@ int rtllib_rx_DELBA(struct rtllib_device *ieee, struct sk_buff *skb)
 {
 	 struct rtllib_hdr_3addr *delba = NULL;
 	union delba_param_set *pDelBaParamSet = NULL;
+	u16 *pReasonCode = NULL;
 	u8 *dst = NULL;
 
 	if (skb->len < sizeof(struct rtllib_hdr_3addr) + 6) {
@@ -452,7 +453,9 @@ int rtllib_rx_DELBA(struct rtllib_device *ieee, struct sk_buff *skb)
 #endif
 	delba = (struct rtllib_hdr_3addr *)skb->data;
 	dst = (u8 *)(&delba->addr2[0]);
-	pDelBaParamSet = (union delba_param_set *)&delba->payload[2];
+	delba += sizeof(struct rtllib_hdr_3addr);
+	pDelBaParamSet = (union delba_param_set *)(delba+2);
+	pReasonCode = (u16 *)(delba+4);
 
 	if (pDelBaParamSet->field.Initiator == 1) {
 		struct rx_ts_record *pRxTs;

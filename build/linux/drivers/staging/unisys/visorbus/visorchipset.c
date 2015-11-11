@@ -1,11 +1,12 @@
 /* visorchipset_main.c
  *
- * Copyright (C) 2010 - 2015 UNISYS CORPORATION
+ * Copyright (C) 2010 - 2013 UNISYS CORPORATION
  * All rights reserved.
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or (at
+ * your option) any later version.
  *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -118,7 +119,7 @@ static struct visorchannel *controlvm_channel;
 
 /* Manages the request payload in the controlvm channel */
 struct visor_controlvm_payload_info {
-	u8 *ptr;		/* pointer to base address of payload pool */
+	u8 __iomem *ptr;	/* pointer to base address of payload pool */
 	u64 offset;		/* offset from beginning of controlvm
 				 * channel to beginning of payload * pool */
 	u32 bytes;		/* number of bytes in payload pool */
@@ -400,22 +401,21 @@ parser_init_byte_stream(u64 addr, u32 bytes, bool local, bool *retry)
 		p = __va((unsigned long) (addr));
 		memcpy(ctx->data, p, bytes);
 	} else {
-		void *mapping;
+		void __iomem *mapping;
 
 		if (!request_mem_region(addr, bytes, "visorchipset")) {
 			rc = NULL;
 			goto cleanup;
 		}
 
-		mapping = memremap(addr, bytes, MEMREMAP_WB);
+		mapping = ioremap_cache(addr, bytes);
 		if (!mapping) {
 			release_mem_region(addr, bytes);
 			rc = NULL;
 			goto cleanup;
 		}
-		memcpy(ctx->data, mapping, bytes);
+		memcpy_fromio(ctx->data, mapping, bytes);
 		release_mem_region(addr, bytes);
-		memunmap(mapping);
 	}
 
 	ctx->byte_stream = true;
@@ -1247,11 +1247,10 @@ my_device_create(struct controlvm_message *inmsg)
 	POSTCODE_LINUX_4(DEVICE_CREATE_ENTRY_PC, dev_no, bus_no,
 			 POSTCODE_SEVERITY_INFO);
 
-	visorchannel =
-	       visorchannel_create_with_lock(cmd->create_device.channel_addr,
-					     cmd->create_device.channel_bytes,
-					     GFP_KERNEL,
-					     cmd->create_device.data_type_uuid);
+	visorchannel = visorchannel_create(cmd->create_device.channel_addr,
+					   cmd->create_device.channel_bytes,
+					   GFP_KERNEL,
+					   cmd->create_device.data_type_uuid);
 
 	if (!visorchannel) {
 		POSTCODE_LINUX_4(DEVICE_CREATE_FAILURE_PC, dev_no, bus_no,
@@ -1328,7 +1327,7 @@ static int
 initialize_controlvm_payload_info(u64 phys_addr, u64 offset, u32 bytes,
 				  struct visor_controlvm_payload_info *info)
 {
-	u8 *payload = NULL;
+	u8 __iomem *payload = NULL;
 	int rc = CONTROLVM_RESP_SUCCESS;
 
 	if (!info) {
@@ -1340,7 +1339,7 @@ initialize_controlvm_payload_info(u64 phys_addr, u64 offset, u32 bytes,
 		rc = -CONTROLVM_RESP_ERROR_PAYLOAD_INVALID;
 		goto cleanup;
 	}
-	payload = memremap(phys_addr + offset, bytes, MEMREMAP_WB);
+	payload = ioremap_cache(phys_addr + offset, bytes);
 	if (!payload) {
 		rc = -CONTROLVM_RESP_ERROR_IOREMAP_FAILED;
 		goto cleanup;
@@ -1353,7 +1352,7 @@ initialize_controlvm_payload_info(u64 phys_addr, u64 offset, u32 bytes,
 cleanup:
 	if (rc < 0) {
 		if (payload) {
-			memunmap(payload);
+			iounmap(payload);
 			payload = NULL;
 		}
 	}
@@ -1364,7 +1363,7 @@ static void
 destroy_controlvm_payload_info(struct visor_controlvm_payload_info *info)
 {
 	if (info->ptr) {
-		memunmap(info->ptr);
+		iounmap(info->ptr);
 		info->ptr = NULL;
 	}
 	memset(info, 0, sizeof(struct visor_controlvm_payload_info));
@@ -2048,7 +2047,6 @@ device_create_response(struct visor_device *dev_info, int response)
 			 response);
 
 	kfree(dev_info->pending_msg_hdr);
-	dev_info->pending_msg_hdr = NULL;
 }
 
 static void

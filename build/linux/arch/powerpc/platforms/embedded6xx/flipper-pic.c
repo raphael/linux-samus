@@ -108,8 +108,7 @@ static int flipper_pic_map(struct irq_domain *h, unsigned int virq,
 	return 0;
 }
 
-static int flipper_pic_match(struct irq_domain *h, struct device_node *np,
-			     enum irq_domain_bus_token bus_token)
+static int flipper_pic_match(struct irq_domain *h, struct device_node *np)
 {
 	return 1;
 }

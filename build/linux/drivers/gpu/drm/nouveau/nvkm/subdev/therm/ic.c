@@ -27,16 +27,16 @@
 #include <subdev/i2c.h>
 
 static bool
-probe_monitoring_device(struct nvkm_i2c_bus *bus,
+probe_monitoring_device(struct nvkm_i2c_port *i2c,
 			struct i2c_board_info *info, void *data)
 {
-	struct nvkm_therm *therm = data;
-	struct nvbios_therm_sensor *sensor = &therm->bios_sensor;
+	struct nvkm_therm_priv *priv = data;
+	struct nvbios_therm_sensor *sensor = &priv->bios_sensor;
 	struct i2c_client *client;
 
 	request_module("%s%s", I2C_MODULE_PREFIX, info->type);
 
-	client = i2c_new_device(&bus->i2c, info);
+	client = i2c_new_device(&i2c->adapter, info);
 	if (!client)
 		return false;
 
@@ -46,15 +46,15 @@ probe_monitoring_device(struct nvkm_i2c_bus *bus,
 		return false;
 	}
 
-	nvkm_debug(&therm->subdev,
-		   "Found an %s at address 0x%x (controlled by lm_sensors, "
-		   "temp offset %+i C)\n",
-		   info->type, info->addr, sensor->offset_constant);
-	therm->ic = client;
+	nv_info(priv,
+		"Found an %s at address 0x%x (controlled by lm_sensors, "
+		"temp offset %+i C)\n",
+		info->type, info->addr, sensor->offset_constant);
+	priv->ic = client;
 	return true;
 }
 
-static struct nvkm_i2c_bus_probe
+static struct nvkm_i2c_board_info
 nv_board_infos[] = {
 	{ { I2C_BOARD_INFO("w83l785ts", 0x2d) }, 0 },
 	{ { I2C_BOARD_INFO("w83781d", 0x2d) }, 0  },
@@ -82,43 +82,38 @@ nv_board_infos[] = {
 void
 nvkm_therm_ic_ctor(struct nvkm_therm *therm)
 {
-	struct nvkm_device *device = therm->subdev.device;
-	struct nvkm_bios *bios = device->bios;
-	struct nvkm_i2c *i2c = device->i2c;
-	struct nvkm_i2c_bus *bus;
+	struct nvkm_therm_priv *priv = (void *)therm;
+	struct nvkm_bios *bios = nvkm_bios(therm);
+	struct nvkm_i2c *i2c = nvkm_i2c(therm);
 	struct nvbios_extdev_func extdev_entry;
 
-	bus = nvkm_i2c_bus_find(i2c, NVKM_I2C_BUS_PRI);
-	if (!bus)
-		return;
-
 	if (!nvbios_extdev_find(bios, NVBIOS_EXTDEV_LM89, &extdev_entry)) {
-		struct nvkm_i2c_bus_probe board[] = {
+		struct nvkm_i2c_board_info board[] = {
 		  { { I2C_BOARD_INFO("lm90", extdev_entry.addr >> 1) }, 0},
 		  { }
 		};
 
-		nvkm_i2c_bus_probe(bus, "monitoring device", board,
-				   probe_monitoring_device, therm);
-		if (therm->ic)
+		i2c->identify(i2c, NV_I2C_DEFAULT(0), "monitoring device",
+			      board, probe_monitoring_device, therm);
+		if (priv->ic)
 			return;
 	}
 
 	if (!nvbios_extdev_find(bios, NVBIOS_EXTDEV_ADT7473, &extdev_entry)) {
-		struct nvkm_i2c_bus_probe board[] = {
+		struct nvkm_i2c_board_info board[] = {
 		  { { I2C_BOARD_INFO("adt7473", extdev_entry.addr >> 1) }, 20 },
 		  { }
 		};
 
-		nvkm_i2c_bus_probe(bus, "monitoring device", board,
-				   probe_monitoring_device, therm);
-		if (therm->ic)
+		i2c->identify(i2c, NV_I2C_DEFAULT(0), "monitoring device",
+			      board, probe_monitoring_device, therm);
+		if (priv->ic)
 			return;
 	}
 
 	/* The vbios doesn't provide the address of an exisiting monitoring
 	   device. Let's try our static list.
 	 */
-	nvkm_i2c_bus_probe(bus, "monitoring device", nv_board_infos,
-			   probe_monitoring_device, therm);
+	i2c->identify(i2c, NV_I2C_DEFAULT(0), "monitoring device",
+		      nv_board_infos, probe_monitoring_device, therm);
 }

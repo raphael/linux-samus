@@ -116,12 +116,6 @@ struct dentry *debugfs_create_devm_seqfile(struct device *dev, const char *name,
 
 bool debugfs_initialized(void);
 
-ssize_t debugfs_read_file_bool(struct file *file, char __user *user_buf,
-			       size_t count, loff_t *ppos);
-
-ssize_t debugfs_write_file_bool(struct file *file, const char __user *user_buf,
-				size_t count, loff_t *ppos);
-
 #else
 
 #include <linux/err.h>
@@ -286,20 +280,6 @@ static inline struct dentry *debugfs_create_devm_seqfile(struct device *dev,
 							  void *data))
 {
 	return ERR_PTR(-ENODEV);
-}
-
-static inline ssize_t debugfs_read_file_bool(struct file *file,
-					     char __user *user_buf,
-					     size_t count, loff_t *ppos)
-{
-	return -ENODEV;
-}
-
-static inline ssize_t debugfs_write_file_bool(struct file *file,
-					      const char __user *user_buf,
-					      size_t count, loff_t *ppos)
-{
-	return -ENODEV;
 }
 
 #endif

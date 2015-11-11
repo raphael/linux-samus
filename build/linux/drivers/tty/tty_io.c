@@ -106,11 +106,6 @@
 #include <linux/nsproxy.h>
 
 #undef TTY_DEBUG_HANGUP
-#ifdef TTY_DEBUG_HANGUP
-# define tty_debug_hangup(tty, f, args...)	tty_debug(tty, f, ##args)
-#else
-# define tty_debug_hangup(tty, f, args...)	do { } while (0)
-#endif
 
 #define TTY_PARANOIA_CHECK 1
 #define CHECK_TTY_COUNT 1
@@ -393,14 +388,10 @@ EXPORT_SYMBOL_GPL(tty_find_polling_driver);
 int tty_check_change(struct tty_struct *tty)
 {
 	unsigned long flags;
-	struct pid *pgrp;
 	int ret = 0;
 
 	if (current->signal->tty != tty)
 		return 0;
-
-	rcu_read_lock();
-	pgrp = task_pgrp(current);
 
 	spin_lock_irqsave(&tty->ctrl_lock, flags);
 
@@ -408,25 +399,22 @@ int tty_check_change(struct tty_struct *tty)
 		printk(KERN_WARNING "tty_check_change: tty->pgrp == NULL!\n");
 		goto out_unlock;
 	}
-	if (pgrp == tty->pgrp)
+	if (task_pgrp(current) == tty->pgrp)
 		goto out_unlock;
 	spin_unlock_irqrestore(&tty->ctrl_lock, flags);
-
 	if (is_ignored(SIGTTOU))
-		goto out_rcuunlock;
+		goto out;
 	if (is_current_pgrp_orphaned()) {
 		ret = -EIO;
-		goto out_rcuunlock;
+		goto out;
 	}
-	kill_pgrp(pgrp, SIGTTOU, 1);
-	rcu_read_unlock();
+	kill_pgrp(task_pgrp(current), SIGTTOU, 1);
 	set_thread_flag(TIF_SIGPENDING);
 	ret = -ERESTARTSYS;
+out:
 	return ret;
 out_unlock:
 	spin_unlock_irqrestore(&tty->ctrl_lock, flags);
-out_rcuunlock:
-	rcu_read_unlock();
 	return ret;
 }
 
@@ -536,8 +524,7 @@ static void __proc_set_tty(struct tty_struct *tty)
 	spin_unlock_irqrestore(&tty->ctrl_lock, flags);
 	tty->session = get_pid(task_session(current));
 	if (current->signal->tty) {
-		tty_debug(tty, "current tty %s not NULL!!\n",
-			  current->signal->tty->name);
+		printk(KERN_DEBUG "tty not NULL!!\n");
 		tty_kref_put(current->signal->tty);
 	}
 	put_pid(current->signal->tty_old_pgrp);
@@ -779,7 +766,9 @@ static void do_tty_hangup(struct work_struct *work)
 
 void tty_hangup(struct tty_struct *tty)
 {
-	tty_debug_hangup(tty, "\n");
+#ifdef TTY_DEBUG_HANGUP
+	printk(KERN_DEBUG "%s hangup...\n", tty_name(tty));
+#endif
 	schedule_work(&tty->hangup_work);
 }
 
@@ -796,7 +785,9 @@ EXPORT_SYMBOL(tty_hangup);
 
 void tty_vhangup(struct tty_struct *tty)
 {
-	tty_debug_hangup(tty, "\n");
+#ifdef TTY_DEBUG_HANGUP
+	printk(KERN_DEBUG "%s vhangup...\n", tty_name(tty));
+#endif
 	__tty_hangup(tty, 0);
 }
 
@@ -833,7 +824,9 @@ void tty_vhangup_self(void)
 
 static void tty_vhangup_session(struct tty_struct *tty)
 {
-	tty_debug_hangup(tty, "\n");
+#ifdef TTY_DEBUG_HANGUP
+	printk(KERN_DEBUG "%s vhangup session...\n", tty_name(tty));
+#endif
 	__tty_hangup(tty, 1);
 }
 
@@ -927,8 +920,12 @@ void disassociate_ctty(int on_exit)
 		tty->pgrp = NULL;
 		spin_unlock_irqrestore(&tty->ctrl_lock, flags);
 		tty_kref_put(tty);
-	} else
-		tty_debug_hangup(tty, "no current tty\n");
+	} else {
+#ifdef TTY_DEBUG_HANGUP
+		printk(KERN_DEBUG "error attempted to write to tty [0x%p]"
+		       " = NULL", tty);
+#endif
+	}
 
 	spin_unlock_irq(&current->sighand->siglock);
 	/* Now clear signal->tty under the lock */
@@ -1708,7 +1705,8 @@ static int tty_release_checks(struct tty_struct *tty, int idx)
 {
 #ifdef TTY_PARANOIA_CHECK
 	if (idx < 0 || idx >= tty->driver->num) {
-		tty_debug(tty, "bad idx %d\n", idx);
+		printk(KERN_DEBUG "%s: bad idx when trying to free (%s)\n",
+				__func__, tty->name);
 		return -1;
 	}
 
@@ -1717,20 +1715,20 @@ static int tty_release_checks(struct tty_struct *tty, int idx)
 		return 0;
 
 	if (tty != tty->driver->ttys[idx]) {
-		tty_debug(tty, "bad driver table[%d] = %p\n",
-			  idx, tty->driver->ttys[idx]);
+		printk(KERN_DEBUG "%s: driver.table[%d] not tty for (%s)\n",
+				__func__, idx, tty->name);
 		return -1;
 	}
 	if (tty->driver->other) {
 		struct tty_struct *o_tty = tty->link;
 
 		if (o_tty != tty->driver->other->ttys[idx]) {
-			tty_debug(tty, "bad other table[%d] = %p\n",
-				  idx, tty->driver->other->ttys[idx]);
+			printk(KERN_DEBUG "%s: other->table[%d] not o_tty for (%s)\n",
+					__func__, idx, tty->name);
 			return -1;
 		}
 		if (o_tty->link != tty) {
-			tty_debug(tty, "bad link = %p\n", o_tty->link);
+			printk(KERN_DEBUG "%s: bad pty pointers\n", __func__);
 			return -1;
 		}
 	}
@@ -1784,7 +1782,10 @@ int tty_release(struct inode *inode, struct file *filp)
 		return 0;
 	}
 
-	tty_debug_hangup(tty, "(tty count=%d)...\n", tty->count);
+#ifdef TTY_DEBUG_HANGUP
+	printk(KERN_DEBUG "%s: %s (tty count=%d)...\n", __func__,
+			tty_name(tty), tty->count);
+#endif
 
 	if (tty->ops->close)
 		tty->ops->close(tty, filp);
@@ -1894,7 +1895,9 @@ int tty_release(struct inode *inode, struct file *filp)
 	if (!final)
 		return 0;
 
-	tty_debug_hangup(tty, "final close\n");
+#ifdef TTY_DEBUG_HANGUP
+	printk(KERN_DEBUG "%s: %s: final close\n", __func__, tty_name(tty));
+#endif
 	/*
 	 * Ask the line discipline code to release its structures
 	 */
@@ -1903,7 +1906,10 @@ int tty_release(struct inode *inode, struct file *filp)
 	/* Wait for pending work before tty destruction commmences */
 	tty_flush_works(tty);
 
-	tty_debug_hangup(tty, "freeing structure...\n");
+#ifdef TTY_DEBUG_HANGUP
+	printk(KERN_DEBUG "%s: %s: freeing structure...\n", __func__,
+	       tty_name(tty));
+#endif
 	/*
 	 * The release_tty function takes care of the details of clearing
 	 * the slots and preserving the termios structure. The tty_unlock_pair
@@ -2092,9 +2098,9 @@ retry_open:
 	if (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
 	    tty->driver->subtype == PTY_TYPE_MASTER)
 		noctty = 1;
-
-	tty_debug_hangup(tty, "(tty count=%d)\n", tty->count);
-
+#ifdef TTY_DEBUG_HANGUP
+	printk(KERN_DEBUG "%s: opening %s...\n", __func__, tty->name);
+#endif
 	if (tty->ops->open)
 		retval = tty->ops->open(tty, filp);
 	else
@@ -2102,8 +2108,10 @@ retry_open:
 	filp->f_flags = saved_flags;
 
 	if (retval) {
-		tty_debug_hangup(tty, "error %d, releasing...\n", retval);
-
+#ifdef TTY_DEBUG_HANGUP
+		printk(KERN_DEBUG "%s: error %d in opening %s...\n", __func__,
+				retval, tty->name);
+#endif
 		tty_unlock(tty); /* need to call tty_release without BTM */
 		tty_release(inode, filp);
 		if (retval != -ERESTARTSYS)
@@ -3174,18 +3182,10 @@ struct class *tty_class;
 static int tty_cdev_add(struct tty_driver *driver, dev_t dev,
 		unsigned int index, unsigned int count)
 {
-	int err;
-
 	/* init here, since reused cdevs cause crashes */
-	driver->cdevs[index] = cdev_alloc();
-	if (!driver->cdevs[index])
-		return -ENOMEM;
-	driver->cdevs[index]->ops = &tty_fops;
-	driver->cdevs[index]->owner = driver->owner;
-	err = cdev_add(driver->cdevs[index], dev, count);
-	if (err)
-		kobject_put(&driver->cdevs[index]->kobj);
-	return err;
+	cdev_init(&driver->cdevs[index], &tty_fops);
+	driver->cdevs[index].owner = driver->owner;
+	return cdev_add(&driver->cdevs[index], dev, count);
 }
 
 /**
@@ -3291,10 +3291,8 @@ struct device *tty_register_device_attr(struct tty_driver *driver,
 
 error:
 	put_device(dev);
-	if (cdev) {
-		cdev_del(driver->cdevs[index]);
-		driver->cdevs[index] = NULL;
-	}
+	if (cdev)
+		cdev_del(&driver->cdevs[index]);
 	return ERR_PTR(retval);
 }
 EXPORT_SYMBOL_GPL(tty_register_device_attr);
@@ -3314,10 +3312,8 @@ void tty_unregister_device(struct tty_driver *driver, unsigned index)
 {
 	device_destroy(tty_class,
 		MKDEV(driver->major, driver->minor_start) + index);
-	if (!(driver->flags & TTY_DRIVER_DYNAMIC_ALLOC)) {
-		cdev_del(driver->cdevs[index]);
-		driver->cdevs[index] = NULL;
-	}
+	if (!(driver->flags & TTY_DRIVER_DYNAMIC_ALLOC))
+		cdev_del(&driver->cdevs[index]);
 }
 EXPORT_SYMBOL(tty_unregister_device);
 
@@ -3382,7 +3378,6 @@ err_free_all:
 	kfree(driver->ports);
 	kfree(driver->ttys);
 	kfree(driver->termios);
-	kfree(driver->cdevs);
 	kfree(driver);
 	return ERR_PTR(err);
 }
@@ -3411,7 +3406,7 @@ static void destruct_tty_driver(struct kref *kref)
 		}
 		proc_tty_unregister_driver(driver);
 		if (driver->flags & TTY_DRIVER_DYNAMIC_ALLOC)
-			cdev_del(driver->cdevs[0]);
+			cdev_del(&driver->cdevs[0]);
 	}
 	kfree(driver->cdevs);
 	kfree(driver->ports);

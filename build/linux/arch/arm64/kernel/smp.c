@@ -52,7 +52,6 @@
 #include <asm/sections.h>
 #include <asm/tlbflush.h>
 #include <asm/ptrace.h>
-#include <asm/virt.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/ipi.h>
@@ -311,22 +310,10 @@ void cpu_die(void)
 }
 #endif
 
-static void __init hyp_mode_check(void)
-{
-	if (is_hyp_mode_available())
-		pr_info("CPU: All CPU(s) started at EL2\n");
-	else if (is_hyp_mode_mismatched())
-		WARN_TAINT(1, TAINT_CPU_OUT_OF_SPEC,
-			   "CPU: CPUs started in inconsistent modes");
-	else
-		pr_info("CPU: All CPU(s) started at EL1\n");
-}
-
 void __init smp_cpus_done(unsigned int max_cpus)
 {
 	pr_info("SMP: Total of %d processors activated.\n", num_online_cpus());
-	hyp_mode_check();
-	apply_alternatives_all();
+	do_post_cpus_up_work();
 }
 
 void __init smp_prepare_boot_cpu(void)

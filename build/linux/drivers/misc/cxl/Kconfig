@@ -11,16 +11,11 @@ config CXL_KERNEL_API
 	bool
 	default n
 
-config CXL_EEH
-	bool
-	default n
-
 config CXL
 	tristate "Support for IBM Coherent Accelerators (CXL)"
-	depends on PPC_POWERNV && PCI_MSI && EEH
+	depends on PPC_POWERNV && PCI_MSI
 	select CXL_BASE
 	select CXL_KERNEL_API
-	select CXL_EEH
 	default m
 	help
 	  Select this option to enable driver support for IBM Coherent

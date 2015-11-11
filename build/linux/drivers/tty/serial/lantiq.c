@@ -21,6 +21,7 @@
  */
 
 #include <linux/slab.h>
+#include <linux/module.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
 #include <linux/console.h>
@@ -739,6 +740,7 @@ static const struct of_device_id ltq_asc_match[] = {
 	{ .compatible = DRVNAME },
 	{},
 };
+MODULE_DEVICE_TABLE(of, ltq_asc_match);
 
 static struct platform_driver lqasc_driver = {
 	.driver		= {
@@ -762,4 +764,8 @@ init_lqasc(void)
 
 	return ret;
 }
-device_initcall(init_lqasc);
+
+module_init(init_lqasc);
+
+MODULE_DESCRIPTION("Lantiq serial port driver");
+MODULE_LICENSE("GPL");

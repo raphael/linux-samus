@@ -8,7 +8,8 @@
 #include <linux/io.h>
 
 /* This is all the chips recognized by this library */
-typedef enum _logical_chip_type_t {
+typedef enum _logical_chip_type_t
+{
 	SM_UNKNOWN,
 	SM718,
 	SM750,
@@ -17,7 +18,8 @@ typedef enum _logical_chip_type_t {
 logical_chip_type_t;
 
 
-typedef enum _clock_type_t {
+typedef enum _clock_type_t
+{
 	MXCLK_PLL,
 	PRIMARY_PLL,
 	SECONDARY_PLL,
@@ -26,7 +28,8 @@ typedef enum _clock_type_t {
 }
 clock_type_t;
 
-typedef struct _pll_value_t {
+typedef struct _pll_value_t
+{
 	clock_type_t clockType;
 	unsigned long inputFreq; /* Input clock frequency to the PLL */
 
@@ -39,7 +42,8 @@ typedef struct _pll_value_t {
 pll_value_t;
 
 /* input struct to initChipParam() function */
-typedef struct _initchip_param_t {
+typedef struct _initchip_param_t
+{
 	unsigned short powerMode;    /* Use power mode 0 or 1 */
 	unsigned short chipClock;    /**
 				      * Speed of main chip clock in MHz unit

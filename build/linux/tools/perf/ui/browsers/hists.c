@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "../libslang.h"
 #include <stdlib.h>
 #include <string.h>
 #include <linux/rbtree.h>
@@ -26,7 +27,7 @@ struct hist_browser {
 	struct map_symbol   *selection;
 	struct hist_browser_timer *hbt;
 	struct pstack	    *pstack;
-	struct perf_env *env;
+	struct perf_session_env *env;
 	int		     print_seq;
 	bool		     show_dso;
 	bool		     show_headers;
@@ -539,10 +540,10 @@ static void hist_browser__show_callchain_entry(struct hist_browser *browser,
 
 	ui_browser__set_color(&browser->b, color);
 	hist_browser__gotorc(browser, row, 0);
-	ui_browser__write_nstring(&browser->b, " ", offset);
-	ui_browser__printf(&browser->b, "%c", folded_sign);
+	slsmg_write_nstring(" ", offset);
+	slsmg_printf("%c", folded_sign);
 	ui_browser__write_graph(&browser->b, show_annotated ? SLSMG_RARROW_CHAR : ' ');
-	ui_browser__write_nstring(&browser->b, str, width);
+	slsmg_write_nstring(str, width);
 }
 
 static void hist_browser__fprintf_callchain_entry(struct hist_browser *b __maybe_unused,
@@ -679,7 +680,7 @@ static int __hpp__slsmg_color_printf(struct perf_hpp *hpp, const char *fmt, ...)
 	ui_browser__set_percent_color(arg->b, percent, arg->current_entry);
 
 	ret = scnprintf(hpp->buf, hpp->size, fmt, len, percent);
-	ui_browser__printf(arg->b, "%s", hpp->buf);
+	slsmg_printf("%s", hpp->buf);
 
 	advance_hpp(hpp, ret);
 	return ret;
@@ -712,11 +713,10 @@ hist_browser__hpp_color_##_type(struct perf_hpp_fmt *fmt,		\
 				struct hist_entry *he)			\
 {									\
 	if (!symbol_conf.cumulate_callchain) {				\
-		struct hpp_arg *arg = hpp->ptr;				\
 		int len = fmt->user_len ?: fmt->len;			\
 		int ret = scnprintf(hpp->buf, hpp->size,		\
 				    "%*s", len, "N/A");			\
-		ui_browser__printf(arg->b, "%s", hpp->buf);		\
+		slsmg_printf("%s", hpp->buf);				\
 									\
 		return ret;						\
 	}								\
@@ -801,12 +801,12 @@ static int hist_browser__show_entry(struct hist_browser *browser,
 
 			if (first) {
 				if (symbol_conf.use_callchain) {
-					ui_browser__printf(&browser->b, "%c ", folded_sign);
+					slsmg_printf("%c ", folded_sign);
 					width -= 2;
 				}
 				first = false;
 			} else {
-				ui_browser__printf(&browser->b, "  ");
+				slsmg_printf("  ");
 				width -= 2;
 			}
 
@@ -814,7 +814,7 @@ static int hist_browser__show_entry(struct hist_browser *browser,
 				width -= fmt->color(fmt, &hpp, entry);
 			} else {
 				width -= fmt->entry(fmt, &hpp, entry);
-				ui_browser__printf(&browser->b, "%s", s);
+				slsmg_printf("%s", s);
 			}
 		}
 
@@ -822,7 +822,7 @@ static int hist_browser__show_entry(struct hist_browser *browser,
 		if (!browser->b.navkeypressed)
 			width += 1;
 
-		ui_browser__write_nstring(&browser->b, "", width);
+		slsmg_write_nstring("", width);
 
 		++row;
 		++printed;
@@ -899,7 +899,7 @@ static void hist_browser__show_headers(struct hist_browser *browser)
 	hists__scnprintf_headers(headers, sizeof(headers), browser->hists);
 	ui_browser__gotorc(&browser->b, 0, 0);
 	ui_browser__set_color(&browser->b, HE_COLORSET_ROOT);
-	ui_browser__write_nstring(&browser->b, headers, browser->b.width + 1);
+	slsmg_write_nstring(headers, browser->b.width + 1);
 }
 
 static void ui_browser__hists_init_top(struct ui_browser *browser)
@@ -1214,7 +1214,7 @@ static int hist_browser__dump(struct hist_browser *browser)
 
 static struct hist_browser *hist_browser__new(struct hists *hists,
 					      struct hist_browser_timer *hbt,
-					      struct perf_env *env)
+					      struct perf_session_env *env)
 {
 	struct hist_browser *browser = zalloc(sizeof(*browser));
 
@@ -1267,8 +1267,6 @@ static int hists__browser_title(struct hists *hists,
 	const char *ev_name = perf_evsel__name(evsel);
 	char buf[512];
 	size_t buflen = sizeof(buf);
-	char ref[30] = " show reference callgraph, ";
-	bool enable_ref = false;
 
 	if (symbol_conf.filter_relative) {
 		nr_samples = hists->stats.nr_non_filtered_samples;
@@ -1294,13 +1292,10 @@ static int hists__browser_title(struct hists *hists,
 		}
 	}
 
-	if (symbol_conf.show_ref_callgraph &&
-	    strstr(ev_name, "call-graph=no"))
-		enable_ref = true;
 	nr_samples = convert_unit(nr_samples, &unit);
 	printed = scnprintf(bf, size,
-			   "Samples: %lu%c of event '%s',%sEvent count (approx.): %" PRIu64,
-			   nr_samples, unit, ev_name, enable_ref ? ref : " ", nr_events);
+			   "Samples: %lu%c of event '%s', Event count (approx.): %" PRIu64,
+			   nr_samples, unit, ev_name, nr_events);
 
 
 	if (hists->uid_filter_str)
@@ -1695,7 +1690,7 @@ static int perf_evsel__hists_browse(struct perf_evsel *evsel, int nr_events,
 				    bool left_exits,
 				    struct hist_browser_timer *hbt,
 				    float min_pcnt,
-				    struct perf_env *env)
+				    struct perf_session_env *env)
 {
 	struct hists *hists = evsel__hists(evsel);
 	struct hist_browser *browser = hist_browser__new(hists, hbt, env);
@@ -1873,7 +1868,6 @@ static int perf_evsel__hists_browse(struct perf_evsel *evsel, int nr_events,
 		case K_RIGHT:
 			/* menu */
 			break;
-		case K_ESC:
 		case K_LEFT: {
 			const void *top;
 
@@ -1883,12 +1877,6 @@ static int perf_evsel__hists_browse(struct perf_evsel *evsel, int nr_events,
 				 */
 				if (left_exits)
 					goto out_free_stack;
-
-				if (key == K_ESC &&
-				    ui_browser__dialog_yesno(&browser->b,
-							     "Do you really want to exit?"))
-					goto out_free_stack;
-
 				continue;
 			}
 			top = pstack__peek(browser->pstack);
@@ -1904,6 +1892,12 @@ static int perf_evsel__hists_browse(struct perf_evsel *evsel, int nr_events,
 				do_zoom_thread(browser, actions);
 			continue;
 		}
+		case K_ESC:
+			if (!left_exits &&
+			    !ui_browser__dialog_yesno(&browser->b,
+					       "Do you really want to exit?"))
+				continue;
+			/* Fall thru */
 		case 'q':
 		case CTRL('c'):
 			goto out_free_stack;
@@ -1968,8 +1962,7 @@ skip_annotation:
 					  &options[nr_options], dso);
 		nr_options += add_map_opt(browser, &actions[nr_options],
 					  &options[nr_options],
-					  browser->selection ?
-						browser->selection->map : NULL);
+					  browser->selection->map);
 
 		/* perf script support */
 		if (browser->he_selection) {
@@ -1977,15 +1970,6 @@ skip_annotation:
 						     &actions[nr_options],
 						     &options[nr_options],
 						     thread, NULL);
-			/*
-			 * Note that browser->selection != NULL
-			 * when browser->he_selection is not NULL,
-			 * so we don't need to check browser->selection
-			 * before fetching browser->selection->sym like what
-			 * we do before fetching browser->selection->map.
-			 *
-			 * See hist_browser__show_entry.
-			 */
 			nr_options += add_script_opt(browser,
 						     &actions[nr_options],
 						     &options[nr_options],
@@ -2026,7 +2010,7 @@ struct perf_evsel_menu {
 	struct perf_evsel *selection;
 	bool lost_events, lost_events_warned;
 	float min_pcnt;
-	struct perf_env *env;
+	struct perf_session_env *env;
 };
 
 static void perf_evsel_menu__write(struct ui_browser *browser,
@@ -2060,7 +2044,7 @@ static void perf_evsel_menu__write(struct ui_browser *browser,
 	nr_events = convert_unit(nr_events, &unit);
 	printed = scnprintf(bf, sizeof(bf), "%lu%c%s%s", nr_events,
 			   unit, unit == ' ' ? "" : " ", ev_name);
-	ui_browser__printf(browser, "%s", bf);
+	slsmg_printf("%s", bf);
 
 	nr_events = hists->stats.nr_events[PERF_RECORD_LOST];
 	if (nr_events != 0) {
@@ -2073,7 +2057,7 @@ static void perf_evsel_menu__write(struct ui_browser *browser,
 		warn = bf;
 	}
 
-	ui_browser__write_nstring(browser, warn, browser->width - printed);
+	slsmg_write_nstring(warn, browser->width - printed);
 
 	if (current_entry)
 		menu->selection = evsel;
@@ -2136,11 +2120,15 @@ browse_hists:
 				else
 					pos = perf_evsel__prev(pos);
 				goto browse_hists;
+			case K_ESC:
+				if (!ui_browser__dialog_yesno(&menu->b,
+						"Do you really want to exit?"))
+					continue;
+				/* Fall thru */
 			case K_SWITCH_INPUT_DATA:
 			case 'q':
 			case CTRL('c'):
 				goto out;
-			case K_ESC:
 			default:
 				continue;
 			}
@@ -2179,7 +2167,7 @@ static int __perf_evlist__tui_browse_hists(struct perf_evlist *evlist,
 					   int nr_entries, const char *help,
 					   struct hist_browser_timer *hbt,
 					   float min_pcnt,
-					   struct perf_env *env)
+					   struct perf_session_env *env)
 {
 	struct perf_evsel *pos;
 	struct perf_evsel_menu menu = {
@@ -2212,7 +2200,7 @@ static int __perf_evlist__tui_browse_hists(struct perf_evlist *evlist,
 int perf_evlist__tui_browse_hists(struct perf_evlist *evlist, const char *help,
 				  struct hist_browser_timer *hbt,
 				  float min_pcnt,
-				  struct perf_env *env)
+				  struct perf_session_env *env)
 {
 	int nr_entries = evlist->nr_entries;
 

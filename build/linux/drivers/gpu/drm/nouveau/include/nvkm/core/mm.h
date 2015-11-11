@@ -27,7 +27,7 @@ struct nvkm_mm {
 static inline bool
 nvkm_mm_initialised(struct nvkm_mm *mm)
 {
-	return mm->heap_nodes;
+	return mm->block_size != 0;
 }
 
 int  nvkm_mm_init(struct nvkm_mm *, u32 offset, u32 length, u32 block);
@@ -37,5 +37,4 @@ int  nvkm_mm_head(struct nvkm_mm *, u8 heap, u8 type, u32 size_max,
 int  nvkm_mm_tail(struct nvkm_mm *, u8 heap, u8 type, u32 size_max,
 		  u32 size_min, u32 align, struct nvkm_mm_node **);
 void nvkm_mm_free(struct nvkm_mm *, struct nvkm_mm_node **);
-void nvkm_mm_dump(struct nvkm_mm *, const char *);
 #endif

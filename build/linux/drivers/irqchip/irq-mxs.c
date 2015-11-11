@@ -19,7 +19,6 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/irq.h>
-#include <linux/irqchip.h>
 #include <linux/irqdomain.h>
 #include <linux/io.h>
 #include <linux/of.h>
@@ -27,6 +26,8 @@
 #include <linux/of_irq.h>
 #include <linux/stmp_device.h>
 #include <asm/exception.h>
+
+#include "irqchip.h"
 
 #define HW_ICOLL_VECTOR				0x0000
 #define HW_ICOLL_LEVELACK			0x0010
@@ -84,6 +85,7 @@ static int icoll_irq_domain_map(struct irq_domain *d, unsigned int virq,
 				irq_hw_number_t hw)
 {
 	irq_set_chip_and_handler(virq, &mxs_icoll_chip, handle_level_irq);
+	set_irq_flags(virq, IRQF_VALID);
 
 	return 0;
 }

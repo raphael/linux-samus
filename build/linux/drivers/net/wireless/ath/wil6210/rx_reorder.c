@@ -121,7 +121,6 @@ __acquires(&sta->tid_rx_lock) __releases(&sta->tid_rx_lock)
 		goto out;
 	}
 
-	r->total++;
 	hseq = r->head_seq_num;
 
 	/** Due to the race between WMI events, where BACK establishment
@@ -154,9 +153,6 @@ __acquires(&sta->tid_rx_lock) __releases(&sta->tid_rx_lock)
 	/* frame with out of date sequence number */
 	if (seq_less(seq, r->head_seq_num)) {
 		r->ssn_last_drop = seq;
-		r->drop_old++;
-		wil_dbg_txrx(wil, "Rx drop: old seq 0x%03x head 0x%03x\n",
-			     seq, r->head_seq_num);
 		dev_kfree_skb(skb);
 		goto out;
 	}
@@ -177,8 +173,6 @@ __acquires(&sta->tid_rx_lock) __releases(&sta->tid_rx_lock)
 
 	/* check if we already stored this frame */
 	if (r->reorder_buf[index]) {
-		r->drop_dup++;
-		wil_dbg_txrx(wil, "Rx drop: dup seq 0x%03x\n", seq);
 		dev_kfree_skb(skb);
 		goto out;
 	}

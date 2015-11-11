@@ -28,7 +28,6 @@
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #include <linux/reboot.h>
-#include <linux/pm.h>
 
 #include "../core.h"
 #include "../pinconf.h"
@@ -734,9 +733,9 @@ static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int type)
 	spin_unlock_irqrestore(&pctrl->lock, flags);
 
 	if (type & (IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH))
-		irq_set_handler_locked(d, handle_level_irq);
+		__irq_set_handler_locked(d->irq, handle_level_irq);
 	else if (type & (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
-		irq_set_handler_locked(d, handle_edge_irq);
+		__irq_set_handler_locked(d->irq, handle_edge_irq);
 
 	return 0;
 }
@@ -765,12 +764,12 @@ static struct irq_chip msm_gpio_irq_chip = {
 	.irq_set_wake   = msm_gpio_irq_set_wake,
 };
 
-static void msm_gpio_irq_handler(struct irq_desc *desc)
+static void msm_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 {
 	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
 	const struct msm_pingroup *g;
 	struct msm_pinctrl *pctrl = to_msm_pinctrl(gc);
-	struct irq_chip *chip = irq_desc_get_chip(desc);
+	struct irq_chip *chip = irq_get_chip(irq);
 	int irq_pin;
 	int handled = 0;
 	u32 val;
@@ -794,7 +793,7 @@ static void msm_gpio_irq_handler(struct irq_desc *desc)
 
 	/* No interrupts were flagged */
 	if (handled == 0)
-		handle_bad_irq(desc);
+		handle_bad_irq(irq, desc);
 
 	chained_irq_exit(chip, desc);
 }
@@ -856,13 +855,6 @@ static int msm_ps_hold_restart(struct notifier_block *nb, unsigned long action,
 	return NOTIFY_DONE;
 }
 
-static struct msm_pinctrl *poweroff_pctrl;
-
-static void msm_ps_hold_poweroff(void)
-{
-	msm_ps_hold_restart(&poweroff_pctrl->restart_nb, 0, NULL);
-}
-
 static void msm_pinctrl_setup_pm_reset(struct msm_pinctrl *pctrl)
 {
 	int i;
@@ -875,8 +867,6 @@ static void msm_pinctrl_setup_pm_reset(struct msm_pinctrl *pctrl)
 			if (register_restart_handler(&pctrl->restart_nb))
 				dev_err(pctrl->dev,
 					"failed to setup restart handler.\n");
-			poweroff_pctrl = pctrl;
-			pm_power_off = msm_ps_hold_poweroff;
 			break;
 		}
 }

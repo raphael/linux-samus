@@ -770,8 +770,10 @@ int rsnd_ssi_probe(struct platform_device *pdev,
 	 */
 	nr	= info->ssi_info_nr;
 	ssi	= devm_kzalloc(dev, sizeof(*ssi) * nr, GFP_KERNEL);
-	if (!ssi)
+	if (!ssi) {
+		dev_err(dev, "SSI allocate failed\n");
 		return -ENOMEM;
+	}
 
 	priv->ssi	= ssi;
 	priv->ssi_nr	= nr;

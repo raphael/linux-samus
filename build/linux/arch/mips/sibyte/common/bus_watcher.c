@@ -250,4 +250,4 @@ int __init sibyte_bus_watcher(void)
 	return 0;
 }
 
-device_initcall(sibyte_bus_watcher);
+__initcall(sibyte_bus_watcher);

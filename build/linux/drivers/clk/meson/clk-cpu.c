@@ -35,7 +35,6 @@
 #include <linux/module.h>
 #include <linux/of_address.h>
 #include <linux/slab.h>
-#include <linux/clk.h>
 #include <linux/clk-provider.h>
 
 #define MESON_CPU_CLK_CNTL1		0x00

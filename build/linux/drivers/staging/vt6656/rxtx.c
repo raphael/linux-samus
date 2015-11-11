@@ -45,11 +45,8 @@
 #include "usbpipe.h"
 
 static const u16 vnt_time_stampoff[2][MAX_RATE] = {
-	/* Long Preamble */
-	{384, 288, 226, 209, 54, 43, 37, 31, 28, 25, 24, 23},
-
-	/* Short Preamble */
-	{384, 192, 130, 113, 54, 43, 37, 31, 28, 25, 24, 23},
+	{384, 288, 226, 209, 54, 43, 37, 31, 28, 25, 24, 23},/* Long Preamble */
+	{384, 192, 130, 113, 54, 43, 37, 31, 28, 25, 24, 23},/* Short Preamble */
 };
 
 static const u16 vnt_fb_opt0[2][5] = {

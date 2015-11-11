@@ -136,6 +136,7 @@ static struct gpio_desc *of_get_gpio_hog(struct device_node *np,
 {
 	struct device_node *chip_np;
 	enum of_gpio_flags xlate_flags;
+	struct gpio_desc *desc;
 	struct gg_data gg_data = {
 		.flags = &xlate_flags,
 	};
@@ -192,7 +193,9 @@ static struct gpio_desc *of_get_gpio_hog(struct device_node *np,
 	if (name && of_property_read_string(np, "line-name", name))
 		*name = np->name;
 
-	return gg_data.out_gpio;
+	desc = gg_data.out_gpio;
+
+	return desc;
 }
 
 /**
@@ -335,7 +338,7 @@ void of_mm_gpiochip_remove(struct of_mm_gpio_chip *mm_gc)
 EXPORT_SYMBOL(of_mm_gpiochip_remove);
 
 #ifdef CONFIG_PINCTRL
-static int of_gpiochip_add_pin_range(struct gpio_chip *chip)
+static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
 {
 	struct device_node *np = chip->of_node;
 	struct of_phandle_args pinspec;
@@ -346,7 +349,7 @@ static int of_gpiochip_add_pin_range(struct gpio_chip *chip)
 	struct property *group_names;
 
 	if (!np)
-		return 0;
+		return;
 
 	group_names = of_find_property(np, group_names_propname, NULL);
 
@@ -358,11 +361,11 @@ static int of_gpiochip_add_pin_range(struct gpio_chip *chip)
 
 		pctldev = of_pinctrl_get(pinspec.np);
 		if (!pctldev)
-			return -EPROBE_DEFER;
+			break;
 
 		if (pinspec.args[2]) {
 			if (group_names) {
-				of_property_read_string_index(np,
+				ret = of_property_read_string_index(np,
 						group_names_propname,
 						index, &name);
 				if (strlen(name)) {
@@ -378,7 +381,7 @@ static int of_gpiochip_add_pin_range(struct gpio_chip *chip)
 					pinspec.args[1],
 					pinspec.args[2]);
 			if (ret)
-				return ret;
+				break;
 		} else {
 			/* npins == 0: special range */
 			if (pinspec.args[1]) {
@@ -408,41 +411,32 @@ static int of_gpiochip_add_pin_range(struct gpio_chip *chip)
 			ret = gpiochip_add_pingroup_range(chip, pctldev,
 						pinspec.args[0], name);
 			if (ret)
-				return ret;
+				break;
 		}
 	}
-
-	return 0;
 }
 
 #else
-static int of_gpiochip_add_pin_range(struct gpio_chip *chip) { return 0; }
+static void of_gpiochip_add_pin_range(struct gpio_chip *chip) {}
 #endif
 
-int of_gpiochip_add(struct gpio_chip *chip)
+void of_gpiochip_add(struct gpio_chip *chip)
 {
-	int status;
-
 	if ((!chip->of_node) && (chip->dev))
 		chip->of_node = chip->dev->of_node;
 
 	if (!chip->of_node)
-		return 0;
+		return;
 
 	if (!chip->of_xlate) {
 		chip->of_gpio_n_cells = 2;
 		chip->of_xlate = of_gpio_simple_xlate;
 	}
 
-	status = of_gpiochip_add_pin_range(chip);
-	if (status)
-		return status;
-
+	of_gpiochip_add_pin_range(chip);
 	of_node_get(chip->of_node);
 
 	of_gpiochip_scan_hogs(chip);
-
-	return 0;
 }
 
 void of_gpiochip_remove(struct gpio_chip *chip)

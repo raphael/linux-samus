@@ -19,7 +19,6 @@
  */
 
 #include <linux/platform_device.h>
-#include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/slab.h>
 #include <linux/io.h>

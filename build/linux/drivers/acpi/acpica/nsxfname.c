@@ -172,15 +172,11 @@ acpi_get_name(acpi_handle handle, u32 name_type, struct acpi_buffer * buffer)
 		return (status);
 	}
 
-	if (name_type == ACPI_FULL_PATHNAME ||
-	    name_type == ACPI_FULL_PATHNAME_NO_TRAILING) {
+	if (name_type == ACPI_FULL_PATHNAME) {
 
 		/* Get the full pathname (From the namespace root) */
 
-		status = acpi_ns_handle_to_pathname(handle, buffer,
-						    name_type ==
-						    ACPI_FULL_PATHNAME ? FALSE :
-						    TRUE);
+		status = acpi_ns_handle_to_pathname(handle, buffer);
 		return (status);
 	}
 

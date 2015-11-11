@@ -61,9 +61,7 @@
 #define PMIC_MPP_REG_DIG_PULL_CTL		0x42
 #define PMIC_MPP_REG_DIG_IN_CTL			0x43
 #define PMIC_MPP_REG_EN_CTL			0x46
-#define PMIC_MPP_REG_AOUT_CTL			0x48
 #define PMIC_MPP_REG_AIN_CTL			0x4a
-#define PMIC_MPP_REG_SINK_CTL			0x4c
 
 /* PMIC_MPP_REG_MODE_CTL */
 #define PMIC_MPP_REG_MODE_VALUE_MASK		0x1
@@ -87,25 +85,11 @@
 #define PMIC_MPP_REG_AIN_ROUTE_SHIFT		0
 #define PMIC_MPP_REG_AIN_ROUTE_MASK		0x7
 
-#define PMIC_MPP_MODE_DIGITAL_INPUT		0
-#define PMIC_MPP_MODE_DIGITAL_OUTPUT		1
-#define PMIC_MPP_MODE_DIGITAL_BIDIR		2
-#define PMIC_MPP_MODE_ANALOG_BIDIR		3
-#define PMIC_MPP_MODE_ANALOG_INPUT		4
-#define PMIC_MPP_MODE_ANALOG_OUTPUT		5
-#define PMIC_MPP_MODE_CURRENT_SINK		6
-
-#define PMIC_MPP_SELECTOR_NORMAL		0
-#define PMIC_MPP_SELECTOR_PAIRED		1
-#define PMIC_MPP_SELECTOR_DTEST_FIRST		4
-
 #define PMIC_MPP_PHYSICAL_OFFSET		1
 
 /* Qualcomm specific pin configurations */
 #define PMIC_MPP_CONF_AMUX_ROUTE		(PIN_CONFIG_END + 1)
-#define PMIC_MPP_CONF_ANALOG_LEVEL		(PIN_CONFIG_END + 2)
-#define PMIC_MPP_CONF_DTEST_SELECTOR		(PIN_CONFIG_END + 3)
-#define PMIC_MPP_CONF_PAIRED			(PIN_CONFIG_END + 4)
+#define PMIC_MPP_CONF_ANALOG_MODE		(PIN_CONFIG_END + 2)
 
 /**
  * struct pmic_mpp_pad - keep current MPP settings
@@ -115,15 +99,13 @@
  * @out_value: Cached pin output value.
  * @output_enabled: Set to true if MPP output logic is enabled.
  * @input_enabled: Set to true if MPP input buffer logic is enabled.
- * @paired: Pin operates in paired mode
+ * @analog_mode: Set to true when MPP should operate in Analog Input, Analog
+ *	Output or Bidirectional Analog mode.
  * @num_sources: Number of power-sources supported by this MPP.
  * @power_source: Current power-source used.
  * @amux_input: Set the source for analog input.
- * @aout_level: Analog output level
  * @pullup: Pullup resistor value. Valid in Bidirectional mode only.
  * @function: See pmic_mpp_functions[].
- * @drive_strength: Amount of current in sink mode
- * @dtest: DTEST route selector
  */
 struct pmic_mpp_pad {
 	u16		base;
@@ -132,15 +114,12 @@ struct pmic_mpp_pad {
 	bool		out_value;
 	bool		output_enabled;
 	bool		input_enabled;
-	bool		paired;
+	bool		analog_mode;
 	unsigned int	num_sources;
 	unsigned int	power_source;
 	unsigned int	amux_input;
-	unsigned int	aout_level;
 	unsigned int	pullup;
 	unsigned int	function;
-	unsigned int	drive_strength;
-	unsigned int	dtest;
 };
 
 struct pmic_mpp_state {
@@ -150,32 +129,25 @@ struct pmic_mpp_state {
 	struct gpio_chip chip;
 };
 
-static const struct pinconf_generic_params pmic_mpp_bindings[] = {
-	{"qcom,amux-route",	PMIC_MPP_CONF_AMUX_ROUTE,	0},
-	{"qcom,analog-level",	PMIC_MPP_CONF_ANALOG_LEVEL,	0},
-	{"qcom,dtest",		PMIC_MPP_CONF_DTEST_SELECTOR,	0},
-	{"qcom,paired",		PMIC_MPP_CONF_PAIRED,		0},
+struct pmic_mpp_bindings {
+	const char	*property;
+	unsigned	param;
 };
 
-#ifdef CONFIG_DEBUG_FS
-static const struct pin_config_item pmic_conf_items[] = {
-	PCONFDUMP(PMIC_MPP_CONF_AMUX_ROUTE, "analog mux", NULL, true),
-	PCONFDUMP(PMIC_MPP_CONF_ANALOG_LEVEL, "analog level", NULL, true),
-	PCONFDUMP(PMIC_MPP_CONF_DTEST_SELECTOR, "dtest", NULL, true),
-	PCONFDUMP(PMIC_MPP_CONF_PAIRED, "paired", NULL, false),
+static struct pmic_mpp_bindings pmic_mpp_bindings[] = {
+	{"qcom,amux-route",	PMIC_MPP_CONF_AMUX_ROUTE},
+	{"qcom,analog-mode",	PMIC_MPP_CONF_ANALOG_MODE},
 };
-#endif
 
 static const char *const pmic_mpp_groups[] = {
 	"mpp1", "mpp2", "mpp3", "mpp4", "mpp5", "mpp6", "mpp7", "mpp8",
 };
 
-#define PMIC_MPP_DIGITAL	0
-#define PMIC_MPP_ANALOG		1
-#define PMIC_MPP_SINK		2
-
 static const char *const pmic_mpp_functions[] = {
-	"digital", "analog", "sink"
+	PMIC_MPP_FUNC_NORMAL, PMIC_MPP_FUNC_PAIRED,
+	"reserved1", "reserved2",
+	PMIC_MPP_FUNC_DTEST1, PMIC_MPP_FUNC_DTEST2,
+	PMIC_MPP_FUNC_DTEST3, PMIC_MPP_FUNC_DTEST4,
 };
 
 static inline struct pmic_mpp_state *to_mpp_state(struct gpio_chip *chip)
@@ -232,11 +204,118 @@ static int pmic_mpp_get_group_pins(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
+static int pmic_mpp_parse_dt_config(struct device_node *np,
+				    struct pinctrl_dev *pctldev,
+				    unsigned long **configs,
+				    unsigned int *nconfs)
+{
+	struct pmic_mpp_bindings *par;
+	unsigned long cfg;
+	int ret, i;
+	u32 val;
+
+	for (i = 0; i < ARRAY_SIZE(pmic_mpp_bindings); i++) {
+		par = &pmic_mpp_bindings[i];
+		ret = of_property_read_u32(np, par->property, &val);
+
+		/* property not found */
+		if (ret == -EINVAL)
+			continue;
+
+		/* use zero as default value, when no value is specified */
+		if (ret)
+			val = 0;
+
+		dev_dbg(pctldev->dev, "found %s with value %u\n",
+			par->property, val);
+
+		cfg = pinconf_to_config_packed(par->param, val);
+
+		ret = pinctrl_utils_add_config(pctldev, configs, nconfs, cfg);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int pmic_mpp_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+				      struct device_node *np,
+				      struct pinctrl_map **map,
+				      unsigned *reserv, unsigned *nmaps,
+				      enum pinctrl_map_type type)
+{
+	unsigned long *configs = NULL;
+	unsigned nconfs = 0;
+	struct property *prop;
+	const char *group;
+	int ret;
+
+	ret = pmic_mpp_parse_dt_config(np, pctldev, &configs, &nconfs);
+	if (ret < 0)
+		return ret;
+
+	if (!nconfs)
+		return 0;
+
+	ret = of_property_count_strings(np, "pins");
+	if (ret < 0)
+		goto exit;
+
+	ret = pinctrl_utils_reserve_map(pctldev, map, reserv, nmaps, ret);
+	if (ret < 0)
+		goto exit;
+
+	of_property_for_each_string(np, "pins", prop, group) {
+		ret = pinctrl_utils_add_map_configs(pctldev, map,
+						    reserv, nmaps, group,
+						    configs, nconfs, type);
+		if (ret < 0)
+			break;
+	}
+exit:
+	kfree(configs);
+	return ret;
+}
+
+static int pmic_mpp_dt_node_to_map(struct pinctrl_dev *pctldev,
+				   struct device_node *np_config,
+				   struct pinctrl_map **map, unsigned *nmaps)
+{
+	struct device_node *np;
+	enum pinctrl_map_type type;
+	unsigned reserv;
+	int ret;
+
+	ret = 0;
+	*map = NULL;
+	*nmaps = 0;
+	reserv = 0;
+	type = PIN_MAP_TYPE_CONFIGS_GROUP;
+
+	for_each_child_of_node(np_config, np) {
+		ret = pinconf_generic_dt_subnode_to_map(pctldev, np, map,
+							&reserv, nmaps, type);
+		if (ret)
+			break;
+
+		ret = pmic_mpp_dt_subnode_to_map(pctldev, np, map, &reserv,
+						 nmaps, type);
+		if (ret)
+			break;
+	}
+
+	if (ret < 0)
+		pinctrl_utils_dt_free_map(pctldev, *map, *nmaps);
+
+	return ret;
+}
+
 static const struct pinctrl_ops pmic_mpp_pinctrl_ops = {
 	.get_groups_count	= pmic_mpp_get_groups_count,
 	.get_group_name		= pmic_mpp_get_group_name,
 	.get_group_pins		= pmic_mpp_get_group_pins,
-	.dt_node_to_map		= pinconf_generic_dt_node_to_map_group,
+	.dt_node_to_map		= pmic_mpp_dt_node_to_map,
 	.dt_free_map		= pinctrl_utils_dt_free_map,
 };
 
@@ -261,53 +340,6 @@ static int pmic_mpp_get_function_groups(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
-static int pmic_mpp_write_mode_ctl(struct pmic_mpp_state *state,
-				   struct pmic_mpp_pad *pad)
-{
-	unsigned int mode;
-	unsigned int sel;
-	unsigned int val;
-	unsigned int en;
-
-	switch (pad->function) {
-	case PMIC_MPP_ANALOG:
-		if (pad->input_enabled && pad->output_enabled)
-			mode = PMIC_MPP_MODE_ANALOG_BIDIR;
-		else if (pad->input_enabled)
-			mode = PMIC_MPP_MODE_ANALOG_INPUT;
-		else
-			mode = PMIC_MPP_MODE_ANALOG_OUTPUT;
-		break;
-	case PMIC_MPP_DIGITAL:
-		if (pad->input_enabled && pad->output_enabled)
-			mode = PMIC_MPP_MODE_DIGITAL_BIDIR;
-		else if (pad->input_enabled)
-			mode = PMIC_MPP_MODE_DIGITAL_INPUT;
-		else
-			mode = PMIC_MPP_MODE_DIGITAL_OUTPUT;
-		break;
-	case PMIC_MPP_SINK:
-	default:
-		mode = PMIC_MPP_MODE_CURRENT_SINK;
-		break;
-	}
-
-	if (pad->dtest)
-		sel = PMIC_MPP_SELECTOR_DTEST_FIRST + pad->dtest - 1;
-	else if (pad->paired)
-		sel = PMIC_MPP_SELECTOR_PAIRED;
-	else
-		sel = PMIC_MPP_SELECTOR_NORMAL;
-
-	en = !!pad->out_value;
-
-	val = mode << PMIC_MPP_REG_MODE_DIR_SHIFT |
-	      sel << PMIC_MPP_REG_MODE_FUNCTION_SHIFT |
-	      en;
-
-	return pmic_mpp_write(state, pad, PMIC_MPP_REG_MODE_CTL, val);
-}
-
 static int pmic_mpp_set_mux(struct pinctrl_dev *pctldev, unsigned function,
 				unsigned pin)
 {
@@ -320,7 +352,31 @@ static int pmic_mpp_set_mux(struct pinctrl_dev *pctldev, unsigned function,
 
 	pad->function = function;
 
-	ret = pmic_mpp_write_mode_ctl(state, pad);
+	if (!pad->analog_mode) {
+		val = 0;	/* just digital input */
+		if (pad->output_enabled) {
+			if (pad->input_enabled)
+				val = 2; /* digital input and output */
+			else
+				val = 1; /* just digital output */
+		}
+	} else {
+		val = 4;	/* just analog input */
+		if (pad->output_enabled) {
+			if (pad->input_enabled)
+				val = 3; /* analog input and output */
+			else
+				val = 5; /* just analog output */
+		}
+	}
+
+	val = val << PMIC_MPP_REG_MODE_DIR_SHIFT;
+	val |= pad->function << PMIC_MPP_REG_MODE_FUNCTION_SHIFT;
+	val |= pad->out_value & PMIC_MPP_REG_MODE_VALUE_MASK;
+
+	ret = pmic_mpp_write(state, pad, PMIC_MPP_REG_MODE_CTL, val);
+	if (ret < 0)
+		return ret;
 
 	val = pad->is_enabled << PMIC_MPP_REG_MASTER_EN_SHIFT;
 
@@ -377,20 +433,11 @@ static int pmic_mpp_config_get(struct pinctrl_dev *pctldev,
 	case PIN_CONFIG_OUTPUT:
 		arg = pad->out_value;
 		break;
-	case PMIC_MPP_CONF_DTEST_SELECTOR:
-		arg = pad->dtest;
-		break;
 	case PMIC_MPP_CONF_AMUX_ROUTE:
 		arg = pad->amux_input;
 		break;
-	case PMIC_MPP_CONF_PAIRED:
-		arg = pad->paired;
-		break;
-	case PIN_CONFIG_DRIVE_STRENGTH:
-		arg = pad->drive_strength;
-		break;
-	case PMIC_MPP_CONF_ANALOG_LEVEL:
-		arg = pad->aout_level;
+	case PMIC_MPP_CONF_ANALOG_MODE:
+		arg = pad->analog_mode;
 		break;
 	default:
 		return -EINVAL;
@@ -411,9 +458,6 @@ static int pmic_mpp_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
 	int i, ret;
 
 	pad = pctldev->desc->pins[pin].drv_data;
-
-	/* Make it possible to enable the pin, by not setting high impedance */
-	pad->is_enabled = true;
 
 	for (i = 0; i < nconfs; i++) {
 		param = pinconf_to_config_param(configs[i]);
@@ -453,22 +497,13 @@ static int pmic_mpp_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
 			pad->output_enabled = true;
 			pad->out_value = arg;
 			break;
-		case PMIC_MPP_CONF_DTEST_SELECTOR:
-			pad->dtest = arg;
-			break;
-		case PIN_CONFIG_DRIVE_STRENGTH:
-			arg = pad->drive_strength;
-			break;
 		case PMIC_MPP_CONF_AMUX_ROUTE:
 			if (arg >= PMIC_MPP_AMUX_ROUTE_ABUS4)
 				return -EINVAL;
 			pad->amux_input = arg;
 			break;
-		case PMIC_MPP_CONF_ANALOG_LEVEL:
-			pad->aout_level = arg;
-			break;
-		case PMIC_MPP_CONF_PAIRED:
-			pad->paired = !!arg;
+		case PMIC_MPP_CONF_ANALOG_MODE:
+			pad->analog_mode = true;
 			break;
 		default:
 			return -EINVAL;
@@ -493,17 +528,29 @@ static int pmic_mpp_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
 	if (ret < 0)
 		return ret;
 
-	ret = pmic_mpp_write(state, pad, PMIC_MPP_REG_AOUT_CTL, pad->aout_level);
-	if (ret < 0)
-		return ret;
+	if (!pad->analog_mode) {
+		val = 0;	/* just digital input */
+		if (pad->output_enabled) {
+			if (pad->input_enabled)
+				val = 2; /* digital input and output */
+			else
+				val = 1; /* just digital output */
+		}
+	} else {
+		val = 4;	/* just analog input */
+		if (pad->output_enabled) {
+			if (pad->input_enabled)
+				val = 3; /* analog input and output */
+			else
+				val = 5; /* just analog output */
+		}
+	}
 
-	ret = pmic_mpp_write_mode_ctl(state, pad);
-	if (ret < 0)
-		return ret;
+	val = val << PMIC_MPP_REG_MODE_DIR_SHIFT;
+	val |= pad->function << PMIC_MPP_REG_MODE_FUNCTION_SHIFT;
+	val |= pad->out_value & PMIC_MPP_REG_MODE_VALUE_MASK;
 
-	val = pad->is_enabled << PMIC_MPP_REG_MASTER_EN_SHIFT;
-
-	return pmic_mpp_write(state, pad, PMIC_MPP_REG_EN_CTL, val);
+	return pmic_mpp_write(state, pad, PMIC_MPP_REG_MODE_CTL, val);
 }
 
 static void pmic_mpp_config_dbg_show(struct pinctrl_dev *pctldev,
@@ -511,17 +558,20 @@ static void pmic_mpp_config_dbg_show(struct pinctrl_dev *pctldev,
 {
 	struct pmic_mpp_state *state = pinctrl_dev_get_drvdata(pctldev);
 	struct pmic_mpp_pad *pad;
-	int ret;
+	int ret, val;
 
 	static const char *const biases[] = {
 		"0.6kOhm", "10kOhm", "30kOhm", "Disabled"
 	};
 
+
 	pad = pctldev->desc->pins[pin].drv_data;
 
 	seq_printf(s, " mpp%-2d:", pin + PMIC_MPP_PHYSICAL_OFFSET);
 
-	if (!pad->is_enabled) {
+	val = pmic_mpp_read(state, pad, PMIC_MPP_REG_EN_CTL);
+
+	if (val < 0 || !(val >> PMIC_MPP_REG_MASTER_EN_SHIFT)) {
 		seq_puts(s, " ---");
 	} else {
 
@@ -535,20 +585,15 @@ static void pmic_mpp_config_dbg_show(struct pinctrl_dev *pctldev,
 		}
 
 		seq_printf(s, " %-4s", pad->output_enabled ? "out" : "in");
+		seq_printf(s, " %-4s", pad->analog_mode ? "ana" : "dig");
 		seq_printf(s, " %-7s", pmic_mpp_functions[pad->function]);
 		seq_printf(s, " vin-%d", pad->power_source);
-		seq_printf(s, " %d", pad->aout_level);
 		seq_printf(s, " %-8s", biases[pad->pullup]);
 		seq_printf(s, " %-4s", pad->out_value ? "high" : "low");
-		if (pad->dtest)
-			seq_printf(s, " dtest%d", pad->dtest);
-		if (pad->paired)
-			seq_puts(s, " paired");
 	}
 }
 
 static const struct pinconf_ops pmic_mpp_pinconf_ops = {
-	.is_generic = true,
 	.pin_config_group_get		= pmic_mpp_config_get,
 	.pin_config_group_set		= pmic_mpp_config_set,
 	.pin_config_group_dbg_show	= pmic_mpp_config_dbg_show,
@@ -664,7 +709,6 @@ static int pmic_mpp_populate(struct pmic_mpp_state *state,
 			     struct pmic_mpp_pad *pad)
 {
 	int type, subtype, val, dir;
-	unsigned int sel;
 
 	type = pmic_mpp_read(state, pad, PMIC_MPP_REG_TYPE);
 	if (type < 0)
@@ -707,53 +751,43 @@ static int pmic_mpp_populate(struct pmic_mpp_state *state,
 	dir &= PMIC_MPP_REG_MODE_DIR_MASK;
 
 	switch (dir) {
-	case PMIC_MPP_MODE_DIGITAL_INPUT:
+	case 0:
 		pad->input_enabled = true;
 		pad->output_enabled = false;
-		pad->function = PMIC_MPP_DIGITAL;
+		pad->analog_mode = false;
 		break;
-	case PMIC_MPP_MODE_DIGITAL_OUTPUT:
+	case 1:
 		pad->input_enabled = false;
 		pad->output_enabled = true;
-		pad->function = PMIC_MPP_DIGITAL;
+		pad->analog_mode = false;
 		break;
-	case PMIC_MPP_MODE_DIGITAL_BIDIR:
+	case 2:
 		pad->input_enabled = true;
 		pad->output_enabled = true;
-		pad->function = PMIC_MPP_DIGITAL;
+		pad->analog_mode = false;
 		break;
-	case PMIC_MPP_MODE_ANALOG_BIDIR:
+	case 3:
 		pad->input_enabled = true;
 		pad->output_enabled = true;
-		pad->function = PMIC_MPP_ANALOG;
+		pad->analog_mode = true;
 		break;
-	case PMIC_MPP_MODE_ANALOG_INPUT:
+	case 4:
 		pad->input_enabled = true;
 		pad->output_enabled = false;
-		pad->function = PMIC_MPP_ANALOG;
+		pad->analog_mode = true;
 		break;
-	case PMIC_MPP_MODE_ANALOG_OUTPUT:
+	case 5:
 		pad->input_enabled = false;
 		pad->output_enabled = true;
-		pad->function = PMIC_MPP_ANALOG;
-		break;
-	case PMIC_MPP_MODE_CURRENT_SINK:
-		pad->input_enabled = false;
-		pad->output_enabled = true;
-		pad->function = PMIC_MPP_SINK;
+		pad->analog_mode = true;
 		break;
 	default:
 		dev_err(state->dev, "unknown MPP direction\n");
 		return -ENODEV;
 	}
 
-	sel = val >> PMIC_MPP_REG_MODE_FUNCTION_SHIFT;
-	sel &= PMIC_MPP_REG_MODE_FUNCTION_MASK;
-
-	if (sel >= PMIC_MPP_SELECTOR_DTEST_FIRST)
-		pad->dtest = sel + 1;
-	else if (sel == PMIC_MPP_SELECTOR_PAIRED)
-		pad->paired = true;
+	pad->function = val >> PMIC_MPP_REG_MODE_FUNCTION_SHIFT;
+	pad->function &= PMIC_MPP_REG_MODE_FUNCTION_MASK;
 
 	val = pmic_mpp_read(state, pad, PMIC_MPP_REG_DIG_VIN_CTL);
 	if (val < 0)
@@ -776,24 +810,8 @@ static int pmic_mpp_populate(struct pmic_mpp_state *state,
 	pad->amux_input = val >> PMIC_MPP_REG_AIN_ROUTE_SHIFT;
 	pad->amux_input &= PMIC_MPP_REG_AIN_ROUTE_MASK;
 
-	val = pmic_mpp_read(state, pad, PMIC_MPP_REG_SINK_CTL);
-	if (val < 0)
-		return val;
-
-	pad->drive_strength = val;
-
-	val = pmic_mpp_read(state, pad, PMIC_MPP_REG_AOUT_CTL);
-	if (val < 0)
-		return val;
-
-	pad->aout_level = val;
-
-	val = pmic_mpp_read(state, pad, PMIC_MPP_REG_EN_CTL);
-	if (val < 0)
-		return val;
-
-	pad->is_enabled = !!val;
-
+	/* Pin could be disabled with PIN_CONFIG_BIAS_HIGH_IMPEDANCE */
+	pad->is_enabled = true;
 	return 0;
 }
 
@@ -847,12 +865,6 @@ static int pmic_mpp_probe(struct platform_device *pdev)
 	pctrldesc->name = dev_name(dev);
 	pctrldesc->pins = pindesc;
 	pctrldesc->npins = npins;
-
-	pctrldesc->num_custom_params = ARRAY_SIZE(pmic_mpp_bindings);
-	pctrldesc->custom_params = pmic_mpp_bindings;
-#ifdef CONFIG_DEBUG_FS
-	pctrldesc->custom_conf_items = pmic_conf_items;
-#endif
 
 	for (i = 0; i < npins; i++, pindesc++) {
 		pad = &pads[i];

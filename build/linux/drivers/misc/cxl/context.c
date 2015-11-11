@@ -126,18 +126,6 @@ static int cxl_mmap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	if (ctx->status != STARTED) {
 		mutex_unlock(&ctx->status_mutex);
 		pr_devel("%s: Context not started, failing problem state access\n", __func__);
-		if (ctx->mmio_err_ff) {
-			if (!ctx->ff_page) {
-				ctx->ff_page = alloc_page(GFP_USER);
-				if (!ctx->ff_page)
-					return VM_FAULT_OOM;
-				memset(page_address(ctx->ff_page), 0xff, PAGE_SIZE);
-			}
-			get_page(ctx->ff_page);
-			vmf->page = ctx->ff_page;
-			vma->vm_page_prot = pgprot_cached(vma->vm_page_prot);
-			return 0;
-		}
 		return VM_FAULT_SIGBUS;
 	}
 
@@ -205,11 +193,7 @@ int __detach_context(struct cxl_context *ctx)
 	if (status != STARTED)
 		return -EBUSY;
 
-	/* Only warn if we detached while the link was OK.
-	 * If detach fails when hw is down, we don't care.
-	 */
-	WARN_ON(cxl_detach_process(ctx) &&
-		cxl_adapter_link_ok(ctx->afu->adapter));
+	WARN_ON(cxl_detach_process(ctx));
 	flush_work(&ctx->fault_work); /* Only needed for dedicated process */
 	put_pid(ctx->pid);
 	cxl_ctx_put();
@@ -269,14 +253,7 @@ static void reclaim_ctx(struct rcu_head *rcu)
 	struct cxl_context *ctx = container_of(rcu, struct cxl_context, rcu);
 
 	free_page((u64)ctx->sstp);
-	if (ctx->ff_page)
-		__free_page(ctx->ff_page);
 	ctx->sstp = NULL;
-	if (ctx->kernelapi)
-		kfree(ctx->mapping);
-
-	if (ctx->irq_bitmap)
-		kfree(ctx->irq_bitmap);
 
 	kfree(ctx);
 }

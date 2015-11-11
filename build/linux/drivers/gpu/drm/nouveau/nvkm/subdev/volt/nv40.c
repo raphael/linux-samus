@@ -21,24 +21,35 @@
  *
  * Authors: Ben Skeggs
  */
-#include "priv.h"
+#include <subdev/volt.h>
 
-static const struct nvkm_volt_func
-nv40_volt = {
-	.vid_get = nvkm_voltgpio_get,
-	.vid_set = nvkm_voltgpio_set,
+struct nv40_volt_priv {
+	struct nvkm_volt base;
 };
 
-int
-nv40_volt_new(struct nvkm_device *device, int index, struct nvkm_volt **pvolt)
+static int
+nv40_volt_ctor(struct nvkm_object *parent, struct nvkm_object *engine,
+	       struct nvkm_oclass *oclass, void *data, u32 size,
+	       struct nvkm_object **pobject)
 {
-	struct nvkm_volt *volt;
+	struct nv40_volt_priv *priv;
 	int ret;
 
-	ret = nvkm_volt_new_(&nv40_volt, device, index, &volt);
-	*pvolt = volt;
+	ret = nvkm_volt_create(parent, engine, oclass, &priv);
+	*pobject = nv_object(priv);
 	if (ret)
 		return ret;
 
-	return nvkm_voltgpio_init(volt);
+	return 0;
 }
+
+struct nvkm_oclass
+nv40_volt_oclass = {
+	.handle = NV_SUBDEV(VOLT, 0x40),
+	.ofuncs = &(struct nvkm_ofuncs) {
+		.ctor = nv40_volt_ctor,
+		.dtor = _nvkm_volt_dtor,
+		.init = _nvkm_volt_init,
+		.fini = _nvkm_volt_fini,
+	},
+};

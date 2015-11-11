@@ -43,7 +43,7 @@ struct da732x_priv {
 /*
  * da732x register cache - default settings
  */
-static const struct reg_default da732x_reg_cache[] = {
+static struct reg_default da732x_reg_cache[] = {
 	{ DA732X_REG_REF1		, 0x02 },
 	{ DA732X_REG_BIAS_EN		, 0x80 },
 	{ DA732X_REG_BIAS1		, 0x00 },
@@ -1196,7 +1196,13 @@ static int da732x_set_dai_sysclk(struct snd_soc_dai *dai, int clk_id,
 #define	DA732X_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE | \
 			SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S32_LE)
 
-static const struct snd_soc_dai_ops da732x_dai_ops = {
+static struct snd_soc_dai_ops da732x_dai1_ops = {
+	.hw_params	= da732x_hw_params,
+	.set_fmt	= da732x_set_dai_fmt,
+	.set_sysclk	= da732x_set_dai_sysclk,
+};
+
+static struct snd_soc_dai_ops da732x_dai2_ops = {
 	.hw_params	= da732x_hw_params,
 	.set_fmt	= da732x_set_dai_fmt,
 	.set_sysclk	= da732x_set_dai_sysclk,
@@ -1221,7 +1227,7 @@ static struct snd_soc_dai_driver da732x_dai[] = {
 			.rates = DA732X_RATES,
 			.formats = DA732X_FORMATS,
 		},
-		.ops = &da732x_dai_ops,
+		.ops = &da732x_dai1_ops,
 	},
 	{
 		.name	= "DA732X_AIFB",
@@ -1241,7 +1247,7 @@ static struct snd_soc_dai_driver da732x_dai[] = {
 			.rates = DA732X_RATES,
 			.formats = DA732X_FORMATS,
 		},
-		.ops = &da732x_dai_ops,
+		.ops = &da732x_dai2_ops,
 	},
 };
 
@@ -1566,6 +1572,7 @@ MODULE_DEVICE_TABLE(i2c, da732x_i2c_id);
 static struct i2c_driver da732x_i2c_driver = {
 	.driver		= {
 		.name	= "da7320",
+		.owner	= THIS_MODULE,
 	},
 	.probe		= da732x_i2c_probe,
 	.remove		= da732x_i2c_remove,

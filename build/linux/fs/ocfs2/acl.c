@@ -284,19 +284,7 @@ int ocfs2_set_acl(handle_t *handle,
 
 int ocfs2_iop_set_acl(struct inode *inode, struct posix_acl *acl, int type)
 {
-	struct buffer_head *bh = NULL;
-	int status = 0;
-
-	status = ocfs2_inode_lock(inode, &bh, 1);
-	if (status < 0) {
-		if (status != -ENOENT)
-			mlog_errno(status);
-		return status;
-	}
-	status = ocfs2_set_acl(NULL, inode, bh, type, acl, NULL, NULL);
-	ocfs2_inode_unlock(inode, 1);
-	brelse(bh);
-	return status;
+	return ocfs2_set_acl(NULL, inode, NULL, type, acl, NULL, NULL);
 }
 
 struct posix_acl *ocfs2_iop_get_acl(struct inode *inode, int type)
@@ -304,21 +292,19 @@ struct posix_acl *ocfs2_iop_get_acl(struct inode *inode, int type)
 	struct ocfs2_super *osb;
 	struct buffer_head *di_bh = NULL;
 	struct posix_acl *acl;
-	int ret;
+	int ret = -EAGAIN;
 
 	osb = OCFS2_SB(inode->i_sb);
 	if (!(osb->s_mount_opt & OCFS2_MOUNT_POSIX_ACL))
 		return NULL;
-	ret = ocfs2_inode_lock(inode, &di_bh, 0);
-	if (ret < 0) {
-		if (ret != -ENOENT)
-			mlog_errno(ret);
+
+	ret = ocfs2_read_inode_block(inode, &di_bh);
+	if (ret < 0)
 		return ERR_PTR(ret);
-	}
 
 	acl = ocfs2_get_acl_nolock(inode, type, di_bh);
 
-	ocfs2_inode_unlock(inode, 0);
 	brelse(di_bh);
+
 	return acl;
 }

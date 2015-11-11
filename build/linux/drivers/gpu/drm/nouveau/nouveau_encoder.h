@@ -41,9 +41,7 @@ struct nouveau_encoder {
 
 	struct dcb_output *dcb;
 	int or;
-
-	struct i2c_adapter *i2c;
-	struct nvkm_i2c_aux *aux;
+	struct nvkm_i2c_port *i2c;
 
 	/* different to drm_encoder.crtc, this reflects what's
 	 * actually programmed on the hw, not the proposed crtc */

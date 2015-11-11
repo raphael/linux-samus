@@ -17,6 +17,7 @@
 #ifndef OMAP3_ISP_CORE_H
 #define OMAP3_ISP_CORE_H
 
+#include <media/omap3isp.h>
 #include <media/v4l2-async.h>
 #include <media/v4l2-device.h>
 #include <linux/clk-provider.h>
@@ -26,7 +27,6 @@
 #include <linux/platform_device.h>
 #include <linux/wait.h>
 
-#include "omap3isp.h"
 #include "ispstat.h"
 #include "ispccdc.h"
 #include "ispreg.h"
@@ -101,11 +101,15 @@ struct regmap;
  * struct isp_res_mapping - Map ISP io resources to ISP revision.
  * @isp_rev: ISP_REVISION_x_x
  * @offset: register offsets of various ISP sub-blocks
+ * @syscon_offset: offset of the syscon register for 343x / 3630
+ *	    (CONTROL_CSIRXFE / CONTROL_CAMERA_PHY_CTRL, respectively)
+ *	    from the syscon base address
  * @phy_type: ISP_PHY_TYPE_{3430,3630}
  */
 struct isp_res_mapping {
 	u32 isp_rev;
 	u32 offset[OMAP3_ISP_IOMEM_LAST];
+	u32 syscon_offset;
 	u32 phy_type;
 };
 
@@ -180,6 +184,7 @@ struct isp_device {
 	u32 revision;
 
 	/* platform HW resources */
+	struct isp_platform_data *pdata;
 	unsigned int irq_num;
 
 	void __iomem *mmio_base[OMAP3_ISP_IOMEM_LAST];

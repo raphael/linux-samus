@@ -15,6 +15,7 @@
 
 #include <dt-bindings/clock/exynos5420.h>
 #include "exynos5.dtsi"
+#include "exynos5420-pinctrl.dtsi"
 
 #include <dt-bindings/clock/exynos-audss-clk.h>
 
@@ -1165,5 +1166,3 @@
 	clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
 	clock-names = "uart", "clk_uart_baud0";
 };
-
-#include "exynos5420-pinctrl.dtsi"

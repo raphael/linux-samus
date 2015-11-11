@@ -276,6 +276,7 @@ int __init ti_clk_add_component(struct device_node *node, struct clk_hw *hw,
 	int num_parents;
 	const char **parent_names;
 	struct component_clk *clk;
+	int i;
 
 	num_parents = of_clk_get_parent_count(node);
 
@@ -288,7 +289,8 @@ int __init ti_clk_add_component(struct device_node *node, struct clk_hw *hw,
 	if (!parent_names)
 		return -ENOMEM;
 
-	of_clk_parent_fill(node, parent_names, num_parents);
+	for (i = 0; i < num_parents; i++)
+		parent_names[i] = of_clk_get_parent_name(node, i);
 
 	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
 	if (!clk) {

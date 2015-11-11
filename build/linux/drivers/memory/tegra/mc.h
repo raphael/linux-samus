@@ -41,8 +41,4 @@ extern const struct tegra_mc_soc tegra124_mc_soc;
 extern const struct tegra_mc_soc tegra132_mc_soc;
 #endif
 
-#ifdef CONFIG_ARCH_TEGRA_210_SOC
-extern const struct tegra_mc_soc tegra210_mc_soc;
-#endif
-
 #endif /* MEMORY_TEGRA_MC_H */

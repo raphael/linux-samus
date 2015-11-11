@@ -22,7 +22,6 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/of.h>
-#include <linux/gpio.h>
 
 #define MII_REGS_NUM 29
 
@@ -39,7 +38,6 @@ struct fixed_phy {
 	struct fixed_phy_status status;
 	int (*link_update)(struct net_device *, struct fixed_phy_status *);
 	struct list_head node;
-	int link_gpio;
 };
 
 static struct platform_device *pdev;
@@ -54,87 +52,61 @@ static int fixed_phy_update_regs(struct fixed_phy *fp)
 	u16 lpagb = 0;
 	u16 lpa = 0;
 
-	if (gpio_is_valid(fp->link_gpio))
-		fp->status.link = !!gpio_get_value_cansleep(fp->link_gpio);
+	if (!fp->status.link)
+		goto done;
+	bmsr |= BMSR_LSTATUS | BMSR_ANEGCOMPLETE;
 
 	if (fp->status.duplex) {
+		bmcr |= BMCR_FULLDPLX;
+
 		switch (fp->status.speed) {
 		case 1000:
 			bmsr |= BMSR_ESTATEN;
+			bmcr |= BMCR_SPEED1000;
+			lpagb |= LPA_1000FULL;
 			break;
 		case 100:
 			bmsr |= BMSR_100FULL;
+			bmcr |= BMCR_SPEED100;
+			lpa |= LPA_100FULL;
 			break;
 		case 10:
 			bmsr |= BMSR_10FULL;
+			lpa |= LPA_10FULL;
 			break;
 		default:
-			break;
+			pr_warn("fixed phy: unknown speed\n");
+			return -EINVAL;
 		}
 	} else {
 		switch (fp->status.speed) {
 		case 1000:
 			bmsr |= BMSR_ESTATEN;
+			bmcr |= BMCR_SPEED1000;
+			lpagb |= LPA_1000HALF;
 			break;
 		case 100:
 			bmsr |= BMSR_100HALF;
+			bmcr |= BMCR_SPEED100;
+			lpa |= LPA_100HALF;
 			break;
 		case 10:
 			bmsr |= BMSR_10HALF;
+			lpa |= LPA_10HALF;
 			break;
 		default:
-			break;
-		}
-	}
-
-	if (fp->status.link) {
-		bmsr |= BMSR_LSTATUS | BMSR_ANEGCOMPLETE;
-
-		if (fp->status.duplex) {
-			bmcr |= BMCR_FULLDPLX;
-
-			switch (fp->status.speed) {
-			case 1000:
-				bmcr |= BMCR_SPEED1000;
-				lpagb |= LPA_1000FULL;
-				break;
-			case 100:
-				bmcr |= BMCR_SPEED100;
-				lpa |= LPA_100FULL;
-				break;
-			case 10:
-				lpa |= LPA_10FULL;
-				break;
-			default:
-				pr_warn("fixed phy: unknown speed\n");
-				return -EINVAL;
-			}
-		} else {
-			switch (fp->status.speed) {
-			case 1000:
-				bmcr |= BMCR_SPEED1000;
-				lpagb |= LPA_1000HALF;
-				break;
-			case 100:
-				bmcr |= BMCR_SPEED100;
-				lpa |= LPA_100HALF;
-				break;
-			case 10:
-				lpa |= LPA_10HALF;
-				break;
-			default:
-				pr_warn("fixed phy: unknown speed\n");
+			pr_warn("fixed phy: unknown speed\n");
 			return -EINVAL;
-			}
 		}
-
-		if (fp->status.pause)
-			lpa |= LPA_PAUSE_CAP;
-
-		if (fp->status.asym_pause)
-			lpa |= LPA_PAUSE_ASYM;
 	}
 
+	if (fp->status.pause)
+		lpa |= LPA_PAUSE_CAP;
+
+	if (fp->status.asym_pause)
+		lpa |= LPA_PAUSE_ASYM;
+
+done:
 	fp->regs[MII_PHYSID1] = 0;
 	fp->regs[MII_PHYSID2] = 0;
 
@@ -220,7 +192,7 @@ int fixed_phy_update_state(struct phy_device *phydev,
 	struct fixed_mdio_bus *fmb = &platform_fmb;
 	struct fixed_phy *fp;
 
-	if (!phydev || phydev->bus != fmb->mii_bus)
+	if (!phydev || !phydev->bus)
 		return -EINVAL;
 
 	list_for_each_entry(fp, &fmb->phys, node) {
@@ -243,8 +215,7 @@ int fixed_phy_update_state(struct phy_device *phydev,
 EXPORT_SYMBOL(fixed_phy_update_state);
 
 int fixed_phy_add(unsigned int irq, int phy_addr,
-		  struct fixed_phy_status *status,
-		  int link_gpio)
+		  struct fixed_phy_status *status)
 {
 	int ret;
 	struct fixed_mdio_bus *fmb = &platform_fmb;
@@ -260,26 +231,15 @@ int fixed_phy_add(unsigned int irq, int phy_addr,
 
 	fp->addr = phy_addr;
 	fp->status = *status;
-	fp->link_gpio = link_gpio;
-
-	if (gpio_is_valid(fp->link_gpio)) {
-		ret = gpio_request_one(fp->link_gpio, GPIOF_DIR_IN,
-				       "fixed-link-gpio-link");
-		if (ret)
-			goto err_regs;
-	}
 
 	ret = fixed_phy_update_regs(fp);
 	if (ret)
-		goto err_gpio;
+		goto err_regs;
 
 	list_add_tail(&fp->node, &fmb->phys);
 
 	return 0;
 
-err_gpio:
-	if (gpio_is_valid(fp->link_gpio))
-		gpio_free(fp->link_gpio);
 err_regs:
 	kfree(fp);
 	return ret;
@@ -294,8 +254,6 @@ void fixed_phy_del(int phy_addr)
 	list_for_each_entry_safe(fp, tmp, &fmb->phys, node) {
 		if (fp->addr == phy_addr) {
 			list_del(&fp->node);
-			if (gpio_is_valid(fp->link_gpio))
-				gpio_free(fp->link_gpio);
 			kfree(fp);
 			return;
 		}
@@ -308,7 +266,6 @@ static DEFINE_SPINLOCK(phy_fixed_addr_lock);
 
 struct phy_device *fixed_phy_register(unsigned int irq,
 				      struct fixed_phy_status *status,
-				      int link_gpio,
 				      struct device_node *np)
 {
 	struct fixed_mdio_bus *fmb = &platform_fmb;
@@ -325,7 +282,7 @@ struct phy_device *fixed_phy_register(unsigned int irq,
 	phy_addr = phy_fixed_addr++;
 	spin_unlock(&phy_fixed_addr_lock);
 
-	ret = fixed_phy_add(irq, phy_addr, status, link_gpio);
+	ret = fixed_phy_add(PHY_POLL, phy_addr, status);
 	if (ret < 0)
 		return ERR_PTR(ret);
 
@@ -346,19 +303,6 @@ struct phy_device *fixed_phy_register(unsigned int irq,
 
 	of_node_get(np);
 	phy->dev.of_node = np;
-	phy->is_pseudo_fixed_link = true;
-
-	switch (status->speed) {
-	case SPEED_1000:
-		phy->supported = PHY_1000BT_FEATURES;
-		break;
-	case SPEED_100:
-		phy->supported = PHY_100BT_FEATURES;
-		break;
-	case SPEED_10:
-	default:
-		phy->supported = PHY_10BT_FEATURES;
-	}
 
 	ret = phy_device_register(phy);
 	if (ret) {

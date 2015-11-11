@@ -656,9 +656,8 @@ static int ssd1307fb_probe(struct i2c_client *client,
 	bl = backlight_device_register(bl_name, &client->dev, par,
 				       &ssd1307fb_bl_ops, NULL);
 	if (IS_ERR(bl)) {
-		ret = PTR_ERR(bl);
-		dev_err(&client->dev, "unable to register backlight device: %d\n",
-			ret);
+		dev_err(&client->dev, "unable to register backlight device: %ld\n",
+			PTR_ERR(bl));
 		goto bl_init_error;
 	}
 
@@ -720,6 +719,7 @@ static struct i2c_driver ssd1307fb_driver = {
 	.driver = {
 		.name = "ssd1307fb",
 		.of_match_table = ssd1307fb_of_match,
+		.owner = THIS_MODULE,
 	},
 };
 

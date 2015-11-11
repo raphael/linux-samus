@@ -23,53 +23,78 @@
  */
 #include "priv.h"
 
+#include <core/device.h>
 #include <subdev/gpio.h>
+
+struct gt215_therm_priv {
+	struct nvkm_therm_priv base;
+};
 
 int
 gt215_therm_fan_sense(struct nvkm_therm *therm)
 {
-	struct nvkm_device *device = therm->subdev.device;
-	u32 tach = nvkm_rd32(device, 0x00e728) & 0x0000ffff;
-	u32 ctrl = nvkm_rd32(device, 0x00e720);
+	u32 tach = nv_rd32(therm, 0x00e728) & 0x0000ffff;
+	u32 ctrl = nv_rd32(therm, 0x00e720);
 	if (ctrl & 0x00000001)
 		return tach * 60 / 2;
 	return -ENODEV;
 }
 
-static void
-gt215_therm_init(struct nvkm_therm *therm)
+static int
+gt215_therm_init(struct nvkm_object *object)
 {
-	struct nvkm_device *device = therm->subdev.device;
-	struct dcb_gpio_func *tach = &therm->fan->tach;
+	struct gt215_therm_priv *priv = (void *)object;
+	struct dcb_gpio_func *tach = &priv->base.fan->tach;
+	int ret;
 
-	g84_sensor_setup(therm);
+	ret = nvkm_therm_init(&priv->base.base);
+	if (ret)
+		return ret;
+
+	g84_sensor_setup(&priv->base.base);
 
 	/* enable fan tach, count revolutions per-second */
-	nvkm_mask(device, 0x00e720, 0x00000003, 0x00000002);
+	nv_mask(priv, 0x00e720, 0x00000003, 0x00000002);
 	if (tach->func != DCB_GPIO_UNUSED) {
-		nvkm_wr32(device, 0x00e724, device->crystal * 1000);
-		nvkm_mask(device, 0x00e720, 0x001f0000, tach->line << 16);
-		nvkm_mask(device, 0x00e720, 0x00000001, 0x00000001);
+		nv_wr32(priv, 0x00e724, nv_device(priv)->crystal * 1000);
+		nv_mask(priv, 0x00e720, 0x001f0000, tach->line << 16);
+		nv_mask(priv, 0x00e720, 0x00000001, 0x00000001);
 	}
-	nvkm_mask(device, 0x00e720, 0x00000002, 0x00000000);
+	nv_mask(priv, 0x00e720, 0x00000002, 0x00000000);
+
+	return 0;
 }
 
-static const struct nvkm_therm_func
-gt215_therm = {
-	.init = gt215_therm_init,
-	.fini = g84_therm_fini,
-	.pwm_ctrl = nv50_fan_pwm_ctrl,
-	.pwm_get = nv50_fan_pwm_get,
-	.pwm_set = nv50_fan_pwm_set,
-	.pwm_clock = nv50_fan_pwm_clock,
-	.temp_get = g84_temp_get,
-	.fan_sense = gt215_therm_fan_sense,
-	.program_alarms = nvkm_therm_program_alarms_polling,
-};
-
-int
-gt215_therm_new(struct nvkm_device *device, int index,
-	       struct nvkm_therm **ptherm)
+static int
+gt215_therm_ctor(struct nvkm_object *parent, struct nvkm_object *engine,
+		 struct nvkm_oclass *oclass, void *data, u32 size,
+		 struct nvkm_object **pobject)
 {
-	return nvkm_therm_new_(&gt215_therm, device, index, ptherm);
+	struct gt215_therm_priv *priv;
+	int ret;
+
+	ret = nvkm_therm_create(parent, engine, oclass, &priv);
+	*pobject = nv_object(priv);
+	if (ret)
+		return ret;
+
+	priv->base.base.pwm_ctrl = nv50_fan_pwm_ctrl;
+	priv->base.base.pwm_get = nv50_fan_pwm_get;
+	priv->base.base.pwm_set = nv50_fan_pwm_set;
+	priv->base.base.pwm_clock = nv50_fan_pwm_clock;
+	priv->base.base.temp_get = g84_temp_get;
+	priv->base.base.fan_sense = gt215_therm_fan_sense;
+	priv->base.sensor.program_alarms = nvkm_therm_program_alarms_polling;
+	return nvkm_therm_preinit(&priv->base.base);
 }
+
+struct nvkm_oclass
+gt215_therm_oclass = {
+	.handle = NV_SUBDEV(THERM, 0xa3),
+	.ofuncs = &(struct nvkm_ofuncs) {
+		.ctor = gt215_therm_ctor,
+		.dtor = _nvkm_therm_dtor,
+		.init = gt215_therm_init,
+		.fini = g84_therm_fini,
+	},
+};

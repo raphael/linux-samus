@@ -164,30 +164,25 @@ static inline int own_fpu(int restore)
 	return ret;
 }
 
-static inline void lose_fpu_inatomic(int save, struct task_struct *tsk)
-{
-	if (is_msa_enabled()) {
-		if (save) {
-			save_msa(tsk);
-			tsk->thread.fpu.fcr31 =
-					read_32bit_cp1_register(CP1_STATUS);
-		}
-		disable_msa();
-		clear_tsk_thread_flag(tsk, TIF_USEDMSA);
-		__disable_fpu();
-	} else if (is_fpu_owner()) {
-		if (save)
-			_save_fp(tsk);
-		__disable_fpu();
-	}
-	KSTK_STATUS(tsk) &= ~ST0_CU1;
-	clear_tsk_thread_flag(tsk, TIF_USEDFPU);
-}
-
 static inline void lose_fpu(int save)
 {
 	preempt_disable();
-	lose_fpu_inatomic(save, current);
+	if (is_msa_enabled()) {
+		if (save) {
+			save_msa(current);
+			current->thread.fpu.fcr31 =
+					read_32bit_cp1_register(CP1_STATUS);
+		}
+		disable_msa();
+		clear_thread_flag(TIF_USEDMSA);
+		__disable_fpu();
+	} else if (is_fpu_owner()) {
+		if (save)
+			_save_fp(current);
+		__disable_fpu();
+	}
+	KSTK_STATUS(current) &= ~ST0_CU1;
+	clear_thread_flag(TIF_USEDFPU);
 	preempt_enable();
 }
 

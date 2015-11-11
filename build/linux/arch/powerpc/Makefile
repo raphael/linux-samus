@@ -67,7 +67,7 @@ UTS_MACHINE := $(OLDARCH)
 
 ifeq ($(CONFIG_CPU_LITTLE_ENDIAN),y)
 override CC	+= -mlittle-endian
-ifneq ($(cc-name),clang)
+ifneq ($(COMPILER),clang)
 override CC	+= -mno-strict-align
 endif
 override AS	+= -mlittle-endian
@@ -288,26 +288,6 @@ PHONY += pseries_le_defconfig
 pseries_le_defconfig:
 	$(call merge_into_defconfig,pseries_defconfig,le)
 
-PHONY += mpc85xx_defconfig
-mpc85xx_defconfig:
-	$(call merge_into_defconfig,mpc85xx_basic_defconfig,\
-		85xx-32bit 85xx-hw fsl-emb-nonhw)
-
-PHONY += mpc85xx_smp_defconfig
-mpc85xx_smp_defconfig:
-	$(call merge_into_defconfig,mpc85xx_basic_defconfig,\
-		85xx-32bit 85xx-smp 85xx-hw fsl-emb-nonhw)
-
-PHONY += corenet32_smp_defconfig
-corenet32_smp_defconfig:
-	$(call merge_into_defconfig,corenet_basic_defconfig,\
-		85xx-32bit 85xx-smp 85xx-hw fsl-emb-nonhw)
-
-PHONY += corenet64_smp_defconfig
-corenet64_smp_defconfig:
-	$(call merge_into_defconfig,corenet_basic_defconfig,\
-		85xx-64bit 85xx-smp altivec 85xx-hw fsl-emb-nonhw)
-
 define archhelp
   @echo '* zImage          - Build default images selected by kernel config'
   @echo '  zImage.*        - Compressed kernel image (arch/$(ARCH)/boot/zImage.*)'
@@ -353,7 +333,7 @@ TOUT	:= .tmp_gas_check
 # - Require gcc 4.0 or above on 64-bit
 # - gcc-4.2.0 has issues compiling modules on 64-bit
 checkbin:
-	@if test "$(cc-name)" != "clang" \
+	@if test "${COMPILER}" != "clang" \
 	    && test "$(cc-version)" = "0304" ; then \
 		if ! /bin/echo mftb 5 | $(AS) -v -mppc -many -o $(TOUT) >/dev/null 2>&1 ; then \
 			echo -n '*** ${VERSION}.${PATCHLEVEL} kernels no longer build '; \
@@ -362,14 +342,14 @@ checkbin:
 			false; \
 		fi ; \
 	fi
-	@if test "$(cc-name)" != "clang" \
+	@if test "${COMPILER}" != "clang" \
 	    && test "$(cc-version)" -lt "0400" \
 	    && test "x${CONFIG_PPC64}" = "xy" ; then \
                 echo -n "Sorry, GCC v4.0 or above is required to build " ; \
                 echo "the 64-bit powerpc kernel." ; \
                 false ; \
         fi
-	@if test "$(cc-name)" != "clang" \
+	@if test "${COMPILER}" != "clang" \
 	    && test "$(cc-fullversion)" = "040200" \
 	    && test "x${CONFIG_MODULES}${CONFIG_PPC64}" = "xyy" ; then \
 		echo -n '*** GCC-4.2.0 cannot compile the 64-bit powerpc ' ; \

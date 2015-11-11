@@ -78,10 +78,11 @@ struct jz4740_codec {
 	struct regmap *regmap;
 };
 
-static const DECLARE_TLV_DB_RANGE(jz4740_mic_tlv,
+static const unsigned int jz4740_mic_tlv[] = {
+	TLV_DB_RANGE_HEAD(2),
 	0, 2, TLV_DB_SCALE_ITEM(0, 600, 0),
-	3, 3, TLV_DB_SCALE_ITEM(2000, 0, 0)
-);
+	3, 3, TLV_DB_SCALE_ITEM(2000, 0, 0),
+};
 
 static const DECLARE_TLV_DB_SCALE(jz4740_out_tlv, 0, 200, 0);
 static const DECLARE_TLV_DB_SCALE(jz4740_in_tlv, -3450, 150, 0);

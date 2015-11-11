@@ -15,13 +15,9 @@ struct pci_dev;
 #ifdef CONFIG_PCI
 /* Create a virtual mapping cookie for a PCI BAR (memory or IO) */
 extern void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long max);
-extern void __iomem *pci_iomap_wc(struct pci_dev *dev, int bar, unsigned long max);
 extern void __iomem *pci_iomap_range(struct pci_dev *dev, int bar,
 				     unsigned long offset,
 				     unsigned long maxlen);
-extern void __iomem *pci_iomap_wc_range(struct pci_dev *dev, int bar,
-					unsigned long offset,
-					unsigned long maxlen);
 /* Create a virtual mapping cookie for a port on a given PCI device.
  * Do not call this directly, it exists to make it easier for architectures
  * to override */
@@ -38,19 +34,9 @@ static inline void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned lon
 	return NULL;
 }
 
-static inline void __iomem *pci_iomap_wc(struct pci_dev *dev, int bar, unsigned long max)
-{
-	return NULL;
-}
 static inline void __iomem *pci_iomap_range(struct pci_dev *dev, int bar,
 					    unsigned long offset,
 					    unsigned long maxlen)
-{
-	return NULL;
-}
-static inline void __iomem *pci_iomap_wc_range(struct pci_dev *dev, int bar,
-					       unsigned long offset,
-					       unsigned long maxlen)
 {
 	return NULL;
 }

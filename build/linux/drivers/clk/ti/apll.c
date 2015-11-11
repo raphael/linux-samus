@@ -15,7 +15,6 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -27,8 +26,6 @@
 #include <linux/of_address.h>
 #include <linux/clk/ti.h>
 #include <linux/delay.h>
-
-#include "clock.h"
 
 #define APLL_FORCE_LOCK 0x1
 #define APLL_AUTO_IDLE	0x2
@@ -50,7 +47,7 @@ static int dra7_apll_enable(struct clk_hw *hw)
 	if (!ad)
 		return -EINVAL;
 
-	clk_name = clk_hw_get_name(&clk->hw);
+	clk_name = __clk_get_name(clk->hw.clk);
 
 	state <<= __ffs(ad->idlest_mask);
 
@@ -173,6 +170,7 @@ static void __init of_dra7_apll_setup(struct device_node *node)
 	struct clk_hw_omap *clk_hw = NULL;
 	struct clk_init_data *init = NULL;
 	const char **parent_names = NULL;
+	int i;
 
 	ad = kzalloc(sizeof(*ad), GFP_KERNEL);
 	clk_hw = kzalloc(sizeof(*clk_hw), GFP_KERNEL);
@@ -197,7 +195,8 @@ static void __init of_dra7_apll_setup(struct device_node *node)
 	if (!parent_names)
 		goto cleanup;
 
-	of_clk_parent_fill(node, parent_names, init->num_parents);
+	for (i = 0; i < init->num_parents; i++)
+		parent_names[i] = of_clk_get_parent_name(node, i);
 
 	init->parent_names = parent_names;
 
@@ -273,7 +272,7 @@ static int omap2_apll_enable(struct clk_hw *hw)
 
 	if (i == MAX_APLL_WAIT_TRIES) {
 		pr_warn("%s failed to transition to locked\n",
-			clk_hw_get_name(&clk->hw));
+			__clk_get_name(clk->hw.clk));
 		return -EBUSY;
 	}
 

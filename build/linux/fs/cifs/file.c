@@ -3216,7 +3216,7 @@ cifs_page_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 	return VM_FAULT_LOCKED;
 }
 
-static const struct vm_operations_struct cifs_file_vm_ops = {
+static struct vm_operations_struct cifs_file_vm_ops = {
 	.fault = filemap_fault,
 	.map_pages = filemap_map_pages,
 	.page_mkwrite = cifs_page_mkwrite,
@@ -3380,7 +3380,6 @@ readpages_get_pages(struct address_space *mapping, struct list_head *page_list,
 	struct page *page, *tpage;
 	unsigned int expected_index;
 	int rc;
-	gfp_t gfp = GFP_KERNEL & mapping_gfp_mask(mapping);
 
 	INIT_LIST_HEAD(tmplist);
 
@@ -3393,7 +3392,7 @@ readpages_get_pages(struct address_space *mapping, struct list_head *page_list,
 	 */
 	__set_page_locked(page);
 	rc = add_to_page_cache_locked(page, mapping,
-				      page->index, gfp);
+				      page->index, GFP_KERNEL);
 
 	/* give up if we can't stick it in the cache */
 	if (rc) {
@@ -3419,7 +3418,8 @@ readpages_get_pages(struct address_space *mapping, struct list_head *page_list,
 			break;
 
 		__set_page_locked(page);
-		if (add_to_page_cache_locked(page, mapping, page->index, gfp)) {
+		if (add_to_page_cache_locked(page, mapping, page->index,
+								GFP_KERNEL)) {
 			__clear_page_locked(page);
 			break;
 		}

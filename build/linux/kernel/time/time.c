@@ -268,14 +268,10 @@ EXPORT_SYMBOL(jiffies_to_msecs);
 
 unsigned int jiffies_to_usecs(const unsigned long j)
 {
-	/*
-	 * Hz usually doesn't go much further MSEC_PER_SEC.
-	 * jiffies_to_usecs() and usecs_to_jiffies() depend on that.
-	 */
-	BUILD_BUG_ON(HZ > USEC_PER_SEC);
-
-#if !(USEC_PER_SEC % HZ)
+#if HZ <= USEC_PER_SEC && !(USEC_PER_SEC % HZ)
 	return (USEC_PER_SEC / HZ) * j;
+#elif HZ > USEC_PER_SEC && !(HZ % USEC_PER_SEC)
+	return (j + (HZ / USEC_PER_SEC) - 1)/(HZ / USEC_PER_SEC);
 #else
 # if BITS_PER_LONG == 32
 	return (HZ_TO_USEC_MUL32 * j) >> HZ_TO_USEC_SHR32;
@@ -291,20 +287,26 @@ EXPORT_SYMBOL(jiffies_to_usecs);
  * @t: Timespec
  * @gran: Granularity in ns.
  *
- * Truncate a timespec to a granularity. Always rounds down. gran must
- * not be 0 nor greater than a second (NSEC_PER_SEC, or 10^9 ns).
+ * Truncate a timespec to a granularity. gran must be smaller than a second.
+ * Always rounds down.
+ *
+ * This function should be only used for timestamps returned by
+ * current_kernel_time() or CURRENT_TIME, not with do_gettimeofday() because
+ * it doesn't handle the better resolution of the latter.
  */
 struct timespec timespec_trunc(struct timespec t, unsigned gran)
 {
-	/* Avoid division in the common cases 1 ns and 1 s. */
-	if (gran == 1) {
+	/*
+	 * Division is pretty slow so avoid it for common cases.
+	 * Currently current_kernel_time() never returns better than
+	 * jiffies resolution. Exploit that.
+	 */
+	if (gran <= jiffies_to_usecs(1) * 1000) {
 		/* nothing */
-	} else if (gran == NSEC_PER_SEC) {
+	} else if (gran == 1000000000) {
 		t.tv_nsec = 0;
-	} else if (gran > 1 && gran < NSEC_PER_SEC) {
-		t.tv_nsec -= t.tv_nsec % gran;
 	} else {
-		WARN(1, "illegal file time granularity: %u", gran);
+		t.tv_nsec -= t.tv_nsec % gran;
 	}
 	return t;
 }
@@ -544,7 +546,7 @@ EXPORT_SYMBOL(__usecs_to_jiffies);
  * value to a scaled second value.
  */
 static unsigned long
-__timespec64_to_jiffies(u64 sec, long nsec)
+__timespec_to_jiffies(unsigned long sec, long nsec)
 {
 	nsec = nsec + TICK_NSEC - 1;
 
@@ -552,27 +554,22 @@ __timespec64_to_jiffies(u64 sec, long nsec)
 		sec = MAX_SEC_IN_JIFFIES;
 		nsec = 0;
 	}
-	return ((sec * SEC_CONVERSION) +
+	return (((u64)sec * SEC_CONVERSION) +
 		(((u64)nsec * NSEC_CONVERSION) >>
 		 (NSEC_JIFFIE_SC - SEC_JIFFIE_SC))) >> SEC_JIFFIE_SC;
 
 }
 
-static unsigned long
-__timespec_to_jiffies(unsigned long sec, long nsec)
+unsigned long
+timespec_to_jiffies(const struct timespec *value)
 {
-	return __timespec64_to_jiffies((u64)sec, nsec);
+	return __timespec_to_jiffies(value->tv_sec, value->tv_nsec);
 }
 
-unsigned long
-timespec64_to_jiffies(const struct timespec64 *value)
-{
-	return __timespec64_to_jiffies(value->tv_sec, value->tv_nsec);
-}
-EXPORT_SYMBOL(timespec64_to_jiffies);
+EXPORT_SYMBOL(timespec_to_jiffies);
 
 void
-jiffies_to_timespec64(const unsigned long jiffies, struct timespec64 *value)
+jiffies_to_timespec(const unsigned long jiffies, struct timespec *value)
 {
 	/*
 	 * Convert jiffies to nanoseconds and separate with
@@ -583,7 +580,7 @@ jiffies_to_timespec64(const unsigned long jiffies, struct timespec64 *value)
 				    NSEC_PER_SEC, &rem);
 	value->tv_nsec = rem;
 }
-EXPORT_SYMBOL(jiffies_to_timespec64);
+EXPORT_SYMBOL(jiffies_to_timespec);
 
 /*
  * We could use a similar algorithm to timespec_to_jiffies (with a

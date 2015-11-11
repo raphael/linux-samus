@@ -10,6 +10,7 @@
  * Simple multiplexer clock implementation
  */
 
+#include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -31,7 +32,7 @@
 static u8 clk_mux_get_parent(struct clk_hw *hw)
 {
 	struct clk_mux *mux = to_clk_mux(hw);
-	int num_parents = clk_hw_get_num_parents(hw);
+	int num_parents = __clk_get_num_parents(hw->clk);
 	u32 val;
 
 	/*
@@ -84,8 +85,6 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
 
 	if (mux->lock)
 		spin_lock_irqsave(mux->lock, flags);
-	else
-		__acquire(mux->lock);
 
 	if (mux->flags & CLK_MUX_HIWORD_MASK) {
 		val = mux->mask << (mux->shift + 16);
@@ -98,8 +97,6 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
 
 	if (mux->lock)
 		spin_unlock_irqrestore(mux->lock, flags);
-	else
-		__release(mux->lock);
 
 	return 0;
 }

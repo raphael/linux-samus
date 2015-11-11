@@ -1045,6 +1045,7 @@ void setup_graphics(struct boot_params *boot_params)
 struct boot_params *make_boot_params(struct efi_config *c)
 {
 	struct boot_params *boot_params;
+	struct sys_desc_table *sdt;
 	struct apm_bios_info *bi;
 	struct setup_header *hdr;
 	struct efi_info *efi;
@@ -1092,6 +1093,7 @@ struct boot_params *make_boot_params(struct efi_config *c)
 	hdr = &boot_params->hdr;
 	efi = &boot_params->efi_info;
 	bi = &boot_params->apm_bios_info;
+	sdt = &boot_params->sys_desc_table;
 
 	/* Copy the second sector to boot_params */
 	memcpy(&hdr->jump, image->image_base + 512, 512);
@@ -1119,6 +1121,8 @@ struct boot_params *make_boot_params(struct efi_config *c)
 
 	/* Clear APM BIOS info */
 	memset(bi, 0, sizeof(*bi));
+
+	memset(sdt, 0, sizeof(*sdt));
 
 	status = efi_parse_options(cmdline_ptr);
 	if (status != EFI_SUCCESS)

@@ -1919,7 +1919,9 @@ int __init dm_interface_init(void)
 
 void dm_interface_exit(void)
 {
-	misc_deregister(&_dm_misc);
+	if (misc_deregister(&_dm_misc) < 0)
+		DMERR("misc_deregister failed for control device");
+
 	dm_hash_exit();
 }
 

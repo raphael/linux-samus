@@ -26,7 +26,6 @@
 #include <linux/cpu_pm.h>
 #include <linux/io.h>
 #include <linux/irq.h>
-#include <linux/irqchip.h>
 #include <linux/irqdomain.h>
 #include <linux/mfd/syscon.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
@@ -34,6 +33,8 @@
 #include <linux/of_address.h>
 #include <linux/slab.h>
 #include <linux/regmap.h>
+
+#include "irqchip.h"
 
 #define MSCM_CPxNUM		0x4
 

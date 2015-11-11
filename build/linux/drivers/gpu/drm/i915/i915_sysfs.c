@@ -64,15 +64,23 @@ static u32 calc_residency(struct drm_device *dev, const u32 reg)
 			goto out;
 		}
 
-		if (IS_CHERRYVIEW(dev) && czcount_30ns == 1) {
+		units = 0;
+		div = 1000000ULL;
+
+		if (IS_CHERRYVIEW(dev)) {
 			/* Special case for 320Mhz */
-			div = 10000000ULL;
-			units = 3125ULL;
-		} else {
-			czcount_30ns += 1;
-			div = 1000000ULL;
-			units = DIV_ROUND_UP_ULL(30ULL * bias, czcount_30ns);
+			if (czcount_30ns == 1) {
+				div = 10000000ULL;
+				units = 3125ULL;
+			} else {
+				/* chv counts are one less */
+				czcount_30ns += 1;
+			}
 		}
+
+		if (units == 0)
+			units = DIV_ROUND_UP_ULL(30ULL * bias,
+						 (u64)czcount_30ns);
 
 		if (I915_READ(VLV_COUNTER_CONTROL) & VLV_COUNT_RANGE_HIGH)
 			units <<= 8;

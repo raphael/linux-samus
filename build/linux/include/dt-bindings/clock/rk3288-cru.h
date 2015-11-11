@@ -13,9 +13,6 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _DT_BINDINGS_CLK_ROCKCHIP_RK3288_H
-#define _DT_BINDINGS_CLK_ROCKCHIP_RK3288_H
-
 /* core clocks */
 #define PLL_APLL		1
 #define PLL_DPLL		2
@@ -379,5 +376,3 @@
 #define SRST_TSP_CLKIN0		189
 #define SRST_TSP_CLKIN1		190
 #define SRST_TSP_27M		191
-
-#endif

@@ -26,13 +26,17 @@
 
 #include <subdev/fuse.h>
 
+struct g84_therm_priv {
+	struct nvkm_therm_priv base;
+};
+
 int
 g84_temp_get(struct nvkm_therm *therm)
 {
-	struct nvkm_device *device = therm->subdev.device;
+	struct nvkm_fuse *fuse = nvkm_fuse(therm);
 
-	if (nvkm_fuse_read(device->fuse, 0x1a8) == 1)
-		return nvkm_rd32(device, 0x20400);
+	if (nv_ro32(fuse, 0x1a8) == 1)
+		return nv_rd32(therm, 0x20400);
 	else
 		return -ENODEV;
 }
@@ -40,12 +44,12 @@ g84_temp_get(struct nvkm_therm *therm)
 void
 g84_sensor_setup(struct nvkm_therm *therm)
 {
-	struct nvkm_device *device = therm->subdev.device;
+	struct nvkm_fuse *fuse = nvkm_fuse(therm);
 
 	/* enable temperature reading for cards with insane defaults */
-	if (nvkm_fuse_read(device->fuse, 0x1a8) == 1) {
-		nvkm_mask(device, 0x20008, 0x80008000, 0x80000000);
-		nvkm_mask(device, 0x2000c, 0x80000003, 0x00000000);
+	if (nv_ro32(fuse, 0x1a8) == 1) {
+		nv_mask(therm, 0x20008, 0x80008000, 0x80000000);
+		nv_mask(therm, 0x2000c, 0x80000003, 0x00000000);
 		mdelay(20); /* wait for the temperature to stabilize */
 	}
 }
@@ -53,40 +57,36 @@ g84_sensor_setup(struct nvkm_therm *therm)
 static void
 g84_therm_program_alarms(struct nvkm_therm *therm)
 {
-	struct nvbios_therm_sensor *sensor = &therm->bios_sensor;
-	struct nvkm_subdev *subdev = &therm->subdev;
-	struct nvkm_device *device = subdev->device;
+	struct nvkm_therm_priv *priv = (void *)therm;
+	struct nvbios_therm_sensor *sensor = &priv->bios_sensor;
 	unsigned long flags;
 
-	spin_lock_irqsave(&therm->sensor.alarm_program_lock, flags);
+	spin_lock_irqsave(&priv->sensor.alarm_program_lock, flags);
 
 	/* enable RISING and FALLING IRQs for shutdown, THRS 0, 1, 2 and 4 */
-	nvkm_wr32(device, 0x20000, 0x000003ff);
+	nv_wr32(therm, 0x20000, 0x000003ff);
 
 	/* shutdown: The computer should be shutdown when reached */
-	nvkm_wr32(device, 0x20484, sensor->thrs_shutdown.hysteresis);
-	nvkm_wr32(device, 0x20480, sensor->thrs_shutdown.temp);
+	nv_wr32(therm, 0x20484, sensor->thrs_shutdown.hysteresis);
+	nv_wr32(therm, 0x20480, sensor->thrs_shutdown.temp);
 
 	/* THRS_1 : fan boost*/
-	nvkm_wr32(device, 0x204c4, sensor->thrs_fan_boost.temp);
+	nv_wr32(therm, 0x204c4, sensor->thrs_fan_boost.temp);
 
 	/* THRS_2 : critical */
-	nvkm_wr32(device, 0x204c0, sensor->thrs_critical.temp);
+	nv_wr32(therm, 0x204c0, sensor->thrs_critical.temp);
 
 	/* THRS_4 : down clock */
-	nvkm_wr32(device, 0x20414, sensor->thrs_down_clock.temp);
-	spin_unlock_irqrestore(&therm->sensor.alarm_program_lock, flags);
+	nv_wr32(therm, 0x20414, sensor->thrs_down_clock.temp);
+	spin_unlock_irqrestore(&priv->sensor.alarm_program_lock, flags);
 
-	nvkm_debug(subdev,
-		   "Programmed thresholds [ %d(%d), %d(%d), %d(%d), %d(%d) ]\n",
-		   sensor->thrs_fan_boost.temp,
-		   sensor->thrs_fan_boost.hysteresis,
-		   sensor->thrs_down_clock.temp,
-		   sensor->thrs_down_clock.hysteresis,
-		   sensor->thrs_critical.temp,
-		   sensor->thrs_critical.hysteresis,
-		   sensor->thrs_shutdown.temp,
-		   sensor->thrs_shutdown.hysteresis);
+	nv_debug(therm,
+		 "Programmed thresholds [ %d(%d), %d(%d), %d(%d), %d(%d) ]\n",
+		 sensor->thrs_fan_boost.temp, sensor->thrs_fan_boost.hysteresis,
+		 sensor->thrs_down_clock.temp,
+		 sensor->thrs_down_clock.hysteresis,
+		 sensor->thrs_critical.temp, sensor->thrs_critical.hysteresis,
+		 sensor->thrs_shutdown.temp, sensor->thrs_shutdown.hysteresis);
 
 }
 
@@ -97,25 +97,24 @@ g84_therm_threshold_hyst_emulation(struct nvkm_therm *therm,
 				   const struct nvbios_therm_threshold *thrs,
 				   enum nvkm_therm_thrs thrs_name)
 {
-	struct nvkm_device *device = therm->subdev.device;
 	enum nvkm_therm_thrs_direction direction;
 	enum nvkm_therm_thrs_state prev_state, new_state;
 	int temp, cur;
 
 	prev_state = nvkm_therm_sensor_get_threshold_state(therm, thrs_name);
-	temp = nvkm_rd32(device, thrs_reg);
+	temp = nv_rd32(therm, thrs_reg);
 
 	/* program the next threshold */
 	if (temp == thrs->temp) {
-		nvkm_wr32(device, thrs_reg, thrs->temp - thrs->hysteresis);
+		nv_wr32(therm, thrs_reg, thrs->temp - thrs->hysteresis);
 		new_state = NVKM_THERM_THRS_HIGHER;
 	} else {
-		nvkm_wr32(device, thrs_reg, thrs->temp);
+		nv_wr32(therm, thrs_reg, thrs->temp);
 		new_state = NVKM_THERM_THRS_LOWER;
 	}
 
 	/* fix the state (in case someone reprogrammed the alarms) */
-	cur = therm->func->temp_get(therm);
+	cur = therm->temp_get(therm);
 	if (new_state == NVKM_THERM_THRS_LOWER && cur > thrs->temp)
 		new_state = NVKM_THERM_THRS_HIGHER;
 	else if (new_state == NVKM_THERM_THRS_HIGHER &&
@@ -136,17 +135,17 @@ g84_therm_threshold_hyst_emulation(struct nvkm_therm *therm,
 }
 
 static void
-g84_therm_intr(struct nvkm_therm *therm)
+g84_therm_intr(struct nvkm_subdev *subdev)
 {
-	struct nvkm_subdev *subdev = &therm->subdev;
-	struct nvkm_device *device = subdev->device;
-	struct nvbios_therm_sensor *sensor = &therm->bios_sensor;
+	struct nvkm_therm *therm = nvkm_therm(subdev);
+	struct nvkm_therm_priv *priv = (void *)therm;
+	struct nvbios_therm_sensor *sensor = &priv->bios_sensor;
 	unsigned long flags;
 	uint32_t intr;
 
-	spin_lock_irqsave(&therm->sensor.alarm_program_lock, flags);
+	spin_lock_irqsave(&priv->sensor.alarm_program_lock, flags);
 
-	intr = nvkm_rd32(device, 0x20100) & 0x3ff;
+	intr = nv_rd32(therm, 0x20100) & 0x3ff;
 
 	/* THRS_4: downclock */
 	if (intr & 0x002) {
@@ -181,66 +180,87 @@ g84_therm_intr(struct nvkm_therm *therm)
 	}
 
 	if (intr)
-		nvkm_error(subdev, "intr %08x\n", intr);
+		nv_error(therm, "unhandled intr 0x%08x\n", intr);
 
 	/* ACK everything */
-	nvkm_wr32(device, 0x20100, 0xffffffff);
-	nvkm_wr32(device, 0x1100, 0x10000); /* PBUS */
+	nv_wr32(therm, 0x20100, 0xffffffff);
+	nv_wr32(therm, 0x1100, 0x10000); /* PBUS */
 
-	spin_unlock_irqrestore(&therm->sensor.alarm_program_lock, flags);
+	spin_unlock_irqrestore(&priv->sensor.alarm_program_lock, flags);
 }
 
-void
-g84_therm_fini(struct nvkm_therm *therm)
+static int
+g84_therm_init(struct nvkm_object *object)
 {
-	struct nvkm_device *device = therm->subdev.device;
-
-	/* Disable PTherm IRQs */
-	nvkm_wr32(device, 0x20000, 0x00000000);
-
-	/* ACK all PTherm IRQs */
-	nvkm_wr32(device, 0x20100, 0xffffffff);
-	nvkm_wr32(device, 0x1100, 0x10000); /* PBUS */
-}
-
-static void
-g84_therm_init(struct nvkm_therm *therm)
-{
-	g84_sensor_setup(therm);
-}
-
-static const struct nvkm_therm_func
-g84_therm = {
-	.init = g84_therm_init,
-	.fini = g84_therm_fini,
-	.intr = g84_therm_intr,
-	.pwm_ctrl = nv50_fan_pwm_ctrl,
-	.pwm_get = nv50_fan_pwm_get,
-	.pwm_set = nv50_fan_pwm_set,
-	.pwm_clock = nv50_fan_pwm_clock,
-	.temp_get = g84_temp_get,
-	.program_alarms = g84_therm_program_alarms,
-};
-
-int
-g84_therm_new(struct nvkm_device *device, int index, struct nvkm_therm **ptherm)
-{
-	struct nvkm_therm *therm;
+	struct g84_therm_priv *priv = (void *)object;
 	int ret;
 
-	ret = nvkm_therm_new_(&g84_therm, device, index, &therm);
-	*ptherm = therm;
+	ret = nvkm_therm_init(&priv->base.base);
 	if (ret)
 		return ret;
 
-	/* init the thresholds */
-	nvkm_therm_sensor_set_threshold_state(therm, NVKM_THERM_THRS_SHUTDOWN,
-						     NVKM_THERM_THRS_LOWER);
-	nvkm_therm_sensor_set_threshold_state(therm, NVKM_THERM_THRS_FANBOOST,
-						     NVKM_THERM_THRS_LOWER);
-	nvkm_therm_sensor_set_threshold_state(therm, NVKM_THERM_THRS_CRITICAL,
-						     NVKM_THERM_THRS_LOWER);
-	nvkm_therm_sensor_set_threshold_state(therm, NVKM_THERM_THRS_DOWNCLOCK,
-						     NVKM_THERM_THRS_LOWER);
+	g84_sensor_setup(&priv->base.base);
 	return 0;
 }
+
+static int
+g84_therm_ctor(struct nvkm_object *parent, struct nvkm_object *engine,
+	       struct nvkm_oclass *oclass, void *data, u32 size,
+	       struct nvkm_object **pobject)
+{
+	struct g84_therm_priv *priv;
+	int ret;
+
+	ret = nvkm_therm_create(parent, engine, oclass, &priv);
+	*pobject = nv_object(priv);
+	if (ret)
+		return ret;
+
+	priv->base.base.pwm_ctrl = nv50_fan_pwm_ctrl;
+	priv->base.base.pwm_get = nv50_fan_pwm_get;
+	priv->base.base.pwm_set = nv50_fan_pwm_set;
+	priv->base.base.pwm_clock = nv50_fan_pwm_clock;
+	priv->base.base.temp_get = g84_temp_get;
+	priv->base.sensor.program_alarms = g84_therm_program_alarms;
+	nv_subdev(priv)->intr = g84_therm_intr;
+
+	/* init the thresholds */
+	nvkm_therm_sensor_set_threshold_state(&priv->base.base,
+					      NVKM_THERM_THRS_SHUTDOWN,
+					      NVKM_THERM_THRS_LOWER);
+	nvkm_therm_sensor_set_threshold_state(&priv->base.base,
+					      NVKM_THERM_THRS_FANBOOST,
+					      NVKM_THERM_THRS_LOWER);
+	nvkm_therm_sensor_set_threshold_state(&priv->base.base,
+					      NVKM_THERM_THRS_CRITICAL,
+					      NVKM_THERM_THRS_LOWER);
+	nvkm_therm_sensor_set_threshold_state(&priv->base.base,
+					      NVKM_THERM_THRS_DOWNCLOCK,
+					      NVKM_THERM_THRS_LOWER);
+
+	return nvkm_therm_preinit(&priv->base.base);
+}
+
+int
+g84_therm_fini(struct nvkm_object *object, bool suspend)
+{
+	/* Disable PTherm IRQs */
+	nv_wr32(object, 0x20000, 0x00000000);
+
+	/* ACK all PTherm IRQs */
+	nv_wr32(object, 0x20100, 0xffffffff);
+	nv_wr32(object, 0x1100, 0x10000); /* PBUS */
+
+	return _nvkm_therm_fini(object, suspend);
+}
+
+struct nvkm_oclass
+g84_therm_oclass = {
+	.handle = NV_SUBDEV(THERM, 0x84),
+	.ofuncs = &(struct nvkm_ofuncs) {
+		.ctor = g84_therm_ctor,
+		.dtor = _nvkm_therm_dtor,
+		.init = g84_therm_init,
+		.fini = g84_therm_fini,
+	},
+};

@@ -22,16 +22,17 @@
  * Authors: Ben Skeggs
  */
 #include "nv50.h"
-#include "ram.h"
 
-static const struct nv50_fb_func
-g84_fb = {
-	.ram_new = nv50_ram_new,
+struct nvkm_oclass *
+g84_fb_oclass = &(struct nv50_fb_impl) {
+	.base.base.handle = NV_SUBDEV(FB, 0x84),
+	.base.base.ofuncs = &(struct nvkm_ofuncs) {
+		.ctor = nv50_fb_ctor,
+		.dtor = nv50_fb_dtor,
+		.init = nv50_fb_init,
+		.fini = _nvkm_fb_fini,
+	},
+	.base.memtype = nv50_fb_memtype_valid,
+	.base.ram = &nv50_ram_oclass,
 	.trap = 0x001d07ff,
-};
-
-int
-g84_fb_new(struct nvkm_device *device, int index, struct nvkm_fb **pfb)
-{
-	return nv50_fb_new_(&g84_fb, device, index, pfb);
-}
+}.base.base;

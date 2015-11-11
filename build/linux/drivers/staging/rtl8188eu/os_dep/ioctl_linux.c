@@ -179,8 +179,8 @@ static char *translate_scan(struct adapter *padapter,
 
 	cap = le16_to_cpu(le_tmp);
 
-	if (!WLAN_CAPABILITY_IS_STA_BSS(cap)) {
-		if (cap & WLAN_CAPABILITY_ESS)
+	if (cap & (WLAN_CAPABILITY_IBSS | WLAN_CAPABILITY_BSS)) {
+		if (cap & WLAN_CAPABILITY_BSS)
 			iwe.u.mode = IW_MODE_MASTER;
 		else
 			iwe.u.mode = IW_MODE_ADHOC;
@@ -1871,7 +1871,7 @@ static int rtw_wx_set_auth(struct net_device *dev,
 			rtw_disassoc_cmd(padapter, 500, false);
 			DBG_88E("%s...call rtw_indicate_disconnect\n ", __func__);
 			rtw_indicate_disconnect(padapter);
-			rtw_free_assoc_resources(padapter);
+			rtw_free_assoc_resources(padapter, 1);
 		}
 		ret = wpa_set_auth_algs(dev, (u32)param->value);
 		break;
@@ -2485,13 +2485,16 @@ static int rtw_set_beacon(struct net_device *dev, struct ieee_param *param, int 
 
 static int rtw_hostapd_sta_flush(struct net_device *dev)
 {
+	int ret = 0;
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
 
 	DBG_88E("%s\n", __func__);
 
 	flush_all_cam_entry(padapter);	/* clear CAM */
 
-	return rtw_sta_flush(padapter);
+	ret = rtw_sta_flush(padapter);
+
+	return ret;
 }
 
 static int rtw_add_sta(struct net_device *dev, struct ieee_param *param)
@@ -2663,8 +2666,7 @@ static int rtw_get_sta_wpaie(struct net_device *dev, struct ieee_param *param)
 
 	psta = rtw_get_stainfo(pstapriv, param->sta_addr);
 	if (psta) {
-		if (psta->wpa_ie[0] == WLAN_EID_RSN ||
-		    psta->wpa_ie[0] == WLAN_EID_VENDOR_SPECIFIC) {
+		if ((psta->wpa_ie[0] == WLAN_EID_RSN) || (psta->wpa_ie[0] == WLAN_EID_GENERIC)) {
 			int wpa_ie_len;
 			int copy_len;
 
@@ -2807,6 +2809,7 @@ static int rtw_set_hidden_ssid(struct net_device *dev, struct ieee_param *param,
 
 static int rtw_ioctl_acl_remove_sta(struct net_device *dev, struct ieee_param *param, int len)
 {
+	int ret = 0;
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
 	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
 
@@ -2817,11 +2820,13 @@ static int rtw_ioctl_acl_remove_sta(struct net_device *dev, struct ieee_param *p
 	    param->sta_addr[2] == 0xff && param->sta_addr[3] == 0xff &&
 	    param->sta_addr[4] == 0xff && param->sta_addr[5] == 0xff)
 		return -EINVAL;
-	return rtw_acl_remove_sta(padapter, param->sta_addr);
+	ret = rtw_acl_remove_sta(padapter, param->sta_addr);
+	return ret;
 }
 
 static int rtw_ioctl_acl_add_sta(struct net_device *dev, struct ieee_param *param, int len)
 {
+	int ret = 0;
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
 	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
 
@@ -2832,7 +2837,8 @@ static int rtw_ioctl_acl_add_sta(struct net_device *dev, struct ieee_param *para
 	    param->sta_addr[2] == 0xff && param->sta_addr[3] == 0xff &&
 	    param->sta_addr[4] == 0xff && param->sta_addr[5] == 0xff)
 		return -EINVAL;
-	return rtw_acl_add_sta(padapter, param->sta_addr);
+	ret = rtw_acl_add_sta(padapter, param->sta_addr);
+	return ret;
 }
 
 static int rtw_ioctl_set_macaddr_acl(struct net_device *dev, struct ieee_param *param, int len)

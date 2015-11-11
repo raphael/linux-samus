@@ -340,7 +340,6 @@ extern struct Qdisc noop_qdisc;
 extern struct Qdisc_ops noop_qdisc_ops;
 extern struct Qdisc_ops pfifo_fast_ops;
 extern struct Qdisc_ops mq_qdisc_ops;
-extern struct Qdisc_ops noqueue_qdisc_ops;
 extern const struct Qdisc_ops *default_qdisc_ops;
 
 struct Qdisc_class_common {
@@ -514,18 +513,15 @@ static inline void bstats_update(struct gnet_stats_basic_packed *bstats,
 	bstats->packets += skb_is_gso(skb) ? skb_shinfo(skb)->gso_segs : 1;
 }
 
-static inline void bstats_cpu_update(struct gnet_stats_basic_cpu *bstats,
-				     const struct sk_buff *skb)
+static inline void qdisc_bstats_update_cpu(struct Qdisc *sch,
+					   const struct sk_buff *skb)
 {
+	struct gnet_stats_basic_cpu *bstats =
+				this_cpu_ptr(sch->cpu_bstats);
+
 	u64_stats_update_begin(&bstats->syncp);
 	bstats_update(&bstats->bstats, skb);
 	u64_stats_update_end(&bstats->syncp);
-}
-
-static inline void qdisc_bstats_cpu_update(struct Qdisc *sch,
-					   const struct sk_buff *skb)
-{
-	bstats_cpu_update(this_cpu_ptr(sch->cpu_bstats), skb);
 }
 
 static inline void qdisc_bstats_update(struct Qdisc *sch,
@@ -551,24 +547,16 @@ static inline void __qdisc_qstats_drop(struct Qdisc *sch, int count)
 	sch->qstats.drops += count;
 }
 
-static inline void qstats_drop_inc(struct gnet_stats_queue *qstats)
-{
-	qstats->drops++;
-}
-
-static inline void qstats_overlimit_inc(struct gnet_stats_queue *qstats)
-{
-	qstats->overlimits++;
-}
-
 static inline void qdisc_qstats_drop(struct Qdisc *sch)
 {
-	qstats_drop_inc(&sch->qstats);
+	sch->qstats.drops++;
 }
 
-static inline void qdisc_qstats_cpu_drop(struct Qdisc *sch)
+static inline void qdisc_qstats_drop_cpu(struct Qdisc *sch)
 {
-	qstats_drop_inc(this_cpu_ptr(sch->cpu_qstats));
+	struct gnet_stats_queue *qstats = this_cpu_ptr(sch->cpu_qstats);
+
+	qstats->drops++;
 }
 
 static inline void qdisc_qstats_overlimit(struct Qdisc *sch)

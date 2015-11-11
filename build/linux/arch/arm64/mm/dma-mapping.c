@@ -100,7 +100,7 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
 	if (IS_ENABLED(CONFIG_ZONE_DMA) &&
 	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
 		flags |= GFP_DMA;
-	if (dev_get_cma_area(dev) && (flags & __GFP_WAIT)) {
+	if (IS_ENABLED(CONFIG_DMA_CMA) && (flags & __GFP_WAIT)) {
 		struct page *page;
 		void *addr;
 
@@ -144,7 +144,6 @@ static void *__dma_alloc(struct device *dev, size_t size,
 	struct page *page;
 	void *ptr, *coherent_ptr;
 	bool coherent = is_device_dma_coherent(dev);
-	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, false);
 
 	size = PAGE_ALIGN(size);
 
@@ -172,7 +171,9 @@ static void *__dma_alloc(struct device *dev, size_t size,
 	/* create a coherent mapping */
 	page = virt_to_page(ptr);
 	coherent_ptr = dma_common_contiguous_remap(page, size, VM_USERMAP,
-						   prot, NULL);
+				__get_dma_pgprot(attrs,
+					__pgprot(PROT_NORMAL_NC), false),
+					NULL);
 	if (!coherent_ptr)
 		goto no_map;
 
@@ -302,10 +303,9 @@ static void __swiotlb_sync_sg_for_device(struct device *dev,
 				       sg->length, dir);
 }
 
-static int __swiotlb_mmap(struct device *dev,
-			  struct vm_area_struct *vma,
-			  void *cpu_addr, dma_addr_t dma_addr, size_t size,
-			  struct dma_attrs *attrs)
+/* vma->vm_page_prot must be set appropriately before calling this function */
+static int __dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
+			     void *cpu_addr, dma_addr_t dma_addr, size_t size)
 {
 	int ret = -ENXIO;
 	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >>
@@ -313,9 +313,6 @@ static int __swiotlb_mmap(struct device *dev,
 	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
 	unsigned long pfn = dma_to_phys(dev, dma_addr) >> PAGE_SHIFT;
 	unsigned long off = vma->vm_pgoff;
-
-	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot,
-					     is_device_dma_coherent(dev));
 
 	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
 		return ret;
@@ -330,24 +327,20 @@ static int __swiotlb_mmap(struct device *dev,
 	return ret;
 }
 
-static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
-				 void *cpu_addr, dma_addr_t handle, size_t size,
-				 struct dma_attrs *attrs)
+static int __swiotlb_mmap(struct device *dev,
+			  struct vm_area_struct *vma,
+			  void *cpu_addr, dma_addr_t dma_addr, size_t size,
+			  struct dma_attrs *attrs)
 {
-	int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
-
-	if (!ret)
-		sg_set_page(sgt->sgl, phys_to_page(dma_to_phys(dev, handle)),
-			    PAGE_ALIGN(size), 0);
-
-	return ret;
+	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot,
+					     is_device_dma_coherent(dev));
+	return __dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
 }
 
 static struct dma_map_ops swiotlb_dma_ops = {
 	.alloc = __dma_alloc,
 	.free = __dma_free,
 	.mmap = __swiotlb_mmap,
-	.get_sgtable = __swiotlb_get_sgtable,
 	.map_page = __swiotlb_map_page,
 	.unmap_page = __swiotlb_unmap_page,
 	.map_sg = __swiotlb_map_sg_attrs,

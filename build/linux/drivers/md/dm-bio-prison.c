@@ -236,10 +236,8 @@ void dm_cell_error(struct dm_bio_prison *prison,
 	bio_list_init(&bios);
 	dm_cell_release(prison, cell, &bios);
 
-	while ((bio = bio_list_pop(&bios))) {
-		bio->bi_error = error;
-		bio_endio(bio);
-	}
+	while ((bio = bio_list_pop(&bios)))
+		bio_endio(bio, error);
 }
 EXPORT_SYMBOL_GPL(dm_cell_error);
 

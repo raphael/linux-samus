@@ -99,6 +99,8 @@ static void rds_ib_dev_free(struct work_struct *work)
 
 	if (rds_ibdev->mr_pool)
 		rds_ib_destroy_mr_pool(rds_ibdev->mr_pool);
+	if (rds_ibdev->mr)
+		ib_dereg_mr(rds_ibdev->mr);
 	if (rds_ibdev->pd)
 		ib_dealloc_pd(rds_ibdev->pd);
 
@@ -162,6 +164,12 @@ static void rds_ib_add_one(struct ib_device *device)
 		goto put_dev;
 	}
 
+	rds_ibdev->mr = ib_get_dma_mr(rds_ibdev->pd, IB_ACCESS_LOCAL_WRITE);
+	if (IS_ERR(rds_ibdev->mr)) {
+		rds_ibdev->mr = NULL;
+		goto put_dev;
+	}
+
 	rds_ibdev->mr_pool = rds_ib_create_mr_pool(rds_ibdev);
 	if (IS_ERR(rds_ibdev->mr_pool)) {
 		rds_ibdev->mr_pool = NULL;
@@ -222,10 +230,11 @@ struct rds_ib_device *rds_ib_get_client_data(struct ib_device *device)
  *
  * This can be called at any time and can be racing with any other RDS path.
  */
-static void rds_ib_remove_one(struct ib_device *device, void *client_data)
+static void rds_ib_remove_one(struct ib_device *device)
 {
-	struct rds_ib_device *rds_ibdev = client_data;
+	struct rds_ib_device *rds_ibdev;
 
+	rds_ibdev = ib_get_client_data(device, &rds_ib_client);
 	if (!rds_ibdev)
 		return;
 
@@ -308,7 +317,7 @@ static void rds_ib_ic_info(struct socket *sock, unsigned int len,
  * allowed to influence which paths have priority.  We could call userspace
  * asserting this policy "routing".
  */
-static int rds_ib_laddr_check(struct net *net, __be32 addr)
+static int rds_ib_laddr_check(__be32 addr)
 {
 	int ret;
 	struct rdma_cm_id *cm_id;
@@ -357,7 +366,6 @@ void rds_ib_exit(void)
 	rds_ib_sysctl_exit();
 	rds_ib_recv_exit();
 	rds_trans_unregister(&rds_ib_transport);
-	rds_ib_fmr_exit();
 }
 
 struct rds_transport rds_ib_transport = {
@@ -393,13 +401,9 @@ int rds_ib_init(void)
 
 	INIT_LIST_HEAD(&rds_ib_devices);
 
-	ret = rds_ib_fmr_init();
-	if (ret)
-		goto out;
-
 	ret = ib_register_client(&rds_ib_client);
 	if (ret)
-		goto out_fmr_exit;
+		goto out;
 
 	ret = rds_ib_sysctl_init();
 	if (ret)
@@ -423,8 +427,6 @@ out_sysctl:
 	rds_ib_sysctl_exit();
 out_ibreg:
 	rds_ib_unregister_client();
-out_fmr_exit:
-	rds_ib_fmr_exit();
 out:
 	return ret;
 }

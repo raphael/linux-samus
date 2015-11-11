@@ -90,14 +90,12 @@ void *__switch_to(struct task_struct *from, struct task_struct *to)
 
 void interrupt_end(void)
 {
-	struct pt_regs *regs = &current->thread.regs;
-
 	if (need_resched())
 		schedule();
 	if (test_thread_flag(TIF_SIGPENDING))
-		do_signal(regs);
+		do_signal();
 	if (test_and_clear_thread_flag(TIF_NOTIFY_RESUME))
-		tracehook_notify_resume(regs);
+		tracehook_notify_resume(&current->thread.regs);
 }
 
 void exit_thread(void)

@@ -59,9 +59,8 @@ static void amdgpu_do_test_moves(struct amdgpu_device *adev)
 		goto out_cleanup;
 	}
 
-	r = amdgpu_bo_create(adev, size, PAGE_SIZE, true,
-			     AMDGPU_GEM_DOMAIN_VRAM, 0,
-			     NULL, NULL, &vram_obj);
+	r = amdgpu_bo_create(adev, size, PAGE_SIZE, true, AMDGPU_GEM_DOMAIN_VRAM, 0,
+			     NULL, &vram_obj);
 	if (r) {
 		DRM_ERROR("Failed to create VRAM object\n");
 		goto out_cleanup;
@@ -78,11 +77,10 @@ static void amdgpu_do_test_moves(struct amdgpu_device *adev)
 		void *gtt_map, *vram_map;
 		void **gtt_start, **gtt_end;
 		void **vram_start, **vram_end;
-		struct fence *fence = NULL;
+		struct amdgpu_fence *fence = NULL;
 
 		r = amdgpu_bo_create(adev, size, PAGE_SIZE, true,
-				     AMDGPU_GEM_DOMAIN_GTT, 0, NULL,
-				     NULL, gtt_obj + i);
+				     AMDGPU_GEM_DOMAIN_GTT, 0, NULL, gtt_obj + i);
 		if (r) {
 			DRM_ERROR("Failed to create GTT object %d\n", i);
 			goto out_lclean;
@@ -118,13 +116,13 @@ static void amdgpu_do_test_moves(struct amdgpu_device *adev)
 			goto out_lclean_unpin;
 		}
 
-		r = fence_wait(fence, false);
+		r = amdgpu_fence_wait(fence, false);
 		if (r) {
 			DRM_ERROR("Failed to wait for GTT->VRAM fence %d\n", i);
 			goto out_lclean_unpin;
 		}
 
-		fence_put(fence);
+		amdgpu_fence_unref(&fence);
 
 		r = amdgpu_bo_kmap(vram_obj, &vram_map);
 		if (r) {
@@ -163,13 +161,13 @@ static void amdgpu_do_test_moves(struct amdgpu_device *adev)
 			goto out_lclean_unpin;
 		}
 
-		r = fence_wait(fence, false);
+		r = amdgpu_fence_wait(fence, false);
 		if (r) {
 			DRM_ERROR("Failed to wait for VRAM->GTT fence %d\n", i);
 			goto out_lclean_unpin;
 		}
 
-		fence_put(fence);
+		amdgpu_fence_unref(&fence);
 
 		r = amdgpu_bo_kmap(gtt_obj[i], &gtt_map);
 		if (r) {
@@ -216,7 +214,7 @@ out_lclean:
 			amdgpu_bo_unref(&gtt_obj[i]);
 		}
 		if (fence)
-			fence_put(fence);
+			amdgpu_fence_unref(&fence);
 		break;
 	}
 
@@ -240,7 +238,7 @@ void amdgpu_test_moves(struct amdgpu_device *adev)
 
 static int amdgpu_test_create_and_emit_fence(struct amdgpu_device *adev,
 					     struct amdgpu_ring *ring,
-					     struct fence **fence)
+					     struct amdgpu_fence **fence)
 {
 	uint32_t handle = ring->idx ^ 0xdeafbeef;
 	int r;
@@ -271,16 +269,15 @@ static int amdgpu_test_create_and_emit_fence(struct amdgpu_device *adev,
 			DRM_ERROR("Failed to get dummy destroy msg\n");
 			return r;
 		}
+
 	} else {
-		struct amdgpu_fence *a_fence = NULL;
 		r = amdgpu_ring_lock(ring, 64);
 		if (r) {
 			DRM_ERROR("Failed to lock ring A %d\n", ring->idx);
 			return r;
 		}
-		amdgpu_fence_emit(ring, AMDGPU_FENCE_OWNER_UNDEFINED, &a_fence);
+		amdgpu_fence_emit(ring, AMDGPU_FENCE_OWNER_UNDEFINED, fence);
 		amdgpu_ring_unlock_commit(ring);
-		*fence = &a_fence->base;
 	}
 	return 0;
 }
@@ -289,7 +286,7 @@ void amdgpu_test_ring_sync(struct amdgpu_device *adev,
 			   struct amdgpu_ring *ringA,
 			   struct amdgpu_ring *ringB)
 {
-	struct fence *fence1 = NULL, *fence2 = NULL;
+	struct amdgpu_fence *fence1 = NULL, *fence2 = NULL;
 	struct amdgpu_semaphore *semaphore = NULL;
 	int r;
 
@@ -325,7 +322,7 @@ void amdgpu_test_ring_sync(struct amdgpu_device *adev,
 
 	mdelay(1000);
 
-	if (fence_is_signaled(fence1)) {
+	if (amdgpu_fence_signaled(fence1)) {
 		DRM_ERROR("Fence 1 signaled without waiting for semaphore.\n");
 		goto out_cleanup;
 	}
@@ -338,7 +335,7 @@ void amdgpu_test_ring_sync(struct amdgpu_device *adev,
 	amdgpu_semaphore_emit_signal(ringB, semaphore);
 	amdgpu_ring_unlock_commit(ringB);
 
-	r = fence_wait(fence1, false);
+	r = amdgpu_fence_wait(fence1, false);
 	if (r) {
 		DRM_ERROR("Failed to wait for sync fence 1\n");
 		goto out_cleanup;
@@ -346,7 +343,7 @@ void amdgpu_test_ring_sync(struct amdgpu_device *adev,
 
 	mdelay(1000);
 
-	if (fence_is_signaled(fence2)) {
+	if (amdgpu_fence_signaled(fence2)) {
 		DRM_ERROR("Fence 2 signaled without waiting for semaphore.\n");
 		goto out_cleanup;
 	}
@@ -359,7 +356,7 @@ void amdgpu_test_ring_sync(struct amdgpu_device *adev,
 	amdgpu_semaphore_emit_signal(ringB, semaphore);
 	amdgpu_ring_unlock_commit(ringB);
 
-	r = fence_wait(fence2, false);
+	r = amdgpu_fence_wait(fence2, false);
 	if (r) {
 		DRM_ERROR("Failed to wait for sync fence 1\n");
 		goto out_cleanup;
@@ -369,10 +366,10 @@ out_cleanup:
 	amdgpu_semaphore_free(adev, &semaphore, NULL);
 
 	if (fence1)
-		fence_put(fence1);
+		amdgpu_fence_unref(&fence1);
 
 	if (fence2)
-		fence_put(fence2);
+		amdgpu_fence_unref(&fence2);
 
 	if (r)
 		printk(KERN_WARNING "Error while testing ring sync (%d).\n", r);
@@ -383,7 +380,7 @@ static void amdgpu_test_ring_sync2(struct amdgpu_device *adev,
 			    struct amdgpu_ring *ringB,
 			    struct amdgpu_ring *ringC)
 {
-	struct fence *fenceA = NULL, *fenceB = NULL;
+	struct amdgpu_fence *fenceA = NULL, *fenceB = NULL;
 	struct amdgpu_semaphore *semaphore = NULL;
 	bool sigA, sigB;
 	int i, r;
@@ -419,11 +416,11 @@ static void amdgpu_test_ring_sync2(struct amdgpu_device *adev,
 
 	mdelay(1000);
 
-	if (fence_is_signaled(fenceA)) {
+	if (amdgpu_fence_signaled(fenceA)) {
 		DRM_ERROR("Fence A signaled without waiting for semaphore.\n");
 		goto out_cleanup;
 	}
-	if (fence_is_signaled(fenceB)) {
+	if (amdgpu_fence_signaled(fenceB)) {
 		DRM_ERROR("Fence B signaled without waiting for semaphore.\n");
 		goto out_cleanup;
 	}
@@ -438,8 +435,8 @@ static void amdgpu_test_ring_sync2(struct amdgpu_device *adev,
 
 	for (i = 0; i < 30; ++i) {
 		mdelay(100);
-		sigA = fence_is_signaled(fenceA);
-		sigB = fence_is_signaled(fenceB);
+		sigA = amdgpu_fence_signaled(fenceA);
+		sigB = amdgpu_fence_signaled(fenceB);
 		if (sigA || sigB)
 			break;
 	}
@@ -464,12 +461,12 @@ static void amdgpu_test_ring_sync2(struct amdgpu_device *adev,
 
 	mdelay(1000);
 
-	r = fence_wait(fenceA, false);
+	r = amdgpu_fence_wait(fenceA, false);
 	if (r) {
 		DRM_ERROR("Failed to wait for sync fence A\n");
 		goto out_cleanup;
 	}
-	r = fence_wait(fenceB, false);
+	r = amdgpu_fence_wait(fenceB, false);
 	if (r) {
 		DRM_ERROR("Failed to wait for sync fence B\n");
 		goto out_cleanup;
@@ -479,10 +476,10 @@ out_cleanup:
 	amdgpu_semaphore_free(adev, &semaphore, NULL);
 
 	if (fenceA)
-		fence_put(fenceA);
+		amdgpu_fence_unref(&fenceA);
 
 	if (fenceB)
-		fence_put(fenceB);
+		amdgpu_fence_unref(&fenceB);
 
 	if (r)
 		printk(KERN_WARNING "Error while testing ring sync (%d).\n", r);

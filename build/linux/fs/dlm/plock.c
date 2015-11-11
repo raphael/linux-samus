@@ -509,6 +509,7 @@ int dlm_plock_init(void)
 
 void dlm_plock_exit(void)
 {
-	misc_deregister(&plock_dev_misc);
+	if (misc_deregister(&plock_dev_misc) < 0)
+		log_print("dlm_plock_exit: misc_deregister failed");
 }
 

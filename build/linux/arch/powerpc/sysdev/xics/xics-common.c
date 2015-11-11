@@ -298,8 +298,7 @@ int xics_get_irq_server(unsigned int virq, const struct cpumask *cpumask,
 }
 #endif /* CONFIG_SMP */
 
-static int xics_host_match(struct irq_domain *h, struct device_node *node,
-			   enum irq_domain_bus_token bus_token)
+static int xics_host_match(struct irq_domain *h, struct device_node *node)
 {
 	struct ics *ics;
 

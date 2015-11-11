@@ -39,7 +39,7 @@ static int __read_mostly tsc_unstable;
    erroneous rdtsc usage on !cpu_has_tsc processors */
 static int __read_mostly tsc_disabled = -1;
 
-static DEFINE_STATIC_KEY_FALSE(__use_tsc);
+static struct static_key __use_tsc = STATIC_KEY_INIT;
 
 int tsc_clocksource_reliable;
 
@@ -249,7 +249,7 @@ static void set_cyc2ns_scale(unsigned long cpu_khz, int cpu)
 
 	data = cyc2ns_write_begin(cpu);
 
-	tsc_now = rdtsc();
+	rdtscll(tsc_now);
 	ns_now = cycles_2_ns(tsc_now);
 
 	/*
@@ -275,12 +275,7 @@ done:
  */
 u64 native_sched_clock(void)
 {
-	if (static_branch_likely(&__use_tsc)) {
-		u64 tsc_now = rdtsc();
-
-		/* return the value in ns */
-		return cycles_2_ns(tsc_now);
-	}
+	u64 tsc_now;
 
 	/*
 	 * Fall back to jiffies if there's no TSC available:
@@ -290,17 +285,16 @@ u64 native_sched_clock(void)
 	 *   very important for it to be as fast as the platform
 	 *   can achieve it. )
 	 */
+	if (!static_key_false(&__use_tsc)) {
+		/* No locking but a rare wrong value is not a big deal: */
+		return (jiffies_64 - INITIAL_JIFFIES) * (1000000000 / HZ);
+	}
 
-	/* No locking but a rare wrong value is not a big deal: */
-	return (jiffies_64 - INITIAL_JIFFIES) * (1000000000 / HZ);
-}
+	/* read the Time Stamp Counter: */
+	rdtscll(tsc_now);
 
-/*
- * Generate a sched_clock if you already have a TSC value.
- */
-u64 native_sched_clock_from_tsc(u64 tsc)
-{
-	return cycles_2_ns(tsc);
+	/* return the value in ns */
+	return cycles_2_ns(tsc_now);
 }
 
 /* We need to define a real function for sched_clock, to override the
@@ -314,6 +308,12 @@ unsigned long long sched_clock(void)
 unsigned long long
 sched_clock(void) __attribute__((alias("native_sched_clock")));
 #endif
+
+unsigned long long native_read_tsc(void)
+{
+	return __native_read_tsc();
+}
+EXPORT_SYMBOL(native_read_tsc);
 
 int check_tsc_unstable(void)
 {
@@ -977,7 +977,7 @@ static struct clocksource clocksource_tsc;
  */
 static cycle_t read_tsc(struct clocksource *cs)
 {
-	return (cycle_t)rdtsc_ordered();
+	return (cycle_t)get_cycles();
 }
 
 /*
@@ -1213,7 +1213,7 @@ void __init tsc_init(void)
 	/* now allow native_sched_clock() to use rdtsc */
 
 	tsc_disabled = 0;
-	static_branch_enable(&__use_tsc);
+	static_key_slow_inc(&__use_tsc);
 
 	if (!no_sched_irq_time)
 		enable_sched_clock_irqtime();

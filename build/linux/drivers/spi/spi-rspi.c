@@ -383,8 +383,7 @@ static void qspi_update(const struct rspi_data *rspi, u8 mask, u8 val, u8 reg)
 	rspi_write8(rspi, data, reg);
 }
 
-static unsigned int qspi_set_send_trigger(struct rspi_data *rspi,
-					  unsigned int len)
+static int qspi_set_send_trigger(struct rspi_data *rspi, unsigned int len)
 {
 	unsigned int n;
 
@@ -725,25 +724,25 @@ static int rspi_rz_transfer_one(struct spi_master *master,
 static int qspi_trigger_transfer_out_in(struct rspi_data *rspi, const u8 *tx,
 					u8 *rx, unsigned int len)
 {
-	unsigned int i, n;
-	int ret;
+	int i, n, ret;
+	int error;
 
 	while (len > 0) {
 		n = qspi_set_send_trigger(rspi, len);
 		qspi_set_receive_trigger(rspi, len);
 		if (n == QSPI_BUFFER_SIZE) {
-			ret = rspi_wait_for_tx_empty(rspi);
-			if (ret < 0) {
+			error = rspi_wait_for_tx_empty(rspi);
+			if (error < 0) {
 				dev_err(&rspi->master->dev, "transmit timeout\n");
-				return ret;
+				return error;
 			}
 			for (i = 0; i < n; i++)
 				rspi_write_data(rspi, *tx++);
 
-			ret = rspi_wait_for_rx_full(rspi);
-			if (ret < 0) {
+			error = rspi_wait_for_rx_full(rspi);
+			if (error < 0) {
 				dev_err(&rspi->master->dev, "receive timeout\n");
-				return ret;
+				return error;
 			}
 			for (i = 0; i < n; i++)
 				*rx++ = rspi_read_data(rspi);

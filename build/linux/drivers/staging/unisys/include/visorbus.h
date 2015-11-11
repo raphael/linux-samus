@@ -113,8 +113,7 @@ struct visor_driver {
 	struct driver_attribute version_attr;
 };
 
-#define to_visor_driver(x) ((x) ? \
-	(container_of(x, struct visor_driver, driver)) : (NULL))
+#define to_visor_driver(x) container_of(x, struct visor_driver, driver)
 
 /** A device type for things "plugged" into the visorbus bus */
 
@@ -201,8 +200,6 @@ bool visorchannel_signalremove(struct visorchannel *channel, u32 queue,
 			       void *msg);
 bool visorchannel_signalinsert(struct visorchannel *channel, u32 queue,
 			       void *msg);
-bool visorchannel_signalempty(struct visorchannel *channel, u32 queue);
-
 int visorchannel_signalqueue_slots_avail(struct visorchannel *channel,
 					 u32 queue);
 int visorchannel_signalqueue_max_slots(struct visorchannel *channel, u32 queue);

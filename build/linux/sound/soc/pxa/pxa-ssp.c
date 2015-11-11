@@ -813,8 +813,14 @@ static const struct of_device_id pxa_ssp_of_ids[] = {
 
 static int asoc_ssp_probe(struct platform_device *pdev)
 {
-	return devm_snd_soc_register_component(&pdev->dev, &pxa_ssp_component,
-					       &pxa_ssp_dai, 1);
+	return snd_soc_register_component(&pdev->dev, &pxa_ssp_component,
+					  &pxa_ssp_dai, 1);
+}
+
+static int asoc_ssp_remove(struct platform_device *pdev)
+{
+	snd_soc_unregister_component(&pdev->dev);
+	return 0;
 }
 
 static struct platform_driver asoc_ssp_driver = {
@@ -824,6 +830,7 @@ static struct platform_driver asoc_ssp_driver = {
 	},
 
 	.probe = asoc_ssp_probe,
+	.remove = asoc_ssp_remove,
 };
 
 module_platform_driver(asoc_ssp_driver);

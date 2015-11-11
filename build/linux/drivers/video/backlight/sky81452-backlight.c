@@ -65,7 +65,7 @@ static int sky81452_bl_update_status(struct backlight_device *bd)
 
 	if (brightness > 0) {
 		ret = regmap_write(regmap, SKY81452_REG0, brightness - 1);
-		if (ret < 0)
+		if (IS_ERR_VALUE(ret))
 			return ret;
 
 		return regmap_update_bits(regmap, SKY81452_REG1, SKY81452_EN,
@@ -87,12 +87,12 @@ static ssize_t sky81452_bl_store_enable(struct device *dev,
 	int ret;
 
 	ret = kstrtoul(buf, 16, &value);
-	if (ret < 0)
+	if (IS_ERR_VALUE(ret))
 		return ret;
 
 	ret = regmap_update_bits(regmap, SKY81452_REG1, SKY81452_EN,
 					value << CTZ(SKY81452_EN));
-	if (ret < 0)
+	if (IS_ERR_VALUE(ret))
 		return ret;
 
 	return count;
@@ -108,7 +108,7 @@ static ssize_t sky81452_bl_show_open_short(struct device *dev,
 
 	reg = !strcmp(attr->attr.name, "open") ? SKY81452_REG5 : SKY81452_REG4;
 	ret = regmap_read(regmap, reg, &value);
-	if (ret < 0)
+	if (IS_ERR_VALUE(ret))
 		return ret;
 
 	if (value & SKY81452_SHRT) {
@@ -136,7 +136,7 @@ static ssize_t sky81452_bl_show_fault(struct device *dev,
 	int ret;
 
 	ret = regmap_read(regmap, SKY81452_REG4, &value);
-	if (ret < 0)
+	if (IS_ERR_VALUE(ret))
 		return ret;
 
 	*buf = 0;
@@ -196,7 +196,7 @@ static struct sky81452_bl_platform_data *sky81452_bl_parse_dt(
 	pdata->gpio_enable = of_get_gpio(np, 0);
 
 	ret = of_property_count_u32_elems(np, "led-sources");
-	if (ret < 0) {
+	if (IS_ERR_VALUE(ret)) {
 		pdata->enable = SKY81452_EN >> CTZ(SKY81452_EN);
 	} else {
 		num_entry = ret;
@@ -205,7 +205,7 @@ static struct sky81452_bl_platform_data *sky81452_bl_parse_dt(
 
 		ret = of_property_read_u32_array(np, "led-sources", sources,
 					num_entry);
-		if (ret < 0) {
+		if (IS_ERR_VALUE(ret)) {
 			dev_err(dev, "led-sources node is invalid.\n");
 			return ERR_PTR(-EINVAL);
 		}
@@ -218,12 +218,12 @@ static struct sky81452_bl_platform_data *sky81452_bl_parse_dt(
 	ret = of_property_read_u32(np,
 			"skyworks,short-detection-threshold-volt",
 			&pdata->short_detection_threshold);
-	if (ret < 0)
+	if (IS_ERR_VALUE(ret))
 		pdata->short_detection_threshold = 7;
 
 	ret = of_property_read_u32(np, "skyworks,current-limit-mA",
 			&pdata->boost_current_limit);
-	if (ret < 0)
+	if (IS_ERR_VALUE(ret))
 		pdata->boost_current_limit = 2750;
 
 	of_node_put(np);
@@ -278,14 +278,14 @@ static int sky81452_bl_probe(struct platform_device *pdev)
 	if (gpio_is_valid(pdata->gpio_enable)) {
 		ret = devm_gpio_request_one(dev, pdata->gpio_enable,
 					GPIOF_OUT_INIT_HIGH, "sky81452-en");
-		if (ret < 0) {
+		if (IS_ERR_VALUE(ret)) {
 			dev_err(dev, "failed to request GPIO. err=%d\n", ret);
 			return ret;
 		}
 	}
 
 	ret = sky81452_bl_init_device(regmap, pdata);
-	if (ret < 0) {
+	if (IS_ERR_VALUE(ret)) {
 		dev_err(dev, "failed to initialize. err=%d\n", ret);
 		return ret;
 	}
@@ -302,8 +302,8 @@ static int sky81452_bl_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, bd);
 
-	ret = sysfs_create_group(&bd->dev.kobj, &sky81452_bl_attr_group);
-	if (ret < 0) {
+	ret  = sysfs_create_group(&bd->dev.kobj, &sky81452_bl_attr_group);
+	if (IS_ERR_VALUE(ret)) {
 		dev_err(dev, "failed to create attribute. err=%d\n", ret);
 		return ret;
 	}

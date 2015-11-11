@@ -327,7 +327,13 @@ static struct snd_soc_platform_driver sh7760_soc_platform = {
 
 static int sh7760_soc_platform_probe(struct platform_device *pdev)
 {
-	return devm_snd_soc_register_platform(&pdev->dev, &sh7760_soc_platform);
+	return snd_soc_register_platform(&pdev->dev, &sh7760_soc_platform);
+}
+
+static int sh7760_soc_platform_remove(struct platform_device *pdev)
+{
+	snd_soc_unregister_platform(&pdev->dev);
+	return 0;
 }
 
 static struct platform_driver sh7760_pcm_driver = {
@@ -336,6 +342,7 @@ static struct platform_driver sh7760_pcm_driver = {
 	},
 
 	.probe = sh7760_soc_platform_probe,
+	.remove = sh7760_soc_platform_remove,
 };
 
 module_platform_driver(sh7760_pcm_driver);

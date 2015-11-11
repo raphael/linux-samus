@@ -52,8 +52,6 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
 
 	if (gate->lock)
 		spin_lock_irqsave(gate->lock, flags);
-	else
-		__acquire(gate->lock);
 
 	if (gate->flags & CLK_GATE_HIWORD_MASK) {
 		reg = BIT(gate->bit_idx + 16);
@@ -72,8 +70,6 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
 
 	if (gate->lock)
 		spin_unlock_irqrestore(gate->lock, flags);
-	else
-		__release(gate->lock);
 }
 
 static int clk_gate_enable(struct clk_hw *hw)

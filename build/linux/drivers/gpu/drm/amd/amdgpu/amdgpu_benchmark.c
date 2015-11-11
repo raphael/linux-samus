@@ -33,7 +33,7 @@ static int amdgpu_benchmark_do_move(struct amdgpu_device *adev, unsigned size,
 {
 	unsigned long start_jiffies;
 	unsigned long end_jiffies;
-	struct fence *fence = NULL;
+	struct amdgpu_fence *fence = NULL;
 	int i, r;
 
 	start_jiffies = jiffies;
@@ -42,17 +42,17 @@ static int amdgpu_benchmark_do_move(struct amdgpu_device *adev, unsigned size,
 		r = amdgpu_copy_buffer(ring, saddr, daddr, size, NULL, &fence);
 		if (r)
 			goto exit_do_move;
-		r = fence_wait(fence, false);
+		r = amdgpu_fence_wait(fence, false);
 		if (r)
 			goto exit_do_move;
-		fence_put(fence);
+		amdgpu_fence_unref(&fence);
 	}
 	end_jiffies = jiffies;
 	r = jiffies_to_msecs(end_jiffies - start_jiffies);
 
 exit_do_move:
 	if (fence)
-		fence_put(fence);
+		amdgpu_fence_unref(&fence);
 	return r;
 }
 
@@ -79,8 +79,7 @@ static void amdgpu_benchmark_move(struct amdgpu_device *adev, unsigned size,
 	int time;
 
 	n = AMDGPU_BENCHMARK_ITERATIONS;
-	r = amdgpu_bo_create(adev, size, PAGE_SIZE, true, sdomain, 0, NULL,
-			     NULL, &sobj);
+	r = amdgpu_bo_create(adev, size, PAGE_SIZE, true, sdomain, 0, NULL, &sobj);
 	if (r) {
 		goto out_cleanup;
 	}
@@ -92,8 +91,7 @@ static void amdgpu_benchmark_move(struct amdgpu_device *adev, unsigned size,
 	if (r) {
 		goto out_cleanup;
 	}
-	r = amdgpu_bo_create(adev, size, PAGE_SIZE, true, ddomain, 0, NULL,
-			     NULL, &dobj);
+	r = amdgpu_bo_create(adev, size, PAGE_SIZE, true, ddomain, 0, NULL, &dobj);
 	if (r) {
 		goto out_cleanup;
 	}

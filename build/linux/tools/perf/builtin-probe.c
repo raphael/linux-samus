@@ -297,7 +297,8 @@ static void cleanup_params(void)
 		clear_perf_probe_event(params.events + i);
 	line_range__clear(&params.line_range);
 	free(params.target);
-	strfilter__delete(params.filter);
+	if (params.filter)
+		strfilter__delete(params.filter);
 	memset(&params, 0, sizeof(params));
 }
 

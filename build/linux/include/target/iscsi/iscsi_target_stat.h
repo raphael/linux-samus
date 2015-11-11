@@ -50,7 +50,7 @@ struct iscsi_login_stats {
 	u64		last_fail_time;		/* time stamp (jiffies) */
 	u32		last_fail_type;
 	int		last_intr_fail_ip_family;
-	struct sockaddr_storage last_intr_fail_sockaddr;
+	unsigned char	last_intr_fail_ip_addr[IPV6_ADDRESS_SPACE];
 	char		last_intr_fail_name[224];
 } ____cacheline_aligned;
 

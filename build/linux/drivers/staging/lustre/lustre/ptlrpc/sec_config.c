@@ -564,7 +564,7 @@ struct sptlrpc_conf *sptlrpc_conf_get(const char *fsname,
 		return NULL;
 
 	conf = kzalloc(sizeof(*conf), GFP_NOFS);
-	if (!conf)
+	if (conf == NULL)
 		return NULL;
 
 	strcpy(conf->sc_fsname, fsname);

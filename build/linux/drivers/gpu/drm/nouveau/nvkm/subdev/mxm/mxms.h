@@ -1,6 +1,6 @@
 #ifndef __NVMXM_MXMS_H__
 #define __NVMXM_MXMS_H__
-#include "priv.h"
+#include <subdev/mxm.h>
 
 struct mxms_odev {
 	u8 outp_type;
