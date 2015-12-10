@@ -1775,7 +1775,7 @@ static int fec_enet_mdio_read(struct mii_bus *bus, int mii_id, int regnum)
 	int ret = 0;
 
 	ret = pm_runtime_get_sync(dev);
-	if (IS_ERR_VALUE(ret))
+	if (ret < 0)
 		return ret;
 
 	fep->mii_timeout = 0;
@@ -1811,11 +1811,13 @@ static int fec_enet_mdio_write(struct mii_bus *bus, int mii_id, int regnum,
 	struct fec_enet_private *fep = bus->priv;
 	struct device *dev = &fep->pdev->dev;
 	unsigned long time_left;
-	int ret = 0;
+	int ret;
 
 	ret = pm_runtime_get_sync(dev);
-	if (IS_ERR_VALUE(ret))
+	if (ret < 0)
 		return ret;
+	else
+		ret = 0;
 
 	fep->mii_timeout = 0;
 	reinit_completion(&fep->mdio_done);
@@ -2866,7 +2868,7 @@ fec_enet_open(struct net_device *ndev)
 	int ret;
 
 	ret = pm_runtime_get_sync(&fep->pdev->dev);
-	if (IS_ERR_VALUE(ret))
+	if (ret < 0)
 		return ret;
 
 	pinctrl_pm_select_default_state(&fep->pdev->dev);
