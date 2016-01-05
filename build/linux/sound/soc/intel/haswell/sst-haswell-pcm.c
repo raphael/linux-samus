@@ -469,9 +469,16 @@ static int hsw_pcm_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	channels = params_channels(params);
-	map = create_channel_map(SST_HSW_CHANNEL_CONFIG_STEREO);
-	sst_hsw_stream_set_map_config(hsw, pcm_data->stream,
-			map, SST_HSW_CHANNEL_CONFIG_STEREO);
+
+	if (channels == 4) {
+		map = create_channel_map(SST_HSW_CHANNEL_CONFIG_QUATRO);
+		sst_hsw_stream_set_map_config(hsw, pcm_data->stream,
+				map, SST_HSW_CHANNEL_CONFIG_QUATRO);
+	} else {
+		map = create_channel_map(SST_HSW_CHANNEL_CONFIG_STEREO);
+		sst_hsw_stream_set_map_config(hsw, pcm_data->stream,
+				map, SST_HSW_CHANNEL_CONFIG_STEREO);
+	}
 
 	ret = sst_hsw_stream_set_channels(hsw, pcm_data->stream, channels);
 	if (ret < 0) {
