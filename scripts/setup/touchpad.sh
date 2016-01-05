@@ -3,7 +3,6 @@
 echo Compiling libgestures
 git clone https://github.com/hugegreenbug/libgestures
 cd libgestures
-./apply_patches.sh
 make -j4
 echo Installing libgestures
 sudo make install
@@ -20,7 +19,6 @@ cd ..
 echo Compiling xf86-input-cmt
 git clone https://github.com/hugegreenbug/xf86-input-cmt
 cd xf86-input-cmt
-./apply_patches.sh
 ./configure --prefix=/usr
 make -j4
 echo Installing xf86-input-cmt
