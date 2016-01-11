@@ -1,0 +1,8 @@
+[Unit]
+Description=Reset the atmel chip, see https://github.com/raphael/linux-samus/issues/73
+
+[Service]
+ExecStart=/usr/local/bin/enable-atmel.sh
+
+[Install]
+WantedBy=multi-user.target 

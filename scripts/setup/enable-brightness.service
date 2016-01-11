@@ -1,8 +1,0 @@
-[Unit]
-Description=Give access to anyone to execute brightness script
-
-[Service]
-ExecStart=/usr/local/bin/enable-brightness.sh
-
-[Install]
-WantedBy=multi-user.target 

@@ -34,12 +34,6 @@ Install from the AUR:
 ```
 yaourt -S linux-samus4
 ```
-or from repo:
-``` bash
-$ git clone https://github.com/raphael/linux-samus
-$ cd linux-samus/scripts/archlinux
-$ ./install.sh
-```
 ### Other distributions
 The entire kernel patched tree is located under `build/linux`, compile and install using the usual
 instructions for installing kernels. For example:
@@ -55,52 +49,62 @@ $ sudo make install
 > differ depending on your distro/setup. In particular the default kernel makefile
 > assumes LILO is being used. Follow the instructions specific to your
 > distribution for installing kernels from source.
-
 ## Post-install steps
-
 Once installed reboot and load the kernel.
-
+### Sound
 To enable sound run the `sound.sh` script:
 ``` bash
-$ cd linux-samus/scripts/setup
+$ cd linux-samus/scripts/setup/sound
 $ ./sound.sh
 ```
 > *NOTE* this scripts makes a number of assumptions on your system (e.g.
 > `alsaucm` and `amixer` are both installed and the file
 > /etc/pulse/default.pa contains a line to load the modules using udev).
 If the setup script fails please see below "Enabling sound step-by-step".
-
+### Touchpad
+Since linux 4.3 the atmel chip needs to be reset on boot to guarantee that the touchpad works.
+See issue #73 for details. The linux-samus/scripts/setup/touchpad directory contains a script
+that does the reset:
+```bash
+$ cd linux-samus/scripts/setup/touchpad
+$ ./enable-atmel.sh
+```
+The directory also contains the definition of a systemd service that invokes the script
+automatically on boot. Setup the service with the `setup-service.sh` script.
+### Xorg
 To enable X11 acceleration run the `xaccel.sh` script:
 ``` bash
-$ cd linux-samus/scripts/setup
+$ cd linux-samus/scripts/setup/xorg
 $ ./xaccel.sh
 ```
-
-The script `script/setup/brightness` can be used to control the brightness level.
+### Brightness
+The script `script/setup/brightness/brightness` can be used to control the brightness level.
 ```
-$ script/setup/brightness --help
+$ cd scripts/setup/brightness
+$ ./brightness --help
 Increase or decrease screen brighness
 Usage: brightness --increase | --decrease
 ```
 Bind the F6 key to `brightness --decrease` and the F7 key to `brightness --increase` for
 an almost native experience... (assuming the scripts are in your path).
 
-Similarly the script `script/setup/keyboard_led` can be used to control the keyboard backlight,
+Similarly the script `script/setup/brightness/keyboard_led` can be used to control the keyboard backlight,
 bind the ALT-F6 key to `keyboard_led --decrease` and ALT-F7 to `keyboard_led --increase`.
 
 Both these scripts require write access to files living under `/sys` which get mounted
 read-only for non-root users on boot by default. If your system uses `systemd` (e.g. ArchLinux)
-then the file `script/setup/enable-brightness.service` contains the definition for a systemd
+then the file `script/setup/brightness/enable-brightness.service` contains the definition for a systemd
 service that makes the files above writable to non-root user. Run
 `systemctl enable enable-brightness.service` for the service to run on boot.
 
 ### Building your own patch
 
 To build your own patched tree use the `patch.sh` scripts located in the
-`scripts` folder. The script accepts an optional argument which corresponds 
-to the git tag of the kernel tree to build the patch against. The default
-value is `4.2`.
-
+`scripts` folder. The script accepts two arguments which correspond
+to the git branch and tag of the kernel tree to build the patch against. Example:
+```
+./patch.sh 4.3 4.3.4
+```
 This script clones the two trees, diffs the necessary files and create a
 patch. It then applies this generated patch and the other included patches
 to the original tree. This process results in a patched tree located in
