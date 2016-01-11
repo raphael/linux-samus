@@ -24,17 +24,22 @@ The easiest way to get going is to install the packages if you are running
 Ubuntu, Debian or Arch Linux.
 
 ### Ubuntu / Debian
+
 ``` bash
 $ git clone https://github.com/raphael/linux-samus
 $ cd linux-samus/build/debian
 $ sudo dpkg -i *.deb
 ```
+
 ### Arch Linux
+
 Install from the AUR:
 ```
 yaourt -S linux-samus4
 ```
+
 ### Other distributions
+
 The entire kernel patched tree is located under `build/linux`, compile and install using the usual
 instructions for installing kernels. For example:
 ``` bash
@@ -49,9 +54,13 @@ $ sudo make install
 > differ depending on your distro/setup. In particular the default kernel makefile
 > assumes LILO is being used. Follow the instructions specific to your
 > distribution for installing kernels from source.
+
 ## Post-install steps
+
 Once installed reboot and load the kernel.
+
 ### Sound
+
 To enable sound run the `sound.sh` script:
 ``` bash
 $ cd linux-samus/scripts/setup/sound
@@ -61,7 +70,9 @@ $ ./sound.sh
 > `alsaucm` and `amixer` are both installed and the file
 > /etc/pulse/default.pa contains a line to load the modules using udev).
 If the setup script fails please see below "Enabling sound step-by-step".
+
 ### Touchpad
+
 Since linux 4.3 the atmel chip needs to be reset on boot to guarantee that the touchpad works.
 See issue #73 for details. The linux-samus/scripts/setup/touchpad directory contains a script
 that does the reset:
@@ -71,13 +82,17 @@ $ ./enable-atmel.sh
 ```
 The directory also contains the definition of a systemd service that invokes the script
 automatically on boot. Setup the service with the `setup-service.sh` script.
+
 ### Xorg
+
 To enable X11 acceleration run the `xaccel.sh` script:
 ``` bash
 $ cd linux-samus/scripts/setup/xorg
 $ ./xaccel.sh
 ```
+
 ### Brightness
+
 The script `script/setup/brightness/brightness` can be used to control the brightness level.
 ```
 $ cd scripts/setup/brightness
