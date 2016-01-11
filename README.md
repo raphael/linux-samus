@@ -80,8 +80,6 @@ that does the reset:
 $ cd linux-samus/scripts/setup/touchpad
 $ ./enable-atmel.sh
 ```
-The directory also contains the definition of a systemd service that invokes the script
-automatically on boot. Setup the service with the `setup-service.sh` script.
 
 ### Xorg
 
