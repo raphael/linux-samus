@@ -25,7 +25,7 @@ if [ $? -ne 0 ]; then
   echo Failed to run mksrcinfo
   exit 1
 fi
-head -n -3 PKGBUILD > PKGBUILD.new && mv PKGBUILD.new PKGBUILD
+head -n -4 PKGBUILD > PKGBUILD.new && mv PKGBUILD.new PKGBUILD
 makepkg -g >> PKGBUILD
 if [ $? -ne 0 ]; then
   echo Failed to update checksums
