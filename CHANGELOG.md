@@ -1,3 +1,12 @@
+v4.3-3 / 2016-01-10
+--------------------
+Upgrade to Linux 4.3.4
+
+v4.3-2 / 2016-01-05
+--------------------
+Upgrade to Linux 4.3.3
+Make 4.3.3 the default version.
+
 v4.3-1 / 2015-11-08
 --------------------
 Upgrade to Linux 4.3
