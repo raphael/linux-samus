@@ -1,19 +1,19 @@
 # Maintainer: Raphael Simon <simon.raphael@gmail.com>
 
 pkgbase=linux-samus4
-pkgver=4.3
-pkgrel=3
+pkgver=4.4
+pkgrel=1
 arch=('x86_64')
 url="http://www.kernel.org/"
 license=('GPL2')
 makedepends=('xmlto' 'docbook-xsl' 'kmod' 'inetutils' 'bc')
 options=('!strip')
-source=("https://github.com/raphael/linux-samus/archive/v4.3-3.tar.gz"
+source=("https://github.com/raphael/linux-samus/archive/v4.4-1.tar.gz"
         "config"
         "linux.preset"
         )
 _kernelname=${pkgbase#linux}
-_linuxsrc=linux-samus-4.3-3/build/linux/
+_linuxsrc=linux-samus-4.4-1/build/linux/
 
 # $srcdir is: /home/raphael/src/kernel-pkg/src
 prepare() {

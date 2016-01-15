@@ -206,7 +206,17 @@ diff -Nau linux-head/sound/soc/soc-jack.c chromiumos-chromeos-3.14/sound/soc/soc
 diff -Nau linux-head/include/sound/soc.h chromiumos-chromeos-3.14/include/sound/soc.h
 --- linux-head/include/sound/soc.h	2015-09-01 18:55:53.169999321 -0700
 +++ chromiumos-chromeos-3.14/include/sound/soc.h	2015-09-01 23:15:50.903314664 -0700
-@@ -1240,4 +1240,56 @@
+@@ -424,6 +424,8 @@
+ 					unsigned int reg, unsigned int val);
+ int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num);
+-int soc_new_compress(struct snd_soc_pcm_runtime *rtd, int num);
++//#ifdef CONFIG_SND_SOC_COMPRESS
++int soc_new_compress(struct snd_soc_pcm_runtime *rtd, int num);
++//#endif
+ 
+ struct snd_pcm_substream *snd_soc_get_dai_substream(struct snd_soc_card *card,
+ 		const char *dai_link, int stream);
+@@ -1240,4 +1242,56 @@
  }
 
 +/**
