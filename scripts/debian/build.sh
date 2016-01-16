@@ -14,7 +14,7 @@ cd $LINUX
 echo `pwd`
 export KDEB_CHANGELOG_DIST=vivid
 export DEB_BUILD_OPTIONS=parallel=4
-make deb-pkg
+make deb-pkg -j4
 if [ $? -ne 0 ]; then
   echo "** Build failed, aborting"
   exit 1
