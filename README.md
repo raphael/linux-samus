@@ -35,7 +35,7 @@ $ sudo dpkg -i *.deb
 
 Install from the AUR:
 ```
-yaourt -S linux-samus4
+yaourt -S linux-samus4-kernel
 ```
 
 ### Other distributions
