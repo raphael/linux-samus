@@ -80,6 +80,8 @@ that does the reset:
 $ cd linux-samus/scripts/setup/touchpad
 $ ./enable-atmel.sh
 ```
+The same directory also contains `setup.sh` which when executed configures `~/.xinitrc` to run the
+script `enable-atmel.sh` on boot.
 
 ### Xorg
 
