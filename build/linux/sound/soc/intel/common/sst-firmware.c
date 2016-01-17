@@ -197,7 +197,8 @@ static struct dw_dma_chip *dw_probe(struct device *dev, struct resource *mem,
 		return ERR_PTR(err);
 
 	chip->dev = dev;
-	err = dw_dma_probe(chip, &dw_pdata);
+
+	err = dw_dma_probe(chip, NULL);
 	if (err)
 		return ERR_PTR(err);
 

@@ -1,3 +1,16 @@
+diff -Naur linux-patched/sound/soc/intel/common/sst-firmware.c chromiumos-chromeos-3.14/sound/soc/intel/sst-firmware.c
+--- linux-patched/sound/soc/intel/common/sst-firmware.c	2016-01-16 01:05:55.198675685 -0800
++++ chromiumos-chromeos-3.14/sound/soc/intel/sst-firmware.c	2015-09-15 00:16:03.246665570 -0700
+@@ -197,7 +197,8 @@
+ 		return ERR_PTR(err);
+ 
+ 	chip->dev = dev;
++
++	err = dw_dma_probe(chip, NULL);
+-	err = dw_dma_probe(chip, &dw_pdata);
+ 	if (err)
+ 		return ERR_PTR(err);
+ 
 diff -Nau linux-head/sound/soc/codecs/rt5677.c chromiumos-chromeos-3.14/sound/soc/codecs/rt5677.c
 --- linux-head/sound/soc/codecs/rt5677.c	2015-06-18 18:56:44.686665895 -0700
 +++ chromiumos-chromeos-3.14/sound/soc/codecs/rt5677.c	2015-06-15 23:15:50.876647997 -0700
