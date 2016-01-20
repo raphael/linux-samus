@@ -96,7 +96,7 @@ $ ./enable-atmel.sh
 ```
 ./setup.systemd.sh
 ```
-The same directory also contains `setup.systemd.sh`. When executed copies scripts and mxt-app to `/usr/local/bin` and configures systemd to run the script `enable-atmel.sh` on boot and from sleep (after suspend is resumed).
+The same directory also contains `setup.systemd.sh`. When executed, it copies scripts and mxt-app to `/usr/local/bin` and configures systemd to run the script `enable-atmel.sh` on boot and from sleep (after suspend is resumed).
 
 ### Xorg
 
@@ -131,7 +131,7 @@ service that makes the files above writable to non-root user. Run
 ```
 ./setup.systemd.sh
 ```
-The same directory also contains `setup.systemd.sh`. When executed copies scripts to `/usr/local/bin` and configures systemd to run the script `enable-brightness.sh` on boot.
+The same directory also contains `setup.systemd.sh`. When executed, it copies scripts to `/usr/local/bin` and configures systemd to run the script `enable-brightness.sh` on boot.
 
 ### Building your own patch
 
