@@ -2,9 +2,9 @@
 
 # 1. Copy firmware
 if [ -d "/lib/firmware" ]; then
-  sudo cp ../../../firmware/* /lib/firmware
+  sudo cp -r ../../../firmware/* /lib/firmware
 elif [ -d "/usr/lib/firmware" ]; then
-  sudo cp ../../../firmware/* /usr/lib/firmware
+  sudo cp -r ../../../firmware/* /usr/lib/firmware
 else
   echo "Could not find firmware directory, skipping firmware install"
 fi
