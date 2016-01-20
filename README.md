@@ -71,6 +71,18 @@ $ ./sound.sh
 > /etc/pulse/default.pa contains a line to load the modules using udev).
 If the setup script fails please see below "Enabling sound step-by-step".
 
+##### User settings and control
+to set the default sink from the laptop speakers when logged in, modify the users pulseaudio config with:
+```
+pacmd set-default-sink 1
+```
+the following commands will control sound:
+```
+pactl set-sink-mute 1 toggle
+pactl set-sink-volume 1 -2%
+pactl set-sink-volume 1 +2%
+```
+
 ### Touchpad
 
 Since linux 4.3 the atmel chip needs to be reset on boot to guarantee that the touchpad works.
@@ -80,8 +92,11 @@ that does the reset:
 $ cd linux-samus/scripts/setup/touchpad
 $ ./enable-atmel.sh
 ```
-The same directory also contains `setup.sh` which when executed configures `~/.xinitrc` to run the
-script `enable-atmel.sh` on boot.
+##### systemd
+```
+./setup.systemd.sh
+```
+The same directory also contains `setup.systemd.sh`. When executed, it copies scripts and mxt-app to `/usr/local/bin` and configures systemd to run the script `enable-atmel.sh` on boot and from sleep (after suspend is resumed).
 
 ### Xorg
 
@@ -111,6 +126,12 @@ read-only for non-root users on boot by default. If your system uses `systemd` (
 then the file `script/setup/brightness/enable-brightness.service` contains the definition for a systemd
 service that makes the files above writable to non-root user. Run
 `systemctl enable enable-brightness.service` for the service to run on boot.
+
+##### systemd
+```
+./setup.systemd.sh
+```
+The same directory also contains `setup.systemd.sh`. When executed, it copies scripts to `/usr/local/bin` and configures systemd to run the script `enable-brightness.sh` on boot.
 
 ### Building your own patch
 
