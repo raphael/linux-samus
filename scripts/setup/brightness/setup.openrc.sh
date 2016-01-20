@@ -3,6 +3,8 @@
 # Elevate privileges if necessary
 PROMPT=sudo
 
+[ "$UID" -eq 0 ] || $PROMPT cp brightness keyboard_led enable-brightness.sh /usr/local/bin
+
 SCRIPT=enable-brightness.sh
 INIT_PATH=/etc/local.d/enable-brightness.start
 
