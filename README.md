@@ -72,11 +72,11 @@ $ ./sound.sh
 If the setup script fails please see below "Enabling sound step-by-step".
 
 ##### User settings and control
-to set the default sink from the laptop speakers. when logged in, run to modify the users pulseaudio config.
+to set the default sink from the laptop speakers when logged in, modify the users pulseaudio config with:
 ```
 pacmd set-default-sink 1
 ```
-the following commands will control sound
+the following commands will control sound:
 ```
 pactl set-sink-mute 1 toggle
 pactl set-sink-volume 1 -2%
@@ -96,7 +96,7 @@ $ ./enable-atmel.sh
 ```
 ./setup.systemd.sh
 ```
-The same directory also contains `setup.systemd.sh`. When executed copies scripts and mxt-app to `/usr/local/bin` and configures systemd to run the script `enable-atmel.sh on boot and from sleep i.e. after suspend is resumed.
+The same directory also contains `setup.systemd.sh`. When executed copies scripts and mxt-app to `/usr/local/bin` and configures systemd to run the script `enable-atmel.sh` on boot and from sleep (after suspend is resumed).
 
 ### Xorg
 
