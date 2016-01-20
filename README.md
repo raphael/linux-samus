@@ -72,7 +72,7 @@ $ ./sound.sh
 If the setup script fails please see below "Enabling sound step-by-step".
 
 ##### User settings and control
-to set the default sink from the laptop speakers, run when logged in to modify the users pulseaudio config.
+to set the default sink from the laptop speakers. when logged in, run to modify the users pulseaudio config.
 ```
 pacmd set-default-sink 1
 ```
@@ -96,7 +96,7 @@ $ ./enable-atmel.sh
 ```
 ./setup.systemd.sh
 ```
-The same directory also contains `setup.systemd.sh` which when executed copies scripts and mxt-app application to `/usr/local/bin` and configures systemd to run the script `enable-atmel.sh on boot and from sleep i.e. after suspend is resumed.
+The same directory also contains `setup.systemd.sh`. When executed copies scripts and mxt-app to `/usr/local/bin` and configures systemd to run the script `enable-atmel.sh on boot and from sleep i.e. after suspend is resumed.
 
 ### Xorg
 
@@ -131,7 +131,7 @@ service that makes the files above writable to non-root user. Run
 ```
 ./setup.systemd.sh
 ```
-The same directory also contains `setup.systemd.sh` which when executed copies scripts to `/usr/local/bin` and configures systemd to run the script `enable-brightness.sh` on boot.
+The same directory also contains `setup.systemd.sh`. When executed copies scripts to `/usr/local/bin` and configures systemd to run the script `enable-brightness.sh` on boot.
 
 ### Building your own patch
 
