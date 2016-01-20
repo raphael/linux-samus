@@ -1,3 +1,9 @@
+v4.4-4 / 2016-01-19
+--------------------
+Make file system support built-in instead of
+relying on modules to help with booting issues.
+Thank you @ehegnes!
+
 v4.4-3 / 2016-01-16
 --------------------
 Fix sound
