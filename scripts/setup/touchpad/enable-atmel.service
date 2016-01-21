@@ -3,6 +3,7 @@ Description=Resets the Atmel maXTouch chips (Touchscreen/Trackpad)
 
 [Service]
 ExecStart=/usr/local/bin/enable-atmel.sh
+Type=idle
 
 [Install]
 WantedBy=multi-user.target sleep.target
