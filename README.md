@@ -72,7 +72,7 @@ $ ./sound.sh
 If the setup script fails please see below "Enabling sound step-by-step".
 
 ##### User settings and control
-to set the default sink from the laptop speakers when logged in, modify the users pulseaudio config with:
+To set the default sink from the laptop speakers when logged in, modify the users pulseaudio config with:
 ```
 pacmd set-default-sink 1
 ```
@@ -85,8 +85,8 @@ pactl set-sink-volume 1 +2%
 
 ### Touchpad
 
-Since linux 4.3 the atmel chip needs to be reset on boot to guarantee that the touchpad works.
-See issue #73 for details. The linux-samus/scripts/setup/touchpad directory contains a script
+Since Linux 4.3 the Atmel chip needs to be reset on boot to guarantee that the touchpad works.
+See [issue #73](../../issues/73) for details. The `linux-samus/scripts/setup/touchpad` directory contains a script
 that does the reset:
 ```bash
 $ cd linux-samus/scripts/setup/touchpad
@@ -96,7 +96,15 @@ $ ./enable-atmel.sh
 ```
 ./setup.systemd.sh
 ```
-The same directory also contains `setup.systemd.sh`. When executed, it copies scripts and mxt-app to `/usr/local/bin` and configures systemd to run the script `enable-atmel.sh` on boot and from sleep (after suspend is resumed).
+The same directory also contains `setup.systemd.sh`. When executed, it copies scripts and `mxt-app` to `/usr/local/bin`
+and configures systemd to run the script `enable-atmel.sh` on boot and from sleep (after suspend is resumed).
+
+##### OpenRC
+```
+./setup.openrc.sh
+```
+The same directory also contains `setup.openrc.sh`. When executed, it copies scripts and `mxt-app` to `usr/local/bin`
+and configures OpenRC to run the script `enable-atmel.sh` on boot through the `local` service.
 
 ### Xorg
 
@@ -131,7 +139,15 @@ service that makes the files above writable to non-root user. Run
 ```
 ./setup.systemd.sh
 ```
-The same directory also contains `setup.systemd.sh`. When executed, it copies scripts to `/usr/local/bin` and configures systemd to run the script `enable-brightness.sh` on boot.
+The same directory also contains `setup.systemd.sh`. When executed, it copies scripts to `/usr/local/bin`
+and configures systemd to run the script `enable-brightness.sh` on boot.
+
+##### OpenRC
+```
+./setup.openrc.sh
+```
+The same directory also contains `setup.openrc.sh`. When executed, it copies scripts to `/usr/local/bin`
+and configures OpenRC to run the script `enable-brightness.sh` on boot using the `local` service.
 
 ### Building your own patch
 
