@@ -31,7 +31,8 @@ while [ $FOUND -ne 1 ]; do
     fi
   fi
 done
-echo -ne 'r\nq\n' | $PROMPT mxt-app -d i2c-dev:$DEV-004a &>/dev/null
-echo -ne 'r\nq\n' | $PROMPT mxt-app -d i2c-dev:$(expr $DEV+1)-004b &>/dev/null
+echo -ne 'r\nq\n' | $PROMPT mxt-app -d i2c-dev:$DEV-004a &>/dev/null &&
 echo touchpad device i2c-dev:$DEV-004a reset
+echo -ne 'r\nq\n' | $PROMPT mxt-app -d i2c-dev:$((DEV+1))-004b &>/dev/null && 
+echo touchpad device i2c-dev:$((DEV+1))-004b reset
 
