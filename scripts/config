@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/x86 4.4.0 Kernel Configuration
+# Linux/x86 4.4.1 Kernel Configuration
 #
 CONFIG_64BIT=y
 CONFIG_X86_64=y
@@ -5151,7 +5151,7 @@ CONFIG_CRYPTO_ECB=y
 CONFIG_CRYPTO_LRW=m
 CONFIG_CRYPTO_PCBC=m
 CONFIG_CRYPTO_XTS=y
-# CONFIG_CRYPTO_KEYWRAP is not set
+CONFIG_CRYPTO_KEYWRAP=m
 
 #
 # Hash modes
