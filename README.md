@@ -92,6 +92,16 @@ that does the reset:
 $ cd linux-samus/scripts/setup/touchpad
 $ ./enable-atmel.sh
 ```
+
+The following sections provide different ways to run this script automatically.
+
+##### xinitrc
+```
+./setup.xinitrc.sh
+```
+The same directory also contains `setup.xinitrc.sh`. When executed, it copies scripts and `mxt-app` to `/usr/local/bin`
+and configures `~/.xinitrc` to call the script when the Xorg server starts.
+
 ##### systemd
 ```
 ./setup.systemd.sh
