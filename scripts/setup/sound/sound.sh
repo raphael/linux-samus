@@ -67,25 +67,23 @@ if [[ -f /etc/acpi/handler.sh ]]; then
     sudo cp ./alsa/headphones.state /opt/samus
     line=$(sed -n '/^case \"\$1\" in/=' /etc/acpi/handler.sh);
     line=$(echo $line | cut -d " " -f 1)
-    sudo sed -i "${line} a \\
-    jack/headphone)\\
-        case \"\$3\" in\\
-            plug)\\
-                logger \"headphone plugged\"\\
-                alsactl restore -f /opt/samus-alsa/headphones.state\\
-                alsaucm -c bdw-rt5677 set _verb HiFi set _enadev Headphone\\
-                ;;\\
-            unplug)\\
-                logger \"headphone unplugged\"\\ 
-                alsactl restore -f /opt/samus-alsa/speakers.state\\
-                alsaucm -c bdw-rt5677 set _verb HiFi set _disdev Headphone\\
-                ;;\\
-            *)\\
-                logger \"ACPI action undefined: \$3\"\\
-                ;;\\
-        esac\\
-        ;;\\
-" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \        ;;" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \        esac" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \               ;;" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \               logger \"ACPI action undefined: \$3\"" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \           *)" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \               ;;" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \               alsaucm -c bdw-rt5677 set _verb HiFi set _disdev Headphone" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \               alsactl restore -f /opt/samus-alsa/speakers.state" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \               logger \"headphone unplugged\""  /etc/acpi/handler.sh
+    sudo sed -i "${line} a \           unplug)" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \               ;;" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \               alsaucm -c bdw-rt5677 set _verb HiFi set _enadev Headphone" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \               alsactl restore -f /opt/samus-alsa/headphones.state" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \               logger \"headphone plugged\"" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \           plug)" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \        case \"\$3\" in" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \    jack/headphone)" /etc/acpi/handler.sh
   fi
 else
   echo "/etc/acpi/handler.sh not found. Not setting up ACPI hooks. Headphones may not work correctly!"
