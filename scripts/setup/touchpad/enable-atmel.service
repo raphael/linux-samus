@@ -6,4 +6,4 @@ ExecStart=/usr/local/bin/enable-atmel.sh
 Type=idle
 
 [Install]
-WantedBy=multi-user.target sleep.target
+WantedBy=multi-user.target suspend.target
