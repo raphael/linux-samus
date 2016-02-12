@@ -74,12 +74,12 @@ if [[ -f /etc/acpi/handler.sh ]]; then
     sudo sed -i "${line} a \           *)" /etc/acpi/handler.sh
     sudo sed -i "${line} a \               ;;" /etc/acpi/handler.sh
     sudo sed -i "${line} a \               alsaucm -c bdw-rt5677 set _verb HiFi set _disdev Headphone" /etc/acpi/handler.sh
-    sudo sed -i "${line} a \               alsactl restore -f /opt/samus-alsa/speakers.state" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \               alsactl restore -f /opt/samus/speakers.state" /etc/acpi/handler.sh
     sudo sed -i "${line} a \               logger \"headphone unplugged\""  /etc/acpi/handler.sh
     sudo sed -i "${line} a \           unplug)" /etc/acpi/handler.sh
     sudo sed -i "${line} a \               ;;" /etc/acpi/handler.sh
     sudo sed -i "${line} a \               alsaucm -c bdw-rt5677 set _verb HiFi set _enadev Headphone" /etc/acpi/handler.sh
-    sudo sed -i "${line} a \               alsactl restore -f /opt/samus-alsa/headphones.state" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \               alsactl restore -f /opt/samus/headphones.state" /etc/acpi/handler.sh
     sudo sed -i "${line} a \               logger \"headphone plugged\"" /etc/acpi/handler.sh
     sudo sed -i "${line} a \           plug)" /etc/acpi/handler.sh
     sudo sed -i "${line} a \        case \"\$3\" in" /etc/acpi/handler.sh
