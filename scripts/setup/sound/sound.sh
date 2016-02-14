@@ -65,6 +65,24 @@ if [[ -f /etc/acpi/handler.sh ]]; then
     sudo mkdir -p /opt/samus
     sudo cp ./alsa/speakers.state /opt/samus
     sudo cp ./alsa/headphones.state /opt/samus
+    line=$(sed -n '/^# Default acpi script that takes an entry for all actions/=' /etc/acpi/handler.sh);
+    line=$(echo $line | cut -d " " -f 1)
+    sudo sed -i "${line} a \}" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \    done" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \        su \"\${user}\" -c - \"PULSE_RUNTIME_PATH=\\\\\"\${pulsepath}\\\\\" pacmd set-sink-port \${sink} \${port}\"" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \        pulsepath=\"/run/user/\${uid}/pulse/\"" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \        uid=\`id -u \"\${user}\"\`" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \    do" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \    for user in \`ps axc -o user,command | grep pulseaudio | cut -f1 -d\' \' | sort | uniq\`" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \ " /etc/acpi/handler.sh
+    sudo sed -i "${line} a \    fi" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \        port=\"analog-output-headphones\"" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \    if [ \"x\$1\" == \"xplug\" ] ; then" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \ " /etc/acpi/handler.sh
+    sudo sed -i "${line} a \    port=\"analog-output-speaker\"" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \    sink=\"alsa_output.platform-bdw-rt5677.analog-stereo\"" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \function _SwitchPulsePort () {" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \ " /etc/acpi/handler.sh
     line=$(sed -n '/^case \"\$1\" in/=' /etc/acpi/handler.sh);
     line=$(echo $line | cut -d " " -f 1)
     sudo sed -i "${line} a \        ;;" /etc/acpi/handler.sh
@@ -73,13 +91,11 @@ if [[ -f /etc/acpi/handler.sh ]]; then
     sudo sed -i "${line} a \               logger \"ACPI action undefined: \$3\"" /etc/acpi/handler.sh
     sudo sed -i "${line} a \           *)" /etc/acpi/handler.sh
     sudo sed -i "${line} a \               ;;" /etc/acpi/handler.sh
-    sudo sed -i "${line} a \               alsaucm -c bdw-rt5677 set _verb HiFi set _disdev Headphone" /etc/acpi/handler.sh
-    sudo sed -i "${line} a \               alsactl restore -f /opt/samus/speakers.state" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \               _SwitchPulsePort \"\$3\"" /etc/acpi/handler.sh
     sudo sed -i "${line} a \               logger \"headphone unplugged\""  /etc/acpi/handler.sh
     sudo sed -i "${line} a \           unplug)" /etc/acpi/handler.sh
     sudo sed -i "${line} a \               ;;" /etc/acpi/handler.sh
-    sudo sed -i "${line} a \               alsaucm -c bdw-rt5677 set _verb HiFi set _enadev Headphone" /etc/acpi/handler.sh
-    sudo sed -i "${line} a \               alsactl restore -f /opt/samus/headphones.state" /etc/acpi/handler.sh
+    sudo sed -i "${line} a \               _SwitchPulsePort \"\$3\"" /etc/acpi/handler.sh
     sudo sed -i "${line} a \               logger \"headphone plugged\"" /etc/acpi/handler.sh
     sudo sed -i "${line} a \           plug)" /etc/acpi/handler.sh
     sudo sed -i "${line} a \        case \"\$3\" in" /etc/acpi/handler.sh
