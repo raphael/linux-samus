@@ -1,3 +1,11 @@
+v4.4-6 / 2016-02-22
+--------------------
+Upgrade to Linux 4.4.2
+
+v4.4-5 / 2016-02-01
+--------------------
+Upgrade to Linux 4.4.1
+
 v4.4-4 / 2016-01-19
 --------------------
 Make file system support built-in instead of

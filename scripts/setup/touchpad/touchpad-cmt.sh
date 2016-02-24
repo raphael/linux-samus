@@ -25,17 +25,18 @@ echo Installing xf86-input-cmt
 sudo make install
 
 echo Configuring
-if [[ ! -f /usr/share/X11/xorg.conf.d/40-touchpad-cmt.conf ]]; then
-  sudo cp xorg-conf/40-touchpad-cmt.conf /usr/share/X11/xorg.conf.d/
+if [[ ! -f /etc/X11/xorg.conf.d/40-touchpad-cmt.conf ]]; then
+  sudo cp xorg-conf/40-touchpad-cmt.conf /etc/X11/xorg.conf.d/
 fi
-if [[ ! -f /usr/share/X11/xorg.conf.d/50-touchpad-cmt-samus.conf ]]; then
-  sudo cp xorg-conf/50-touchpad-cmt-samus.conf /usr/share/X11/xorg.conf.d/
+if [[ ! -f /etc/X11/xorg.conf.d/50-touchpad-cmt-samus.conf ]]; then
+  sudo cp xorg-conf/50-touchpad-cmt-samus.conf /etc/X11/xorg.conf.d/
 fi
 set +e
+cd ..
 
 
 sudo rm -rf libgestures
 sudo rm -rf libevdevc
 sudo rm -rf xf86-input-cmt
-sudo mv /usr/share/X11/xorg.conf.d/50-synaptics.conf /usr/share/X11/xorg.conf/50-synaptics.conf.old 2>/dev/null
+sudo mv /etc/X11/xorg.conf.d/50-synaptics.conf /etc/X11/xorg.conf/50-synaptics.conf.old 2>/dev/null
 echo all done! - reboot or restart X
