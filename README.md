@@ -1,4 +1,5 @@
 # Linux for Chromebook Pixel 2015
+[![Chat with us on #linux-samus on freenode.net](https://img.shields.io/badge/chat-on%20%23linux--samus-brightgreen.svg)](https://webchat.freenode.net/?channels=linux-samus "Chat with us on #linux-samus on freenode.net")
 
 This repository contains packages for Debian and Arch Linux that installs
 the Linux kernel 4.4 with a set of patches that enable sound support as
@@ -40,7 +41,7 @@ $ yaourt -S linux-samus4
 
 ### Other distributions
 
-The entire kernel patched tree is located under `build/linux`, compile and 
+The entire kernel patched tree is located under `build/linux`, compile and
 install using the usual instructions for installing kernels. For example:
 ```sh
 $ git clone https://github.com/raphael/linux-samus
@@ -57,7 +58,7 @@ $ sudo make install
 
 ## Post-install steps
 
-Once installed reboot and load the kernel
+Once installed reboot and load the kernel.
 
 ### Sound
 
@@ -72,7 +73,7 @@ $ ./sound.sh
 If the setup script fails please see below "Enabling sound step-by-step".
 
 ##### User settings and control
-To set the default sink from the laptop speakers when logged in, modify 
+To set the default sink from the laptop speakers when logged in, modify
 the users pulseaudio config with:
 ```sh
 $ pacmd set-default-sink 1
@@ -88,8 +89,8 @@ $ pactl set-sink-volume 1 +2%
 ### Touchpad
 
 Since Linux 4.3 the Atmel chip needs to be reset on boot to guarantee that the
-touchpad works.  See [issue #73](../../issues/73) for details. The 
-`linux-samus/scripts/setup/touchpad` directory contains a script that does 
+touchpad works.  See [issue #73](../../issues/73) for details. The
+`linux-samus/scripts/setup/touchpad` directory contains a script that does
 the reset:
 ```sh
 $ cd linux-samus/scripts/setup/touchpad
@@ -103,7 +104,7 @@ The following sections provide different ways to run this script automatically.
 ./setup.xinitrc.sh
 ```
 The same directory also contains `setup.xinitrc.sh`. When executed, it copies
-scripts and `mxt-app` to `/usr/local/bin` and configures `~/.xinitrc` to 
+scripts and `mxt-app` to `/usr/local/bin` and configures `~/.xinitrc` to
 call the script when the Xorg server starts.
 
 ##### systemd
