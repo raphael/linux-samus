@@ -1,9 +1,10 @@
 # Linux for Chromebook Pixel 2015
+[![Chat with us on #linux-samus on freenode.net](https://img.shields.io/badge/chat-on%20%23linux--samus-brightgreen.svg)](https://webchat.freenode.net/?channels=linux-samus "Chat with us on #linux-samus on freenode.net")
 
 This repository contains packages for Debian and Arch Linux that installs
 the Linux kernel 4.4 with a set of patches that enable sound support as
 well as keyboard and screen brightness control. The Linux kernel 4.4
-already has built-in support for the touchpad making the Pixel 2 fully
+already has built-in support for the touchpad making the Pixel 2015 fully
 supported with this kernel tree.
 
 The repository also contains the complete source for the patched kernel
@@ -11,10 +12,10 @@ tree so that it can be built and installed on other Linux distributions.
 
 The set of scripts used to create the patched linux kernel source is also
 included. These scripts diff the ChromiumOS 3.14 tree (that's the version
-used to create the Pixel 2 ChromeOS kernel) with the 4.4 tree and apply
+used to create the Pixel 2015 ChromeOS kernel) with the 4.4 tree and apply
 a small set of custom changes necessary to make the code compatible.
 
-The provided kernel config is also somewhat optimized for the Pixel 2.
+The provided kernel config is also somewhat optimized for the Pixel 2015.
 
 *Current kernel version: 4.4.2*
 
@@ -25,7 +26,7 @@ Ubuntu, Debian or Arch Linux.
 
 ### Ubuntu / Debian
 
-``` bash
+```sh
 $ git clone https://github.com/raphael/linux-samus
 $ cd linux-samus/build/debian
 $ sudo dpkg -i *.deb
@@ -33,16 +34,16 @@ $ sudo dpkg -i *.deb
 
 ### Arch Linux
 
-Install from the AUR:
-```
-yaourt -S linux-samus4
+Install the [`linux-samus4`](https://aur.archlinux.org/packages/linux-samus4/) package from the AUR:
+```sh
+$ yaourt -S linux-samus4
 ```
 
 ### Other distributions
 
-The entire kernel patched tree is located under `build/linux`, compile and install using the usual
-instructions for installing kernels. For example:
-``` bash
+The entire kernel patched tree is located under `build/linux`, compile and
+install using the usual instructions for installing kernels. For example:
+```sh
 $ git clone https://github.com/raphael/linux-samus
 $ cd linux-samus/build/linux
 $ make nconfig
@@ -62,7 +63,7 @@ Once installed reboot and load the kernel.
 ### Sound
 
 To enable sound run the `sound.sh` script:
-``` bash
+```sh
 $ cd linux-samus/scripts/setup/sound
 $ ./sound.sh
 ```
@@ -72,23 +73,26 @@ $ ./sound.sh
 If the setup script fails please see below "Enabling sound step-by-step".
 
 ##### User settings and control
-To set the default sink from the laptop speakers when logged in, modify the users pulseaudio config with:
+To set the default sink from the laptop speakers when logged in, modify
+the users pulseaudio config with:
+```sh
+$ pacmd set-default-sink 1
 ```
-pacmd set-default-sink 1
-```
-the following commands will control sound:
-```
-pactl set-sink-mute 1 toggle
-pactl set-sink-volume 1 -2%
-pactl set-sink-volume 1 +2%
+the following commands will toggle mute, increase volume, and decrease volume,
+respectively.
+```sh
+$ pactl set-sink-mute 1 toggle
+$ pactl set-sink-volume 1 -2%
+$ pactl set-sink-volume 1 +2%
 ```
 
 ### Touchpad
 
-Since Linux 4.3 the Atmel chip needs to be reset on boot to guarantee that the touchpad works.
-See [issue #73](../../issues/73) for details. The `linux-samus/scripts/setup/touchpad` directory contains a script
-that does the reset:
-```bash
+Since Linux 4.3 the Atmel chip needs to be reset on boot to guarantee that the
+touchpad works.  See [issue #73](../../issues/73) for details. The
+`linux-samus/scripts/setup/touchpad` directory contains a script that does
+the reset:
+```sh
 $ cd linux-samus/scripts/setup/touchpad
 $ ./enable-atmel.sh
 ```
@@ -96,75 +100,85 @@ $ ./enable-atmel.sh
 The following sections provide different ways to run this script automatically.
 
 ##### xinitrc
-```
+```sh
 ./setup.xinitrc.sh
 ```
-The same directory also contains `setup.xinitrc.sh`. When executed, it copies scripts and `mxt-app` to `/usr/local/bin`
-and configures `~/.xinitrc` to call the script when the Xorg server starts.
+The same directory also contains `setup.xinitrc.sh`. When executed, it copies
+scripts and `mxt-app` to `/usr/local/bin` and configures `~/.xinitrc` to
+call the script when the Xorg server starts.
 
 ##### systemd
-```
+```sh
 ./setup.systemd.sh
 ```
-The same directory also contains `setup.systemd.sh`. When executed, it copies scripts and `mxt-app` to `/usr/local/bin`
-and configures systemd to run the script `enable-atmel.sh` on boot and from sleep (after suspend is resumed).
+The same directory also contains `setup.systemd.sh`. When executed, it copies
+scripts and `mxt-app` to `/usr/local/bin` and configures systemd to run the
+script `enable-atmel.sh` on boot and from sleep (after suspend is resumed).
 
 ##### OpenRC
-```
+```sh
 ./setup.openrc.sh
 ```
-The same directory also contains `setup.openrc.sh`. When executed, it copies scripts and `mxt-app` to `usr/local/bin`
-and configures OpenRC to run the script `enable-atmel.sh` on boot through the `local` service.
+The same directory also contains `setup.openrc.sh`. When executed, it copies
+scripts and `mxt-app` to `usr/local/bin` and configures OpenRC to run the
+script `enable-atmel.sh` on boot through the `local` service.
 
 ### Xorg
 
 To enable X11 acceleration run the `xaccel.sh` script:
-``` bash
+```sh
 $ cd linux-samus/scripts/setup/xorg
 $ ./xaccel.sh
 ```
 
 ### Brightness
 
-The script `script/setup/brightness/brightness` can be used to control the brightness level.
-```
+The script `scripts/setup/brightness/brightness` can be used to control the
+brightness level.
+```sh
 $ cd scripts/setup/brightness
 $ ./brightness --help
 Increase or decrease screen brighness
 Usage: brightness --increase | --decrease
 ```
-Bind the F6 key to `brightness --decrease` and the F7 key to `brightness --increase` for
-an almost native experience... (assuming the scripts are in your path).
+Put `scripts/setup/brightness` in your path and bind the F6 key to
+`brightness --decrease` and the F7 key to `brightness --increase` for an
+almost native experience.
 
-Similarly the script `script/setup/brightness/keyboard_led` can be used to control the keyboard backlight,
-bind the ALT-F6 key to `keyboard_led --decrease` and ALT-F7 to `keyboard_led --increase`.
+Similarly the script `script/setup/brightness/keyboard_led` can be used to
+control the keyboard backlight, bind the ALT-F6 key to
+`keyboard_led --decrease` and ALT-F7 to `keyboard_led --increase`.
 
-Both these scripts require write access to files living under `/sys` which get mounted
-read-only for non-root users on boot by default. If your system uses `systemd` (e.g. ArchLinux)
-then the file `script/setup/brightness/enable-brightness.service` contains the definition for a systemd
-service that makes the files above writable to non-root user. Run
-`systemctl enable enable-brightness.service` for the service to run on boot.
+Both these scripts require write access to files living under `/sys` which
+get mounted read-only for non-root users on boot by default. If your system
+uses `systemd` (e.g. ArchLinux) then the file
+`script/setup/brightness/enable-brightness.service` contains the definition
+for a systemd service that makes the files above writable to non-root user.
+Run `systemctl enable enable-brightness.service` for the service to run on boot.
 
 ##### systemd
-```
+```sh
 ./setup.systemd.sh
 ```
-The same directory also contains `setup.systemd.sh`. When executed, it copies scripts to `/usr/local/bin`
-and configures systemd to run the script `enable-brightness.sh` on boot.
+The same directory also contains `setup.systemd.sh`. When executed, it copies
+scripts to `/usr/local/bin` and configures systemd to run the script
+`enable-brightness.sh` on boot.
 
 ##### OpenRC
-```
+```sh
 ./setup.openrc.sh
 ```
-The same directory also contains `setup.openrc.sh`. When executed, it copies scripts to `/usr/local/bin`
-and configures OpenRC to run the script `enable-brightness.sh` on boot using the `local` service.
+The same directory also contains `setup.openrc.sh`. When executed, it copies
+scripts to `/usr/local/bin` and configures OpenRC to run the script
+`enable-brightness.sh` on boot using the `local` service.
 
 ### Building your own patch
 
 To build your own patched tree use the `patch.sh` scripts located in the
 `scripts` folder. The script accepts two arguments which correspond
-to the git branch and tag of the kernel tree to build the patch against. Example:
-```
+to the git branch and tag of the kernel tree to build the patch against.
+Example:
+```sh
 ./patch.sh 4.3 4.3.4
 ```
 This script clones the two trees, diffs the necessary files and create a
@@ -210,7 +224,7 @@ If that's not what you are getting then check for errors in `dmesg`.
 Once the driver loads correctly enable the "HiFi" verb with ALSAUCM. Make sure
 alsaucm is installed. It's usually part of the "alsa-utils" package. Assuming
 `alsaucm` is present, run the following:
-``` bash
+```sh
 $ cd scripts/setup
 $ ALSA_CONFIG_UCM=ucm/ alsaucm -c bdw-rt5677 set _verb HiFi
 ```
@@ -225,7 +239,7 @@ to `/etc/pulse/default.pa` *before* the line
 load-module module-udev-detect
 ```
 Restart PulseAudio with:
-```
+```sh
 $ pulseaudio -k && pulseaudio -D
 ```
 If PulseAudio fails to restart running it in the foreground may produce helpful
@@ -233,8 +247,8 @@ output:
 ```
 $ pulseaudio
 ```
-Assuming PulseAudio restarted successfully the last thing to do is to restore the alsa state:
-```
+Assuming PulseAudio restarted successfully the last thing to do is to restore the Alsa state:
+```bash
 $ cd scripts/setup
 $ sudo alsactl restore --file alsa/asound.state
 ```
@@ -247,9 +261,7 @@ load-module module-alsa-sink device=hw:0,0
 
 ## Contributions
 
-This repo exists so that we can all benefit from each other's work.
+This repo exists so that we can all benefit from one another's work.
 [Thomas Sowell's linux-samus](https://github.com/tsowell/linux-samus) repo
 was both an inspiration and help in building it. The hope is that others
 (you) will also feel inspired and contribute back. PRs are encouraged!
-
-
