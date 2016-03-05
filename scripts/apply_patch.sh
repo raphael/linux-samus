@@ -33,8 +33,16 @@ mv sound/soc/intel/sst-debugfs.* sound/soc/intel/common
 ln -s $DIR/config .config
 
 # Apply custom patches
-echo -- Applying custom patch --
+echo -- Applying custom patch: monkey.patch --
 patch -p1 < $DIR/monkey.patch
+if [ $? -ne 0 ]; then
+  echo Something wrong happened...
+  echo I couldn\'t patch the main tree with the custom patch which means that changes upstream require an update to this script.
+  exit 1
+fi
+
+echo -- Applying custom patch: lightbar-sys-attributes.patch --
+patch -p1 < $DIR/lightbar-sys-attributes.patch
 if [ $? -ne 0 ]; then
   echo Something wrong happened...
   echo I couldn\'t patch the main tree with the custom patch which means that changes upstream require an update to this script.
