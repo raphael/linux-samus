@@ -17,7 +17,7 @@ a small set of custom changes necessary to make the code compatible.
 
 The provided kernel config is also somewhat optimized for the Pixel 2015.
 
-*Current kernel version: 4.4.2*
+*Current kernel version: 4.4.5*
 
 ## Installation
 
