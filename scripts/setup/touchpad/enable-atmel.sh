@@ -10,7 +10,7 @@
 
 # Elevate privileges if necessary
 PROMPT=sudo
-[ "$UID" -eq 0 ] || exec $PROMPT $SHELL "$0" "$@"
+[ "$UID" -eq 0 ] || exec $PROMPT /bin/bash "$0" "$@"
 
 # Load `i2c-dev` module to access I2C devices through /dev
 $PROMPT modprobe i2c-dev &>/dev/null
