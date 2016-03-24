@@ -8,3 +8,6 @@ else
   echo "failed to find xorg.conf.d directory"
   exit 1
 fi
+echo DONE
+echo Make sure you have the intel drivers installed!
+echo On Archlinux: package xf86-video-intel
