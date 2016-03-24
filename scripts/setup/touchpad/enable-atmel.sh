@@ -20,7 +20,7 @@ $PROMPT modprobe i2c-dev &>/dev/null
 FOUND=0
 DEV=0
 while [ $FOUND -ne 1 ]; do
-  OUT=$(echo -ne 'i\nq\n' | $PROMPT mxt-app -d i2c-dev:$DEV-004a 2>/dev/null)
+  OUT=$(echo -ne 'i\nq\n' | $PROMPT ./mxt-app -d i2c-dev:$DEV-004a 2>/dev/null)
   if [[ $OUT == *"Atmel maXTouch"* ]]; then
     FOUND=1
   else
@@ -31,8 +31,8 @@ while [ $FOUND -ne 1 ]; do
     fi
   fi
 done
-echo -ne 'r\nq\n' | $PROMPT mxt-app -d i2c-dev:$DEV-004a &>/dev/null &&
+echo -ne 'r\nq\n' | $PROMPT ./mxt-app -d i2c-dev:$DEV-004a &>/dev/null &&
 echo touchpad device i2c-dev:$DEV-004a reset
-echo -ne 'r\nq\n' | $PROMPT mxt-app -d i2c-dev:$((DEV+1))-004b &>/dev/null && 
+echo -ne 'r\nq\n' | $PROMPT ./mxt-app -d i2c-dev:$((DEV+1))-004b &>/dev/null && 
 echo touchpad device i2c-dev:$((DEV+1))-004b reset
 
