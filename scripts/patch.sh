@@ -66,13 +66,14 @@ git fetch $ORIGIN
 git checkout .
 git clean -qfdx
 git checkout master
-git branch -D $BRANCH
-git branch $BRANCH --track $ORIGIN/$BRANCH
-git checkout $BRANCH
-git pull $ORIGIN $BRANCH
-if [ $? -ne 0 ]; then
-  exit 1
-fi
+# There doesn't seem to be a linux or linux-stable branch in Linus' repo.
+#git branch -D $BRANCH
+#git branch $BRANCH --track $ORIGIN/$BRANCH
+#git checkout $BRANCH
+#git pull $ORIGIN $BRANCH
+#if [ $? -ne 0 ]; then
+  #exit 1
+#fi
 git checkout $TAG
 cd $CHROMEOS
 git clean -qfdx

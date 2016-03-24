@@ -377,3 +377,16 @@ diff -Nau linux-head/sound/soc/soc-dapm.c chromiumos-chromeos-3.14/sound/soc/soc
   * snd_soc_dapm_set_bias_level - set the bias level for the system
   * @dapm: DAPM context
   * @level: level to configure
+diff -Nau linux-head/sound/soc/soc-compress.c chromiumos-chromeos-3.14/sound/soc/soc-compress.c
+--- linux-head/sound/soc/soc-compress.c 2016-03-23 18:55:53.169999321 -0700
++++ chromiumos-chromeos-3.14/sound/soc/soc-compress.c 2016-03-23 23:15:50.903314664 -0700
+@@ -683,8 +683,8 @@
+ 	if (platform->driver->compr_ops && platform->driver->compr_ops->copy)
+ 		compr->ops->copy = soc_compr_copy;
+ 
+ 	mutex_init(&compr->lock);
+-	ret = snd_compress_new(rtd->card->snd_card, num, direction, compr);
++	ret = snd_compress_new(rtd->card->snd_card, num, direction, new_name, compr);
+ 	if (ret < 0) {
+ 		pr_err("compress asoc: can't create compress for codec %s\n",
+ 			codec->component.name);
