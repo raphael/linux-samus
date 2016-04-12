@@ -1,12 +1,10 @@
 #!/bin/bash
 
-# This script resets the Atmel maXTouch chips that control the touchscreen and
-# touchpad input devices.
+# This script reconfigures the Atmel maXTouch chips that control the touchscreen and
+# touchpad input devices so they properly reset on boot.
+# This should only be needed to be run once.
 
-# It is recommended for this script to be run by the init system on boot and
-# after resuming from suspend.
-
-# Note the use of "mxt-app" which would have to be available to the init system.
+# See https://lkml.org/lkml/2016/4/7/786 for original thread.
 
 # Elevate privileges if necessary
 PROMPT=sudo
@@ -38,8 +36,16 @@ while [ $FOUND -ne 1 ]; do
     fi
   fi
 done
-echo -ne 'r\nq\n' | $PROMPT $SCRIPT -d i2c-dev:$DEV-004a &>/dev/null &&
-echo touchpad device i2c-dev:$DEV-004a reset
-echo -ne 'r\nq\n' | $PROMPT $SCRIPT -d i2c-dev:$((DEV+1))-004b &>/dev/null && 
-echo touchscreen device i2c-dev:$((DEV+1))-004b reset
-
+$PROMPT $SCRIPT -d i2c-dev:$DEV-004a -W -T18 44
+$PROMPT $SCRIPT -d i2c-dev:$DEV-004a --backup
+echo -----------------------------------------------
+echo - touchpad device i2c-dev:$DEV-004a reconfigured -
+echo -----------------------------------------------
+echo
+$PROMPT $SCRIPT -d i2c-dev:$((DEV+1))-004b -W -T18 44
+$PROMPT $SCRIPT -d i2c-dev:$((DEV+1))-004b --backup
+echo --------------------------------------------------
+echo - touchscreen device i2c-dev:$((DEV+1))-004b reconfigured -
+echo --------------------------------------------------
+echo
+echo DONE.
