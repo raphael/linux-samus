@@ -85,36 +85,15 @@ pactl set-sink-volume 1 +2%
 
 ### Touchpad
 
-Since Linux 4.3 the Atmel chip needs to be reset on boot to guarantee that the touchpad works.
+Since Linux 4.3 the Atmel chip needs to be reconfigured to guarantee that the touchpad works.
 See [issue #73](../../issues/73) for details. The `linux-samus/scripts/setup/touchpad` directory contains a script
-that does the reset:
+that does the reconfig:
 ```bash
 $ cd linux-samus/scripts/setup/touchpad
 $ ./enable-atmel.sh
 ```
 
-The following sections provide different ways to run this script automatically.
-
-##### xinitrc
-```
-./setup.xinitrc.sh
-```
-The same directory also contains `setup.xinitrc.sh`. When executed, it copies scripts and `mxt-app` to `/usr/local/bin`
-and configures `~/.xinitrc` to call the script when the Xorg server starts.
-
-##### systemd
-```
-./setup.systemd.sh
-```
-The same directory also contains `setup.systemd.sh`. When executed, it copies scripts and `mxt-app` to `/usr/local/bin`
-and configures systemd to run the script `enable-atmel.sh` on boot and from sleep (after suspend is resumed).
-
-##### OpenRC
-```
-./setup.openrc.sh
-```
-The same directory also contains `setup.openrc.sh`. When executed, it copies scripts and `mxt-app` to `usr/local/bin`
-and configures OpenRC to run the script `enable-atmel.sh` on boot through the `local` service.
+This is only needed to be run once.
 
 ### Xorg
 
