@@ -36,6 +36,15 @@ diff -Nau linux-head/sound/soc/codecs/rt5677.c chromiumos-chromeos-3.14/sound/so
  }
  #else
  static void rt5677_gpio_config(struct rt5677_priv *rt5677, unsigned offset,
+@@ -4881,7 +4878,7 @@
+ 
+ 	rt5677->gpio_chip = rt5677_template_chip;
+ 	rt5677->gpio_chip.ngpio = RT5677_GPIO_NUM;
+-	rt5677->gpio_chip.dev = &i2c->dev;
++	rt5677->gpio_chip.parent = &i2c->dev;
+ 	rt5677->gpio_chip.base = -1;
+ 
+ 	ret = gpiochip_add(&rt5677->gpio_chip);
 diff -Nau linux-head/sound/soc/intel/boards/bdw-rt5677.c chromiumos-chromeos-3.14/sound/soc/intel/bdw-rt5677.c
 --- linux-head/sound/soc/intel/boards/bdw-rt5677.c	2015-06-18 18:52:58.953332967 -0700
 +++ chromiumos-chromeos-3.14/sound/soc/intel/bdw-rt5677.c	2015-06-15 23:15:50.903314664 -0700

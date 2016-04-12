@@ -41,13 +41,13 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo -- Applying custom patch: lightbar-sys-attributes.patch --
-patch -p1 < $DIR/lightbar-sys-attributes.patch
-if [ $? -ne 0 ]; then
-  echo Something wrong happened...
-  echo I couldn\'t patch the main tree with the custom patch which means that changes upstream require an update to this script.
-  exit 1
-fi
+#echo -- Applying custom patch: lightbar-sys-attributes.patch --
+#patch -p1 < $DIR/lightbar-sys-attributes.patch
+#if [ $? -ne 0 ]; then
+  #echo Something wrong happened...
+  #echo I couldn\'t patch the main tree with the custom patch which means that changes upstream require an update to this script.
+  #exit 1
+#fi
 
 echo
 echo $LINUX now contains the patched source and a default config
