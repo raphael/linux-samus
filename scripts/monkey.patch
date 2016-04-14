@@ -23,7 +23,16 @@ diff -Nau linux-head/sound/soc/codecs/rt5677.c chromiumos-chromeos-3.14/sound/so
  	{RT5677_ASRC_12,	0x0018},
  	{RT5677_PR_BASE + 0x3d,	0x364d},
  	{RT5677_PR_BASE + 0x17,	0x4fc0},
-@@ -4820,11 +4820,8 @@
+@@ -4878,7 +4878,7 @@
+ 
+ 	rt5677->gpio_chip = rt5677_template_chip;
+ 	rt5677->gpio_chip.ngpio = RT5677_GPIO_NUM;
+-	rt5677->gpio_chip.dev = &i2c->dev;
++	rt5677->gpio_chip.parent = &i2c->dev;
+ 	rt5677->gpio_chip.base = -1;
+ 
+ 	ret = gpiochip_add(&rt5677->gpio_chip);
+@@ -4889,11 +4889,8 @@
  static void rt5677_free_gpio(struct i2c_client *i2c)
  {
  	struct rt5677_priv *rt5677 = i2c_get_clientdata(i2c);
@@ -36,15 +45,6 @@ diff -Nau linux-head/sound/soc/codecs/rt5677.c chromiumos-chromeos-3.14/sound/so
  }
  #else
  static void rt5677_gpio_config(struct rt5677_priv *rt5677, unsigned offset,
-@@ -4881,7 +4878,7 @@
- 
- 	rt5677->gpio_chip = rt5677_template_chip;
- 	rt5677->gpio_chip.ngpio = RT5677_GPIO_NUM;
--	rt5677->gpio_chip.dev = &i2c->dev;
-+	rt5677->gpio_chip.parent = &i2c->dev;
- 	rt5677->gpio_chip.base = -1;
- 
- 	ret = gpiochip_add(&rt5677->gpio_chip);
 diff -Nau linux-head/sound/soc/intel/boards/bdw-rt5677.c chromiumos-chromeos-3.14/sound/soc/intel/bdw-rt5677.c
 --- linux-head/sound/soc/intel/boards/bdw-rt5677.c	2015-06-18 18:52:58.953332967 -0700
 +++ chromiumos-chromeos-3.14/sound/soc/intel/bdw-rt5677.c	2015-06-15 23:15:50.903314664 -0700
@@ -164,7 +164,7 @@ diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-pcm.c chromiumos-chrome
 
  #define HSW_PCM_COUNT		6
  #define HSW_VOLUME_MAX		0x7FFFFFFF	/* 0dB */
-@@ -1003,7 +1003,6 @@
+@@ -1010,7 +1010,6 @@
  }
 
  #ifdef CONFIG_PM
@@ -172,7 +172,7 @@ diff -Nau linux-head/sound/soc/intel/haswell/sst-haswell-pcm.c chromiumos-chrome
 
  static int hsw_pcm_runtime_idle(struct device *dev)
  {
-@@ -1152,14 +1151,6 @@
+@@ -1158,14 +1158,6 @@
  	return 0;
  }
 
@@ -308,10 +308,7 @@ diff -Nau linux-head/include/sound/soc-dapm.h chromiumos-chromeos-3.14/include/s
  /* dapm widget types */
  enum snd_soc_dapm_type {
  	snd_soc_dapm_input = 0,		/* input pin */
-diff -Nau linux-head/include/sound/soc-dapm.h chromiumos-chromeos-3.14/include/sound/soc-dapm.h
---- linux-head/include/sound/soc-dapm.h	2015-09-01 18:55:53.169999321 -0700
-+++ chromiumos-chromeos-3.14/include/sound/soc-dapm.h	2015-09-01 23:15:50.903314664 -0700
-@@ -634,4 +634,35 @@
+@@ -637,4 +637,35 @@
  	int neighbour_checks;
  };
 

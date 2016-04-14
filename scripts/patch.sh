@@ -3,38 +3,31 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 LINUX=`readlink -f $DIR/../build/linux-patched`
 CHROMEOS=`readlink -f $DIR/../build/chromiumos-chromeos-3.14`
-ORIGIN=origin
-BRANCH=v4.1
-TAG=v4.1.4
+ORIGIN=git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
+BRANCH=linux-4.5.y
+TAG=v4.5.1
 
 if [ $# -gt 0 ]; then
   if [ "$1" == "--help" ]; then
-    echo "usage: $0 [ORIGIN] [BRANCH] [TAG]"
-    echo "where ORIGIN is linux or linux-stable"
+    echo "usage: $0 [BRANCH] [TAG]"
     exit 0
-  fi
-  ORIGIN=$1
-  if [ "$1" == "linux" ]; then
-    ORIGIN=origin
   fi
 fi
 
 if [ $# -gt 1 ]; then
   if [ "$2" == "--help" ]; then
-    echo "usage: $0 [ORIGIN] [BRANCH] [TAG]"
-    echo "where ORIGIN is linux or linux-stable"
+    echo "usage: $0 [BRANCH] [TAG]"
     exit 0
   fi
-  BRANCH=$2
+  BRANCH=$1
 fi
 
 if [ $# -gt 2 ]; then
   if [ "$3" == "--help" ]; then
-    echo "usage: $0 [ORIGIN] [BRANCH] [TAG]"
-    echo "where ORIGIN is linux or linux-stable"
+    echo "usage: $0 [BRANCH] [TAG]"
     exit 0
   fi
-  TAG=$3
+  TAG=$2
 fi
 
 echo This script will clone two complete copies of the kernel source code.
@@ -45,7 +38,7 @@ echo
 
 if [[ $REPLY =~ ^[Yy]$ ]]; then
   if [ ! -d $LINUX ]; then
-    git clone https://github.com/torvalds/linux.git $LINUX
+    git clone git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git $LINUX
   fi
   if [ ! -d $CHROMEOS ]; then
     git clone https://chromium.googlesource.com/chromiumos/third_party/kernel $CHROMEOS
@@ -62,18 +55,9 @@ fi
 
 echo Resetting repos
 cd $LINUX
-git fetch $ORIGIN
 git checkout .
 git clean -qfdx
-git checkout master
-# There doesn't seem to be a linux or linux-stable branch in Linus' repo.
-#git branch -D $BRANCH
-#git branch $BRANCH --track $ORIGIN/$BRANCH
-#git checkout $BRANCH
-#git pull $ORIGIN $BRANCH
-#if [ $? -ne 0 ]; then
-  #exit 1
-#fi
+git checkout $BRANCH
 git checkout $TAG
 cd $CHROMEOS
 git clean -qfdx
