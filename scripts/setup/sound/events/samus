@@ -1,0 +1,4 @@
+# This file specifies the action(s) to run on headphone plugging detection
+
+event=jack[ /]headphone.*
+action=/etc/acpi/actions/samus.sh %e
