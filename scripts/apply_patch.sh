@@ -29,7 +29,7 @@ fi
 
 # Adjust
 mv sound/soc/intel/bdw-rt5677.c sound/soc/intel/boards/bdw-rt5677.c
-mv sound/soc/intel/sst-debugfs.* sound/soc/intel/common
+#mv sound/soc/intel/sst-debugfs.* sound/soc/intel/common
 ln -s $DIR/config .config
 
 # Apply custom patches

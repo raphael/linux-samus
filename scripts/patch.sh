@@ -76,6 +76,7 @@ fi
 if [ $? -ne 0 ]; then
   exit 1
 fi
+cp bdw-rt5677.c $LINUX/sound/soc/intel/boards
 echo
 echo Successfully patched Linux!!
 echo You may compile and install it with e.g.:
