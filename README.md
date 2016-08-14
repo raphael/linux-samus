@@ -26,7 +26,7 @@ Ubuntu, Debian or Arch Linux.
 ### Ubuntu / Debian
 
 ``` bash
-$ git clone https://github.com/raphael/linux-samus
+$ git clone --depth=1 https://github.com/raphael/linux-samus
 $ cd linux-samus/build/debian
 $ sudo dpkg -i *.deb
 ```
@@ -43,7 +43,7 @@ yaourt -S linux-samus4
 The entire kernel patched tree is located under `build/linux`, compile and install using the usual
 instructions for installing kernels. For example:
 ``` bash
-$ git clone https://github.com/raphael/linux-samus
+$ git clone --depth=1 https://github.com/raphael/linux-samus
 $ cd linux-samus/build/linux
 $ make nconfig
 $ make -j4
