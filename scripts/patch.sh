@@ -29,7 +29,7 @@ git checkout .
 git clean -qfdx
 git checkout master
 git checkout $TAG
-git pull origin master
+git pull origin $TAG
 if [ $? -ne 0 ]; then
   exit 1
 fi
@@ -39,6 +39,9 @@ echo Patching
 cp $DIR/*.patch .
 patch -p1 < codec.patch
 patch -p1 < driver.patch
+
+echo Copy .config
+cp $DIR/config .config
 
 echo
 echo Successfully patched Linux!!

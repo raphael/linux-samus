@@ -1,3 +1,13 @@
+v4.7-2 / 2016-08-16
+--------------------
+Upgrade to Linux 4.7.1
+Further tweak kernel config
+
+v4.7-1 / 2016-08-15
+--------------------
+Upgrade to Linux 4.7
+Switch to official sound patches
+
 v4.5-1 / 2016-03-23
 --------------------
 Upgrade to Linux 4.5
