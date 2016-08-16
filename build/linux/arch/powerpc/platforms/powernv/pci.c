@@ -1,8 +1,6 @@
 /*
  * Support PCI/PCIe on PowerNV platforms
  *
- * Currently supports only P5IOC2
- *
  * Copyright 2011 Benjamin Herrenschmidt, IBM Corp.
  *
  * This program is free software; you can redistribute it and/or
@@ -40,9 +38,6 @@
 
 /* Delay in usec */
 #define PCI_RESET_DELAY_US	3000000
-
-#define cfg_dbg(fmt...)	do { } while(0)
-//#define cfg_dbg(fmt...)	printk(fmt)
 
 #ifdef CONFIG_PCI_MSI
 int pnv_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
@@ -372,7 +367,7 @@ static void pnv_pci_config_check_eeh(struct pci_dn *pdn)
 	struct pnv_phb *phb = pdn->phb->private_data;
 	u8	fstate;
 	__be16	pcierr;
-	int	pe_no;
+	unsigned int pe_no;
 	s64	rc;
 
 	/*
@@ -382,10 +377,7 @@ static void pnv_pci_config_check_eeh(struct pci_dn *pdn)
 	 */
 	pe_no = pdn->pe_number;
 	if (pe_no == IODA_INVALID_PE) {
-		if (phb->type == PNV_PHB_P5IOC2)
-			pe_no = 0;
-		else
-			pe_no = phb->ioda.reserved_pe;
+		pe_no = phb->ioda.reserved_pe_idx;
 	}
 
 	/*
@@ -407,8 +399,8 @@ static void pnv_pci_config_check_eeh(struct pci_dn *pdn)
 		}
 	}
 
-	cfg_dbg(" -> EEH check, bdfn=%04x PE#%d fstate=%x\n",
-		(pdn->busno << 8) | (pdn->devfn), pe_no, fstate);
+	pr_devel(" -> EEH check, bdfn=%04x PE#%d fstate=%x\n",
+		 (pdn->busno << 8) | (pdn->devfn), pe_no, fstate);
 
 	/* Clear the frozen state if applicable */
 	if (fstate == OPAL_EEH_STOPPED_MMIO_FREEZE ||
@@ -456,8 +448,8 @@ int pnv_pci_cfg_read(struct pci_dn *pdn,
 		return PCIBIOS_FUNC_NOT_SUPPORTED;
 	}
 
-	cfg_dbg("%s: bus: %x devfn: %x +%x/%x -> %08x\n",
-		__func__, pdn->busno, pdn->devfn, where, size, *val);
+	pr_devel("%s: bus: %x devfn: %x +%x/%x -> %08x\n",
+		 __func__, pdn->busno, pdn->devfn, where, size, *val);
 	return PCIBIOS_SUCCESSFUL;
 }
 
@@ -467,8 +459,8 @@ int pnv_pci_cfg_write(struct pci_dn *pdn,
 	struct pnv_phb *phb = pdn->phb->private_data;
 	u32 bdfn = (pdn->busno << 8) | pdn->devfn;
 
-	cfg_dbg("%s: bus: %x devfn: %x +%x/%x -> %08x\n",
-		pdn->busno, pdn->devfn, where, size, val);
+	pr_devel("%s: bus: %x devfn: %x +%x/%x -> %08x\n",
+		 __func__, pdn->busno, pdn->devfn, where, size, val);
 	switch (size) {
 	case 1:
 		opal_pci_config_write_byte(phb->opal_id, bdfn, where, val);
@@ -807,7 +799,6 @@ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_IBM, 0x3b9, pnv_p7ioc_rc_quirk);
 void __init pnv_pci_init(void)
 {
 	struct device_node *np;
-	bool found_ioda = false;
 
 	pci_add_flags(PCI_CAN_SKIP_ISA_ALIGN);
 
@@ -815,23 +806,18 @@ void __init pnv_pci_init(void)
 	if (!firmware_has_feature(FW_FEATURE_OPAL))
 		return;
 
-	/* Look for IODA IO-Hubs. We don't support mixing IODA
-	 * and p5ioc2 due to the need to change some global
-	 * probing flags
-	 */
+	/* Look for IODA IO-Hubs. */
 	for_each_compatible_node(np, NULL, "ibm,ioda-hub") {
 		pnv_pci_init_ioda_hub(np);
-		found_ioda = true;
 	}
-
-	/* Look for p5ioc2 IO-Hubs */
-	if (!found_ioda)
-		for_each_compatible_node(np, NULL, "ibm,p5ioc2")
-			pnv_pci_init_p5ioc2_hub(np);
 
 	/* Look for ioda2 built-in PHB3's */
 	for_each_compatible_node(np, NULL, "ibm,ioda2-phb")
 		pnv_pci_init_ioda2_phb(np);
+
+	/* Look for NPU PHBs */
+	for_each_compatible_node(np, NULL, "ibm,ioda2-npu-phb")
+		pnv_pci_init_npu_phb(np);
 
 	/* Setup the linkage between OF nodes and PHBs */
 	pci_devs_phb_init();

@@ -11,11 +11,6 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
  ******************************************************************************/
 /*-----------------------------------------------------------------------------
 
@@ -110,7 +105,7 @@ struct registry_priv {
 	u8	wifi_spec;/*  !turbo_mode */
 
 	u8	channel_plan;
-	bool	bAcceptAddbaReq;
+	bool	accept_addba_req; /* true = accept AP's Add BA req */
 
 	u8	antdiv_cfg;
 	u8	antdiv_type;
@@ -135,9 +130,9 @@ struct registry_priv {
 };
 
 /* For registry parameters */
-#define RGTRY_OFT(field) ((u32)FIELD_OFFSET(struct registry_priv, field))
+#define RGTRY_OFT(field) ((u32)offsetof(struct registry_priv, field))
 #define RGTRY_SZ(field)   sizeof(((struct registry_priv *)0)->field)
-#define BSSID_OFT(field) ((u32)FIELD_OFFSET(struct wlan_bssid_ex, field))
+#define BSSID_OFT(field) ((u32)offsetofT(struct wlan_bssid_ex, field))
 #define BSSID_SZ(field)   sizeof(((struct wlan_bssid_ex *)0)->field)
 
 #define MAX_CONTINUAL_URB_ERR		4
@@ -176,8 +171,6 @@ static inline struct device *dvobj_to_dev(struct dvobj_priv *dvobj)
 };
 
 struct adapter {
-	u16	chip_type;
-
 	struct dvobj_priv *dvobj;
 	struct	mlme_priv mlmepriv;
 	struct	mlme_ext_priv mlmeextpriv;

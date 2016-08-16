@@ -63,6 +63,7 @@ struct ctf_writer {
 			struct bt_ctf_field_type	*s32;
 			struct bt_ctf_field_type	*u32;
 			struct bt_ctf_field_type	*string;
+			struct bt_ctf_field_type	*u32_hex;
 			struct bt_ctf_field_type	*u64_hex;
 		};
 		struct bt_ctf_field_type *array[6];
@@ -203,6 +204,44 @@ static unsigned long long adjust_signedness(unsigned long long value_int, int si
 	return (value_int & value_mask) | ~value_mask;
 }
 
+static int string_set_value(struct bt_ctf_field *field, const char *string)
+{
+	char *buffer = NULL;
+	size_t len = strlen(string), i, p;
+	int err;
+
+	for (i = p = 0; i < len; i++, p++) {
+		if (isprint(string[i])) {
+			if (!buffer)
+				continue;
+			buffer[p] = string[i];
+		} else {
+			char numstr[5];
+
+			snprintf(numstr, sizeof(numstr), "\\x%02x",
+				 (unsigned int)(string[i]) & 0xff);
+
+			if (!buffer) {
+				buffer = zalloc(i + (len - i) * 4 + 2);
+				if (!buffer) {
+					pr_err("failed to set unprintable string '%s'\n", string);
+					return bt_ctf_field_string_set_value(field, "UNPRINTABLE-STRING");
+				}
+				if (i > 0)
+					strncpy(buffer, string, i);
+			}
+			strncat(buffer + p, numstr, 4);
+			p += 3;
+		}
+	}
+
+	if (!buffer)
+		return bt_ctf_field_string_set_value(field, string);
+	err = bt_ctf_field_string_set_value(field, buffer);
+	free(buffer);
+	return err;
+}
+
 static int add_tracepoint_field_value(struct ctf_writer *cw,
 				      struct bt_ctf_event_class *event_class,
 				      struct bt_ctf_event *event,
@@ -269,8 +308,7 @@ static int add_tracepoint_field_value(struct ctf_writer *cw,
 		}
 
 		if (flags & FIELD_IS_STRING)
-			ret = bt_ctf_field_string_set_value(field,
-					data + offset + i * len);
+			ret = string_set_value(field, data + offset + i * len);
 		else {
 			unsigned long long value_int;
 
@@ -348,6 +386,84 @@ static int add_tracepoint_values(struct ctf_writer *cw,
 		ret = add_tracepoint_fields_values(cw, event_class, event,
 						   fields, sample);
 
+	return ret;
+}
+
+static int
+add_bpf_output_values(struct bt_ctf_event_class *event_class,
+		      struct bt_ctf_event *event,
+		      struct perf_sample *sample)
+{
+	struct bt_ctf_field_type *len_type, *seq_type;
+	struct bt_ctf_field *len_field, *seq_field;
+	unsigned int raw_size = sample->raw_size;
+	unsigned int nr_elements = raw_size / sizeof(u32);
+	unsigned int i;
+	int ret;
+
+	if (nr_elements * sizeof(u32) != raw_size)
+		pr_warning("Incorrect raw_size (%u) in bpf output event, skip %lu bytes\n",
+			   raw_size, nr_elements * sizeof(u32) - raw_size);
+
+	len_type = bt_ctf_event_class_get_field_by_name(event_class, "raw_len");
+	len_field = bt_ctf_field_create(len_type);
+	if (!len_field) {
+		pr_err("failed to create 'raw_len' for bpf output event\n");
+		ret = -1;
+		goto put_len_type;
+	}
+
+	ret = bt_ctf_field_unsigned_integer_set_value(len_field, nr_elements);
+	if (ret) {
+		pr_err("failed to set field value for raw_len\n");
+		goto put_len_field;
+	}
+	ret = bt_ctf_event_set_payload(event, "raw_len", len_field);
+	if (ret) {
+		pr_err("failed to set payload to raw_len\n");
+		goto put_len_field;
+	}
+
+	seq_type = bt_ctf_event_class_get_field_by_name(event_class, "raw_data");
+	seq_field = bt_ctf_field_create(seq_type);
+	if (!seq_field) {
+		pr_err("failed to create 'raw_data' for bpf output event\n");
+		ret = -1;
+		goto put_seq_type;
+	}
+
+	ret = bt_ctf_field_sequence_set_length(seq_field, len_field);
+	if (ret) {
+		pr_err("failed to set length of 'raw_data'\n");
+		goto put_seq_field;
+	}
+
+	for (i = 0; i < nr_elements; i++) {
+		struct bt_ctf_field *elem_field =
+			bt_ctf_field_sequence_get_field(seq_field, i);
+
+		ret = bt_ctf_field_unsigned_integer_set_value(elem_field,
+				((u32 *)(sample->raw_data))[i]);
+
+		bt_ctf_field_put(elem_field);
+		if (ret) {
+			pr_err("failed to set raw_data[%d]\n", i);
+			goto put_seq_field;
+		}
+	}
+
+	ret = bt_ctf_event_set_payload(event, "raw_data", seq_field);
+	if (ret)
+		pr_err("failed to set payload for raw_data\n");
+
+put_seq_field:
+	bt_ctf_field_put(seq_field);
+put_seq_type:
+	bt_ctf_field_type_put(seq_type);
+put_len_field:
+	bt_ctf_field_put(len_field);
+put_len_type:
+	bt_ctf_field_type_put(len_type);
 	return ret;
 }
 
@@ -553,7 +669,7 @@ static bool is_flush_needed(struct ctf_stream *cs)
 }
 
 static int process_sample_event(struct perf_tool *tool,
-				union perf_event *_event __maybe_unused,
+				union perf_event *_event,
 				struct perf_sample *sample,
 				struct perf_evsel *evsel,
 				struct machine *machine __maybe_unused)
@@ -592,6 +708,12 @@ static int process_sample_event(struct perf_tool *tool,
 	if (evsel->attr.type == PERF_TYPE_TRACEPOINT) {
 		ret = add_tracepoint_values(cw, event_class, event,
 					    evsel, sample);
+		if (ret)
+			return -1;
+	}
+
+	if (perf_evsel__is_bpf_output(evsel)) {
+		ret = add_bpf_output_values(event_class, event, sample);
 		if (ret)
 			return -1;
 	}
@@ -743,6 +865,25 @@ static int add_tracepoint_types(struct ctf_writer *cw,
 	return ret;
 }
 
+static int add_bpf_output_types(struct ctf_writer *cw,
+				struct bt_ctf_event_class *class)
+{
+	struct bt_ctf_field_type *len_type = cw->data.u32;
+	struct bt_ctf_field_type *seq_base_type = cw->data.u32_hex;
+	struct bt_ctf_field_type *seq_type;
+	int ret;
+
+	ret = bt_ctf_event_class_add_field(class, len_type, "raw_len");
+	if (ret)
+		return ret;
+
+	seq_type = bt_ctf_field_type_sequence_create(seq_base_type, "raw_len");
+	if (!seq_type)
+		return -1;
+
+	return bt_ctf_event_class_add_field(class, seq_type, "raw_data");
+}
+
 static int add_generic_types(struct ctf_writer *cw, struct perf_evsel *evsel,
 			     struct bt_ctf_event_class *event_class)
 {
@@ -754,7 +895,8 @@ static int add_generic_types(struct ctf_writer *cw, struct perf_evsel *evsel,
 	 *                              ctf event header
 	 *   PERF_SAMPLE_READ         - TODO
 	 *   PERF_SAMPLE_CALLCHAIN    - TODO
-	 *   PERF_SAMPLE_RAW          - tracepoint fields are handled separately
+	 *   PERF_SAMPLE_RAW          - tracepoint fields and BPF output
+	 *                              are handled separately
 	 *   PERF_SAMPLE_BRANCH_STACK - TODO
 	 *   PERF_SAMPLE_REGS_USER    - TODO
 	 *   PERF_SAMPLE_STACK_USER   - TODO
@@ -823,6 +965,12 @@ static int add_event(struct ctf_writer *cw, struct perf_evsel *evsel)
 			goto err;
 	}
 
+	if (perf_evsel__is_bpf_output(evsel)) {
+		ret = add_bpf_output_types(cw, event_class);
+		if (ret)
+			goto err;
+	}
+
 	ret = bt_ctf_stream_class_add_event_class(cw->stream_class, event_class);
 	if (ret) {
 		pr("Failed to add event class into stream.\n");
@@ -855,6 +1003,23 @@ static int setup_events(struct ctf_writer *cw, struct perf_session *session)
 			return ret;
 	}
 	return 0;
+}
+
+static void cleanup_events(struct perf_session *session)
+{
+	struct perf_evlist *evlist = session->evlist;
+	struct perf_evsel *evsel;
+
+	evlist__for_each(evlist, evsel) {
+		struct evsel_priv *priv;
+
+		priv = evsel->priv;
+		bt_ctf_event_class_put(priv->event_class);
+		zfree(&evsel->priv);
+	}
+
+	perf_evlist__delete(evlist);
+	session->evlist = NULL;
 }
 
 static int setup_streams(struct ctf_writer *cw, struct perf_session *session)
@@ -952,6 +1117,12 @@ static struct bt_ctf_field_type *create_int_type(int size, bool sign, bool hex)
 	    bt_ctf_field_type_integer_set_base(type, BT_CTF_INTEGER_BASE_HEXADECIMAL))
 		goto err;
 
+#if __BYTE_ORDER == __BIG_ENDIAN
+	bt_ctf_field_type_set_byte_order(type, BT_CTF_BYTE_ORDER_BIG_ENDIAN);
+#else
+	bt_ctf_field_type_set_byte_order(type, BT_CTF_BYTE_ORDER_LITTLE_ENDIAN);
+#endif
+
 	pr2("Created type: INTEGER %d-bit %ssigned %s\n",
 	    size, sign ? "un" : "", hex ? "hex" : "");
 	return type;
@@ -982,6 +1153,7 @@ do {							\
 	CREATE_INT_TYPE(cw->data.u64, 64, false, false);
 	CREATE_INT_TYPE(cw->data.s32, 32, true,  false);
 	CREATE_INT_TYPE(cw->data.u32, 32, false, false);
+	CREATE_INT_TYPE(cw->data.u32_hex, 32, false, true);
 	CREATE_INT_TYPE(cw->data.u64_hex, 64, false, true);
 
 	cw->data.string  = bt_ctf_field_type_string_create();
@@ -1098,7 +1270,7 @@ static int convert__config(const char *var, const char *value, void *cb)
 		return 0;
 	}
 
-	return perf_default_config(var, value, cb);
+	return 0;
 }
 
 int bt_convert__perf2ctf(const char *input, const char *path, bool force)
@@ -1169,6 +1341,7 @@ int bt_convert__perf2ctf(const char *input, const char *path, bool force)
 		(double) c.events_size / 1024.0 / 1024.0,
 		c.events_count);
 
+	cleanup_events(session);
 	perf_session__delete(session);
 	ctf_writer__cleanup(cw);
 

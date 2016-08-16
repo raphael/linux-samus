@@ -114,6 +114,7 @@ Example:
 			#size-cells = <0>;
 			reg = <17 1>;	/* MDIO address 17, switch 1 in tree */
 			mii-bus = <&mii_bus1>;
+			reset-gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
 
 			switch1port0: port@0 {
 				reg = <0>;

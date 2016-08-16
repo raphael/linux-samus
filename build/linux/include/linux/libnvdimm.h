@@ -26,9 +26,8 @@ enum {
 
 	/* need to set a limit somewhere, but yes, this is likely overkill */
 	ND_IOCTL_MAX_BUFLEN = SZ_4M,
-	ND_CMD_MAX_ELEM = 4,
-	ND_CMD_MAX_ENVELOPE = 16,
-	ND_CMD_ARS_STATUS_MAX = SZ_4K,
+	ND_CMD_MAX_ELEM = 5,
+	ND_CMD_MAX_ENVELOPE = 256,
 	ND_MAX_MAPPINGS = 32,
 
 	/* region flag indicating to direct-map persistent memory by default */
@@ -49,7 +48,7 @@ struct nvdimm;
 struct nvdimm_bus_descriptor;
 typedef int (*ndctl_fn)(struct nvdimm_bus_descriptor *nd_desc,
 		struct nvdimm *nvdimm, unsigned int cmd, void *buf,
-		unsigned int buf_len);
+		unsigned int buf_len, int *cmd_rc);
 
 struct nd_namespace_label;
 struct nvdimm_drvdata;
@@ -69,9 +68,12 @@ struct nd_mapping {
 
 struct nvdimm_bus_descriptor {
 	const struct attribute_group **attr_groups;
-	unsigned long dsm_mask;
+	unsigned long cmd_mask;
 	char *provider_name;
 	ndctl_fn ndctl;
+	int (*flush_probe)(struct nvdimm_bus_descriptor *nd_desc);
+	int (*clear_to_send)(struct nvdimm_bus_descriptor *nd_desc,
+			struct nvdimm *nvdimm, unsigned int cmd);
 };
 
 struct nd_cmd_desc {
@@ -116,6 +118,7 @@ static inline struct nd_blk_region_desc *to_blk_region_desc(
 
 }
 
+int nvdimm_bus_add_poison(struct nvdimm_bus *nvdimm_bus, u64 addr, u64 length);
 struct nvdimm_bus *__nvdimm_bus_register(struct device *parent,
 		struct nvdimm_bus_descriptor *nfit_desc, struct module *module);
 #define nvdimm_bus_register(parent, desc) \
@@ -127,10 +130,11 @@ struct nd_region *to_nd_region(struct device *dev);
 struct nd_blk_region *to_nd_blk_region(struct device *dev);
 struct nvdimm_bus_descriptor *to_nd_desc(struct nvdimm_bus *nvdimm_bus);
 const char *nvdimm_name(struct nvdimm *nvdimm);
+unsigned long nvdimm_cmd_mask(struct nvdimm *nvdimm);
 void *nvdimm_provider_data(struct nvdimm *nvdimm);
 struct nvdimm *nvdimm_create(struct nvdimm_bus *nvdimm_bus, void *provider_data,
 		const struct attribute_group **groups, unsigned long flags,
-		unsigned long *dsm_mask);
+		unsigned long cmd_mask);
 const struct nd_cmd_desc *nd_cmd_dimm_desc(int cmd);
 const struct nd_cmd_desc *nd_cmd_bus_desc(int cmd);
 u32 nd_cmd_in_size(struct nvdimm *nvdimm, int cmd,

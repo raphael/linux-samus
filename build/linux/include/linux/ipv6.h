@@ -50,17 +50,21 @@ struct ipv6_devconf {
 	__s32		mc_forwarding;
 #endif
 	__s32		disable_ipv6;
+	__s32		drop_unicast_in_l2_multicast;
 	__s32		accept_dad;
 	__s32		force_tllao;
 	__s32           ndisc_notify;
 	__s32		suppress_frag_ndisc;
 	__s32		accept_ra_mtu;
+	__s32		drop_unsolicited_na;
 	struct ipv6_stable_secret {
 		bool initialized;
 		struct in6_addr secret;
 	} stable_secret;
 	__s32		use_oif_addrs_only;
-	void		*sysctl;
+	__s32		keep_addr_on_down;
+
+	struct ctl_table_header *sysctl_header;
 };
 
 struct ipv6_params {
@@ -114,14 +118,29 @@ struct inet6_skb_parm {
 #define IP6SKB_ROUTERALERT	8
 #define IP6SKB_FRAGMENTED      16
 #define IP6SKB_HOPBYHOP        32
+#define IP6SKB_L3SLAVE         64
 };
+
+#if defined(CONFIG_NET_L3_MASTER_DEV)
+static inline bool skb_l3mdev_slave(__u16 flags)
+{
+	return flags & IP6SKB_L3SLAVE;
+}
+#else
+static inline bool skb_l3mdev_slave(__u16 flags)
+{
+	return false;
+}
+#endif
 
 #define IP6CB(skb)	((struct inet6_skb_parm*)((skb)->cb))
 #define IP6CBMTU(skb)	((struct ip6_mtuinfo *)((skb)->cb))
 
 static inline int inet6_iif(const struct sk_buff *skb)
 {
-	return IP6CB(skb)->iif;
+	bool l3_slave = skb_l3mdev_slave(IP6CB(skb)->flags);
+
+	return l3_slave ? skb->skb_iif : IP6CB(skb)->iif;
 }
 
 struct tcp6_request_sock {

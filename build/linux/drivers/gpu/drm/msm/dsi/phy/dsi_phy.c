@@ -177,19 +177,6 @@ static int dsi_phy_regulator_init(struct msm_dsi_phy *phy)
 		return ret;
 	}
 
-	for (i = 0; i < num; i++) {
-		if (regulator_can_change_voltage(s[i].consumer)) {
-			ret = regulator_set_voltage(s[i].consumer,
-				regs[i].min_voltage, regs[i].max_voltage);
-			if (ret < 0) {
-				dev_err(dev,
-					"regulator %d set voltage failed, %d\n",
-					i, ret);
-				return ret;
-			}
-		}
-	}
-
 	return 0;
 }
 
@@ -276,6 +263,10 @@ static const struct of_device_id dsi_phy_dt_match[] = {
 #ifdef CONFIG_DRM_MSM_DSI_20NM_PHY
 	{ .compatible = "qcom,dsi-phy-20nm",
 	  .data = &dsi_phy_20nm_cfgs },
+#endif
+#ifdef CONFIG_DRM_MSM_DSI_28NM_8960_PHY
+	{ .compatible = "qcom,dsi-phy-28nm-8960",
+	  .data = &dsi_phy_28nm_8960_cfgs },
 #endif
 	{}
 };

@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Tue, 16 Aug 2016 02:28:55 -0700
+Source: linux-4.7.0-ph-dirty
+Binary: linux-image-4.7.0-ph-dirty linux-headers-4.7.0-ph-dirty linux-firmware-image-4.7.0-ph-dirty linux-libc-dev
+Architecture: source amd64 all
+Version: 4.7.0-ph-dirty-6
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-firmware-image-4.7.0-ph-dirty - Linux kernel firmware, version 4.7.0-ph-dirty
+ linux-headers-4.7.0-ph-dirty - Linux kernel headers for 4.7.0-ph-dirty on ${kernel:debarch}
+ linux-image-4.7.0-ph-dirty - Linux kernel, version 4.7.0-ph-dirty
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.7.0-ph-dirty (4.7.0-ph-dirty-6) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ a7307487578d74bbbc30c69f348b391c731935a8 1250 linux-4.7.0-ph-dirty_4.7.0-ph-dirty-6.dsc
+ 6afef8e42bb0c5de754b2f2d6b25c7e73c44a401 380135279 linux-4.7.0-ph-dirty_4.7.0-ph-dirty.orig.tar.gz
+ 8b8c79cb7a1f6f691fe0570d073cda556857ec8c 1291 linux-4.7.0-ph-dirty_4.7.0-ph-dirty-6.debian.tar.gz
+ 40baa36de813eb70af5a0382f16da6e4a499c155 924496 linux-firmware-image-4.7.0-ph-dirty_4.7.0-ph-dirty-6_amd64.deb
+ 782567084c59f81219de965543df2ed881410990 10294816 linux-headers-4.7.0-ph-dirty_4.7.0-ph-dirty-6_amd64.deb
+ 853bf5622633876e084dbd0dfbeacddd58b7af34 43685028 linux-image-4.7.0-ph-dirty_4.7.0-ph-dirty-6_amd64.deb
+ 4e63a2859400e11179dca87f9a17587b1f61206d 849050 linux-libc-dev_4.7.0-ph-dirty-6_amd64.deb
+Checksums-Sha256:
+ fc3bc72975b36531ee2cbed09383f42d55f34d0bde98ddd085c061ff3a4e600b 1250 linux-4.7.0-ph-dirty_4.7.0-ph-dirty-6.dsc
+ a1e8b15795087c3f112976fd0d29112005b9567577533601c8f729d4e6c6ff8a 380135279 linux-4.7.0-ph-dirty_4.7.0-ph-dirty.orig.tar.gz
+ c8c3879e806c4fc8e648a5ed1d2636044512492561f9907262b5c4d45d718707 1291 linux-4.7.0-ph-dirty_4.7.0-ph-dirty-6.debian.tar.gz
+ 933c6aafb4b4ef7b057eafe16dce7c84119bf9c4ee4a436d851f558140e63e36 924496 linux-firmware-image-4.7.0-ph-dirty_4.7.0-ph-dirty-6_amd64.deb
+ a26834906261a6dd3cf1d2d8a6d5208c4dfeea5358d49875a15fafb4c62140df 10294816 linux-headers-4.7.0-ph-dirty_4.7.0-ph-dirty-6_amd64.deb
+ a7234f2e52a33b7e027adf4775e328ead884f42804f5cbdb92945eb14c0ff01a 43685028 linux-image-4.7.0-ph-dirty_4.7.0-ph-dirty-6_amd64.deb
+ 891e82551336fa809998c5b86baa809c213ddf3c5d747610b830a11af0efee8a 849050 linux-libc-dev_4.7.0-ph-dirty-6_amd64.deb
+Files:
+ 167f7881efae0bc5db9d1764521a7ce7 1250 kernel optional linux-4.7.0-ph-dirty_4.7.0-ph-dirty-6.dsc
+ 1e035e98a7969e139b3896f7c7e63282 380135279 kernel optional linux-4.7.0-ph-dirty_4.7.0-ph-dirty.orig.tar.gz
+ e5633b2269c8e59158980738c8414a01 1291 kernel optional linux-4.7.0-ph-dirty_4.7.0-ph-dirty-6.debian.tar.gz
+ 08e1e408865828c2462e1ea370dbf78e 924496 kernel optional linux-firmware-image-4.7.0-ph-dirty_4.7.0-ph-dirty-6_amd64.deb
+ 9d7d28c706efe491bd9322bb3d3aa881 10294816 kernel optional linux-headers-4.7.0-ph-dirty_4.7.0-ph-dirty-6_amd64.deb
+ bb6d9491c5c3e8489aa3dafc584a9db7 43685028 kernel optional linux-image-4.7.0-ph-dirty_4.7.0-ph-dirty-6_amd64.deb
+ 6d4b8da9f708df94b1768d570c37b854 849050 devel optional linux-libc-dev_4.7.0-ph-dirty-6_amd64.deb

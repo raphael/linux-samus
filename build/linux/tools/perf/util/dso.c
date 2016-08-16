@@ -7,6 +7,7 @@
 #include "auxtrace.h"
 #include "util.h"
 #include "debug.h"
+#include "vdso.h"
 
 char dso__symtab_origin(const struct dso *dso)
 {
@@ -38,7 +39,7 @@ int dso__read_binary_type_filename(const struct dso *dso,
 				   enum dso_binary_type type,
 				   char *root_dir, char *filename, size_t size)
 {
-	char build_id_hex[BUILD_ID_SIZE * 2 + 1];
+	char build_id_hex[SBUILD_ID_SIZE];
 	int ret = 0;
 	size_t len;
 
@@ -52,14 +53,17 @@ int dso__read_binary_type_filename(const struct dso *dso,
 			debuglink--;
 		if (*debuglink == '/')
 			debuglink++;
+
+		ret = -1;
+		if (!is_regular_file(filename))
+			break;
+
 		ret = filename__read_debuglink(filename, debuglink,
 					       size - (debuglink - filename));
 		}
 		break;
 	case DSO_BINARY_TYPE__BUILD_ID_CACHE:
-		/* skip the locally configured cache if a symfs is given */
-		if (symbol_conf.symfs[0] ||
-		    (dso__build_id_filename(dso, filename, size) == NULL))
+		if (dso__build_id_filename(dso, filename, size) == NULL)
 			ret = -1;
 		break;
 
@@ -1164,7 +1168,7 @@ bool __dsos__read_build_ids(struct list_head *head, bool with_hits)
 	struct dso *pos;
 
 	list_for_each_entry(pos, head, node) {
-		if (with_hits && !pos->hit)
+		if (with_hits && !pos->hit && !dso__is_vdso(pos))
 			continue;
 		if (pos->has_build_id) {
 			have_build_id = true;
@@ -1243,6 +1247,8 @@ struct dso *__dsos__addnew(struct dsos *dsos, const char *name)
 	if (dso != NULL) {
 		__dsos__add(dsos, dso);
 		dso__set_basename(dso);
+		/* Put dso here because __dsos_add already got it */
+		dso__put(dso);
 	}
 	return dso;
 }
@@ -1294,7 +1300,7 @@ size_t __dsos__fprintf(struct list_head *head, FILE *fp)
 
 size_t dso__fprintf_buildid(struct dso *dso, FILE *fp)
 {
-	char sbuild_id[BUILD_ID_SIZE * 2 + 1];
+	char sbuild_id[SBUILD_ID_SIZE];
 
 	build_id__sprintf(dso->build_id, sizeof(dso->build_id), sbuild_id);
 	return fprintf(fp, "%s", sbuild_id);

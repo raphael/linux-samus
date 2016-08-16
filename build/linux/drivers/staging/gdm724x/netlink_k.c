@@ -88,7 +88,8 @@ static void netlink_rcv(struct sk_buff *skb)
 }
 
 struct sock *netlink_init(int unit,
-	void (*cb)(struct net_device *dev, u16 type, void *msg, int len))
+			  void (*cb)(struct net_device *dev, u16 type,
+				     void *msg, int len))
 {
 	struct sock *sock;
 	struct netlink_kernel_cfg cfg = {
@@ -105,11 +106,6 @@ struct sock *netlink_init(int unit,
 		rcv_cb = cb;
 
 	return sock;
-}
-
-void netlink_exit(struct sock *sock)
-{
-	sock_release(sock->sk_socket);
 }
 
 int netlink_send(struct sock *sock, int group, u16 type, void *msg, int len)

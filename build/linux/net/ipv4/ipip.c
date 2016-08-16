@@ -103,7 +103,6 @@
 #include <linux/tcp.h>
 #include <linux/udp.h>
 #include <linux/if_arp.h>
-#include <linux/mroute.h>
 #include <linux/init.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/if_ether.h>
@@ -196,7 +195,7 @@ static int ipip_rcv(struct sk_buff *skb)
 	if (tunnel) {
 		if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb))
 			goto drop;
-		if (iptunnel_pull_header(skb, 0, tpi.proto))
+		if (iptunnel_pull_header(skb, 0, tpi.proto, false))
 			goto drop;
 		return ip_tunnel_rcv(tunnel, skb, &tpi, NULL, log_ecn_error);
 	}
@@ -220,9 +219,8 @@ static netdev_tx_t ipip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (unlikely(skb->protocol != htons(ETH_P_IP)))
 		goto tx_error;
 
-	skb = iptunnel_handle_offloads(skb, false, SKB_GSO_IPIP);
-	if (IS_ERR(skb))
-		goto out;
+	if (iptunnel_handle_offloads(skb, SKB_GSO_IPXIP4))
+		goto tx_error;
 
 	skb_set_inner_ipproto(skb, IPPROTO_IPIP);
 
@@ -231,7 +229,7 @@ static netdev_tx_t ipip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 
 tx_error:
 	kfree_skb(skb);
-out:
+
 	dev->stats.tx_errors++;
 	return NETDEV_TX_OK;
 }

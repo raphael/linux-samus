@@ -1,23 +1,18 @@
 # Linux for Chromebook Pixel 2015
 [![Chat with us on #linux-samus on freenode.net](https://img.shields.io/badge/chat-on%20%23linux--samus-brightgreen.svg)](https://webchat.freenode.net/?channels=linux-samus "Chat with us on #linux-samus on freenode.net")
 
-This repository contains packages for Debian and Arch Linux that installs
-the Linux kernel 4.4 with a set of patches that enable sound support as
-well as keyboard and screen brightness control. The Linux kernel 4.4
-already has built-in support for the touchpad making the Pixel 2015 fully
-supported with this kernel tree.
+This repository contains packages for Debian and Arch Linux that installs the Linux kernel 4.7 with
+a set of patches that enable sound support.  well as keyboard and screen brightness control. The
+Linux 4.7 kernel already has built-in support for screen and keyboard led control as well as
+touchpad and touchscreen support making the Pixel 2015 fully supported with this kernel tree.
 
-The repository also contains the complete source for the patched kernel
-tree so that it can be built and installed on other Linux distributions.
-
-The set of scripts used to create the patched linux kernel source is also
-included. These scripts diff the ChromiumOS 3.14 tree (that's the version
-used to create the Pixel 2015 ChromeOS kernel) with the 4.4 tree and apply
-a small set of custom changes necessary to make the code compatible.
+The patches that were built in this repo are no longer needed as support for the sound card has been
+submitted upstream. This repo temporarily includes the upstream patches and a patched tree until the
+patches make it in an official Linux release. See https://lkml.org/lkml/2016/8/14/207.
 
 The provided kernel config is also somewhat optimized for the Pixel 2015.
 
-*Current kernel version: 4.4.5*
+*Current kernel version: 4.7*
 
 ## Installation
 
@@ -26,8 +21,8 @@ Ubuntu, Debian or Arch Linux.
 
 ### Ubuntu / Debian
 
-```sh
-$ git clone https://github.com/raphael/linux-samus
+``` bash
+$ git clone --depth=1 https://github.com/raphael/linux-samus
 $ cd linux-samus/build/debian
 $ sudo dpkg -i *.deb
 ```
@@ -41,10 +36,10 @@ $ yaourt -S linux-samus4
 
 ### Other distributions
 
-The entire kernel patched tree is located under `build/linux`, compile and
-install using the usual instructions for installing kernels. For example:
-```sh
-$ git clone https://github.com/raphael/linux-samus
+The entire kernel patched tree is located under `build/linux`, compile and install using the usual
+instructions for installing kernels. For example:
+``` bash
+$ git clone --depth=1 https://github.com/raphael/linux-samus
 $ cd linux-samus/build/linux
 $ make nconfig
 $ make -j4
@@ -52,9 +47,7 @@ $ sudo make modules_install
 $ sudo make install
 ```
 > *NOTE* the steps above are just the standard kernel build steps and may
-> differ depending on your distro/setup. In particular the default kernel makefile
-> assumes LILO is being used. Follow the instructions specific to your
-> distribution for installing kernels from source.
+> differ depending on your distro/setup.
 
 ## Post-install steps
 
@@ -147,20 +140,6 @@ The same directory also contains `setup.openrc.sh`. When executed, it copies
 scripts to `/usr/local/bin` and configures OpenRC to run the script
 `enable-brightness.sh` on boot using the `local` service.
 
-### Building your own patch
-
-To build your own patched tree use the `patch.sh` scripts located in the
-`scripts` folder. The script accepts two arguments which correspond
-to the git branch and tag of the kernel tree to build the patch against.
-Example:
-```sh
-./patch.sh 4.3 4.3.4
-```
-This script clones the two trees, diffs the necessary files and create a
-patch. It then applies this generated patch and the other included patches
-to the original tree. This process results in a patched tree located in
-`build/linux-patched`.
-
 ### Enabling sound step-by-step
 
 If you're reading this either the `sound.sh` script failed or better you want to
@@ -181,18 +160,10 @@ At that point you may want to reboot.  Once rebooted check the output of `aplay 
 you should see something like:
 ```
 **** List of PLAYBACK Hardware Devices ****
-card 0: bdwrt5677 [bdw-rt5677], device 0: System Playback (*) []
+card 0: bdwrt5677 [bdw-rt5677], device 0: System Playback/Capture (*) []
   Subdevices: 1/1
   Subdevice #0: subdevice #0
-card 1: HDMI [HDA Intel HDMI], device 3: HDMI 0 [HDMI 0]
-  Subdevices: 1/1
-  Subdevice #0: subdevice #0
-card 1: HDMI [HDA Intel HDMI], device 7: HDMI 1 [HDMI 1]
-  Subdevices: 1/1
-  Subdevice #0: subdevice #0
-card 1: HDMI [HDA Intel HDMI], device 8: HDMI 2 [HDMI 2]
-  Subdevices: 1/1
-  Subdevice #0: subdevice #0
+
 ```
 If that's not what you are getting then check for errors in `dmesg`.
 
@@ -221,11 +192,6 @@ If PulseAudio fails to restart running it in the foreground may produce helpful
 output:
 ```
 $ pulseaudio
-```
-Assuming PulseAudio restarted successfully the last thing to do is to restore the Alsa state:
-```bash
-$ cd scripts/setup
-$ sudo alsactl restore --file alsa/asound.state
 ```
 Some users have also reported needing to configure PulseAudio to load the output
 driver statically, this can be done by adding the following line in 

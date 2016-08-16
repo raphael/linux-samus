@@ -54,6 +54,7 @@ static const struct platform_device_id ntc_thermistor_id[] = {
 	{ "ncp15wl333", TYPE_NCPXXWL333 },
 	{ "b57330v2103", TYPE_B57330V2103},
 	{ "ncp03wf104", TYPE_NCPXXWF104 },
+	{ "ncp15xh103", TYPE_NCPXXXH103 },
 	{ },
 };
 
@@ -173,6 +174,43 @@ static const struct ntc_compensation ncpXXwf104[] = {
 	{ .temp_c	= 125, .ohm	= 2522 },
 };
 
+static const struct ntc_compensation ncpXXxh103[] = {
+	{ .temp_c	= -40, .ohm	= 247565 },
+	{ .temp_c	= -35, .ohm	= 181742 },
+	{ .temp_c	= -30, .ohm	= 135128 },
+	{ .temp_c	= -25, .ohm	= 101678 },
+	{ .temp_c	= -20, .ohm	= 77373 },
+	{ .temp_c	= -15, .ohm	= 59504 },
+	{ .temp_c	= -10, .ohm	= 46222 },
+	{ .temp_c	= -5, .ohm	= 36244 },
+	{ .temp_c	= 0, .ohm	= 28674 },
+	{ .temp_c	= 5, .ohm	= 22878 },
+	{ .temp_c	= 10, .ohm	= 18399 },
+	{ .temp_c	= 15, .ohm	= 14910 },
+	{ .temp_c	= 20, .ohm	= 12169 },
+	{ .temp_c	= 25, .ohm	= 10000 },
+	{ .temp_c	= 30, .ohm	= 8271 },
+	{ .temp_c	= 35, .ohm	= 6883 },
+	{ .temp_c	= 40, .ohm	= 5762 },
+	{ .temp_c	= 45, .ohm	= 4851 },
+	{ .temp_c	= 50, .ohm	= 4105 },
+	{ .temp_c	= 55, .ohm	= 3492 },
+	{ .temp_c	= 60, .ohm	= 2985 },
+	{ .temp_c	= 65, .ohm	= 2563 },
+	{ .temp_c	= 70, .ohm	= 2211 },
+	{ .temp_c	= 75, .ohm	= 1915 },
+	{ .temp_c	= 80, .ohm	= 1666 },
+	{ .temp_c	= 85, .ohm	= 1454 },
+	{ .temp_c	= 90, .ohm	= 1275 },
+	{ .temp_c	= 95, .ohm	= 1121 },
+	{ .temp_c	= 100, .ohm	= 990 },
+	{ .temp_c	= 105, .ohm	= 876 },
+	{ .temp_c	= 110, .ohm	= 779 },
+	{ .temp_c	= 115, .ohm	= 694 },
+	{ .temp_c	= 120, .ohm	= 620 },
+	{ .temp_c	= 125, .ohm	= 556 },
+};
+
 /*
  * The following compensation table is from the specification of EPCOS NTC
  * Thermistors Datasheet
@@ -221,7 +259,6 @@ struct ntc_data {
 	struct device *dev;
 	int n_comp;
 	char name[PLATFORM_NAME_SIZE];
-	struct thermal_zone_device *tz;
 };
 
 #if defined(CONFIG_OF) && IS_ENABLED(CONFIG_IIO)
@@ -260,6 +297,8 @@ static const struct of_device_id ntc_match[] = {
 		.data = &ntc_thermistor_id[5]},
 	{ .compatible = "murata,ncp03wf104",
 		.data = &ntc_thermistor_id[6] },
+	{ .compatible = "murata,ncp15xh103",
+		.data = &ntc_thermistor_id[7] },
 
 	/* Usage of vendor name "ntc" is deprecated */
 	{ .compatible = "ntc,ncp15wb473",
@@ -539,6 +578,7 @@ static const struct thermal_zone_of_device_ops ntc_of_thermal_ops = {
 
 static int ntc_thermistor_probe(struct platform_device *pdev)
 {
+	struct thermal_zone_device *tz;
 	const struct of_device_id *of_id =
 			of_match_device(of_match_ptr(ntc_match), &pdev->dev);
 	const struct platform_device_id *pdev_id;
@@ -609,6 +649,10 @@ static int ntc_thermistor_probe(struct platform_device *pdev)
 		data->comp = ncpXXwf104;
 		data->n_comp = ARRAY_SIZE(ncpXXwf104);
 		break;
+	case TYPE_NCPXXXH103:
+		data->comp = ncpXXxh103;
+		data->n_comp = ARRAY_SIZE(ncpXXxh103);
+		break;
 	default:
 		dev_err(&pdev->dev, "Unknown device type: %lu(%s)\n",
 				pdev_id->driver_data, pdev_id->name);
@@ -633,12 +677,10 @@ static int ntc_thermistor_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "Thermistor type: %s successfully probed.\n",
 								pdev_id->name);
 
-	data->tz = thermal_zone_of_sensor_register(data->dev, 0, data->dev,
-						   &ntc_of_thermal_ops);
-	if (IS_ERR(data->tz)) {
+	tz = devm_thermal_zone_of_sensor_register(data->dev, 0, data->dev,
+						  &ntc_of_thermal_ops);
+	if (IS_ERR(tz))
 		dev_dbg(&pdev->dev, "Failed to register to thermal fw.\n");
-		data->tz = NULL;
-	}
 
 	return 0;
 err_after_sysfs:
@@ -655,8 +697,6 @@ static int ntc_thermistor_remove(struct platform_device *pdev)
 	hwmon_device_unregister(data->hwmon_dev);
 	sysfs_remove_group(&data->dev->kobj, &ntc_attr_group);
 	ntc_iio_channel_release(pdata);
-
-	thermal_zone_of_sensor_unregister(data->dev, data->tz);
 
 	return 0;
 }

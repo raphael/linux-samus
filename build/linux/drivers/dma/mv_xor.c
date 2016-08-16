@@ -31,6 +31,12 @@
 #include "dmaengine.h"
 #include "mv_xor.h"
 
+enum mv_xor_type {
+	XOR_ORION,
+	XOR_ARMADA_38X,
+	XOR_ARMADA_37XX,
+};
+
 enum mv_xor_mode {
 	XOR_MODE_IN_REG,
 	XOR_MODE_IN_DESC,
@@ -139,45 +145,9 @@ static void mv_chan_clear_err_status(struct mv_xor_chan *chan)
 }
 
 static void mv_chan_set_mode(struct mv_xor_chan *chan,
-			     enum dma_transaction_type type)
+			     u32 op_mode)
 {
-	u32 op_mode;
 	u32 config = readl_relaxed(XOR_CONFIG(chan));
-
-	switch (type) {
-	case DMA_XOR:
-		op_mode = XOR_OPERATION_MODE_XOR;
-		break;
-	case DMA_MEMCPY:
-		op_mode = XOR_OPERATION_MODE_MEMCPY;
-		break;
-	default:
-		dev_err(mv_chan_to_devp(chan),
-			"error: unsupported operation %d\n",
-			type);
-		BUG();
-		return;
-	}
-
-	config &= ~0x7;
-	config |= op_mode;
-
-#if defined(__BIG_ENDIAN)
-	config |= XOR_DESCRIPTOR_SWAP;
-#else
-	config &= ~XOR_DESCRIPTOR_SWAP;
-#endif
-
-	writel_relaxed(config, XOR_CONFIG(chan));
-	chan->current_type = type;
-}
-
-static void mv_chan_set_mode_to_desc(struct mv_xor_chan *chan)
-{
-	u32 op_mode;
-	u32 config = readl_relaxed(XOR_CONFIG(chan));
-
-	op_mode = XOR_OPERATION_MODE_IN_DESC;
 
 	config &= ~0x7;
 	config |= op_mode;
@@ -513,7 +483,7 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
 	BUG_ON(len > MV_XOR_MAX_BYTE_COUNT);
 
 	dev_dbg(mv_chan_to_devp(mv_chan),
-		"%s src_cnt: %d len: %u dest %pad flags: %ld\n",
+		"%s src_cnt: %d len: %zu dest %pad flags: %ld\n",
 		__func__, src_cnt, len, &dest, flags);
 
 	sw_desc = mv_chan_alloc_slot(mv_chan);
@@ -733,8 +703,9 @@ static int mv_chan_memcpy_self_test(struct mv_xor_chan *mv_chan)
 		goto free_resources;
 	}
 
-	src_dma = dma_map_page(dma_chan->device->dev, virt_to_page(src), 0,
-				 PAGE_SIZE, DMA_TO_DEVICE);
+	src_dma = dma_map_page(dma_chan->device->dev, virt_to_page(src),
+			       (size_t)src & ~PAGE_MASK, PAGE_SIZE,
+			       DMA_TO_DEVICE);
 	unmap->addr[0] = src_dma;
 
 	ret = dma_mapping_error(dma_chan->device->dev, src_dma);
@@ -744,8 +715,9 @@ static int mv_chan_memcpy_self_test(struct mv_xor_chan *mv_chan)
 	}
 	unmap->to_cnt = 1;
 
-	dest_dma = dma_map_page(dma_chan->device->dev, virt_to_page(dest), 0,
-				  PAGE_SIZE, DMA_FROM_DEVICE);
+	dest_dma = dma_map_page(dma_chan->device->dev, virt_to_page(dest),
+				(size_t)dest & ~PAGE_MASK, PAGE_SIZE,
+				DMA_FROM_DEVICE);
 	unmap->addr[1] = dest_dma;
 
 	ret = dma_mapping_error(dma_chan->device->dev, dest_dma);
@@ -969,7 +941,7 @@ static int mv_xor_channel_remove(struct mv_xor_chan *mv_chan)
 static struct mv_xor_chan *
 mv_xor_channel_add(struct mv_xor_device *xordev,
 		   struct platform_device *pdev,
-		   int idx, dma_cap_mask_t cap_mask, int irq, int op_in_desc)
+		   int idx, dma_cap_mask_t cap_mask, int irq)
 {
 	int ret = 0;
 	struct mv_xor_chan *mv_chan;
@@ -981,7 +953,10 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 
 	mv_chan->idx = idx;
 	mv_chan->irq = irq;
-	mv_chan->op_in_desc = op_in_desc;
+	if (xordev->xor_type == XOR_ORION)
+		mv_chan->op_in_desc = XOR_MODE_IN_REG;
+	else
+		mv_chan->op_in_desc = XOR_MODE_IN_DESC;
 
 	dma_dev = &mv_chan->dmadev;
 
@@ -1000,8 +975,8 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 	 * requires that we explicitly flush the writes
 	 */
 	mv_chan->dma_desc_pool_virt =
-	  dma_alloc_writecombine(&pdev->dev, MV_XOR_POOL_SIZE,
-				 &mv_chan->dma_desc_pool, GFP_KERNEL);
+	  dma_alloc_wc(&pdev->dev, MV_XOR_POOL_SIZE, &mv_chan->dma_desc_pool,
+		       GFP_KERNEL);
 	if (!mv_chan->dma_desc_pool_virt)
 		return ERR_PTR(-ENOMEM);
 
@@ -1043,9 +1018,9 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 	mv_chan_unmask_interrupts(mv_chan);
 
 	if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
-		mv_chan_set_mode_to_desc(mv_chan);
+		mv_chan_set_mode(mv_chan, XOR_OPERATION_MODE_IN_DESC);
 	else
-		mv_chan_set_mode(mv_chan, DMA_XOR);
+		mv_chan_set_mode(mv_chan, XOR_OPERATION_MODE_XOR);
 
 	spin_lock_init(&mv_chan->lock);
 	INIT_LIST_HEAD(&mv_chan->chain);
@@ -1121,9 +1096,93 @@ mv_xor_conf_mbus_windows(struct mv_xor_device *xordev,
 	writel(0, base + WINDOW_OVERRIDE_CTRL(1));
 }
 
+static void
+mv_xor_conf_mbus_windows_a3700(struct mv_xor_device *xordev)
+{
+	void __iomem *base = xordev->xor_high_base;
+	u32 win_enable = 0;
+	int i;
+
+	for (i = 0; i < 8; i++) {
+		writel(0, base + WINDOW_BASE(i));
+		writel(0, base + WINDOW_SIZE(i));
+		if (i < 4)
+			writel(0, base + WINDOW_REMAP_HIGH(i));
+	}
+	/*
+	 * For Armada3700 open default 4GB Mbus window. The dram
+	 * related configuration are done at AXIS level.
+	 */
+	writel(0xffff0000, base + WINDOW_SIZE(0));
+	win_enable |= 1;
+	win_enable |= 3 << 16;
+
+	writel(win_enable, base + WINDOW_BAR_ENABLE(0));
+	writel(win_enable, base + WINDOW_BAR_ENABLE(1));
+	writel(0, base + WINDOW_OVERRIDE_CTRL(0));
+	writel(0, base + WINDOW_OVERRIDE_CTRL(1));
+}
+
+/*
+ * Since this XOR driver is basically used only for RAID5, we don't
+ * need to care about synchronizing ->suspend with DMA activity,
+ * because the DMA engine will naturally be quiet due to the block
+ * devices being suspended.
+ */
+static int mv_xor_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct mv_xor_device *xordev = platform_get_drvdata(pdev);
+	int i;
+
+	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
+		struct mv_xor_chan *mv_chan = xordev->channels[i];
+
+		if (!mv_chan)
+			continue;
+
+		mv_chan->saved_config_reg =
+			readl_relaxed(XOR_CONFIG(mv_chan));
+		mv_chan->saved_int_mask_reg =
+			readl_relaxed(XOR_INTR_MASK(mv_chan));
+	}
+
+	return 0;
+}
+
+static int mv_xor_resume(struct platform_device *dev)
+{
+	struct mv_xor_device *xordev = platform_get_drvdata(dev);
+	const struct mbus_dram_target_info *dram;
+	int i;
+
+	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
+		struct mv_xor_chan *mv_chan = xordev->channels[i];
+
+		if (!mv_chan)
+			continue;
+
+		writel_relaxed(mv_chan->saved_config_reg,
+			       XOR_CONFIG(mv_chan));
+		writel_relaxed(mv_chan->saved_int_mask_reg,
+			       XOR_INTR_MASK(mv_chan));
+	}
+
+	if (xordev->xor_type == XOR_ARMADA_37XX) {
+		mv_xor_conf_mbus_windows_a3700(xordev);
+		return 0;
+	}
+
+	dram = mv_mbus_dram_info();
+	if (dram)
+		mv_xor_conf_mbus_windows(xordev, dram);
+
+	return 0;
+}
+
 static const struct of_device_id mv_xor_dt_ids[] = {
-	{ .compatible = "marvell,orion-xor", .data = (void *)XOR_MODE_IN_REG },
-	{ .compatible = "marvell,armada-380-xor", .data = (void *)XOR_MODE_IN_DESC },
+	{ .compatible = "marvell,orion-xor", .data = (void *)XOR_ORION },
+	{ .compatible = "marvell,armada-380-xor", .data = (void *)XOR_ARMADA_38X },
+	{ .compatible = "marvell,armada-3700-xor", .data = (void *)XOR_ARMADA_37XX },
 	{},
 };
 
@@ -1137,7 +1196,6 @@ static int mv_xor_probe(struct platform_device *pdev)
 	struct resource *res;
 	unsigned int max_engines, max_channels;
 	int i, ret;
-	int op_in_desc;
 
 	dev_notice(&pdev->dev, "Marvell shared XOR driver\n");
 
@@ -1165,12 +1223,30 @@ static int mv_xor_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, xordev);
 
+
+	/*
+	 * We need to know which type of XOR device we use before
+	 * setting up. In non-dt case it can only be the legacy one.
+	 */
+	xordev->xor_type = XOR_ORION;
+	if (pdev->dev.of_node) {
+		const struct of_device_id *of_id =
+			of_match_device(mv_xor_dt_ids,
+					&pdev->dev);
+
+		xordev->xor_type = (uintptr_t)of_id->data;
+	}
+
 	/*
 	 * (Re-)program MBUS remapping windows if we are asked to.
 	 */
-	dram = mv_mbus_dram_info();
-	if (dram)
-		mv_xor_conf_mbus_windows(xordev, dram);
+	if (xordev->xor_type == XOR_ARMADA_37XX) {
+		mv_xor_conf_mbus_windows_a3700(xordev);
+	} else {
+		dram = mv_mbus_dram_info();
+		if (dram)
+			mv_xor_conf_mbus_windows(xordev, dram);
+	}
 
 	/* Not all platforms can gate the clock, so it is not
 	 * an error if the clock does not exists.
@@ -1184,12 +1260,16 @@ static int mv_xor_probe(struct platform_device *pdev)
 	 * order for async_tx to perform well. So we limit the number
 	 * of engines and channels so that we take into account this
 	 * constraint. Note that we also want to use channels from
-	 * separate engines when possible.
+	 * separate engines when possible.  For dual-CPU Armada 3700
+	 * SoC with single XOR engine allow using its both channels.
 	 */
 	max_engines = num_present_cpus();
-	max_channels = min_t(unsigned int,
-			     MV_XOR_MAX_CHANNELS,
-			     DIV_ROUND_UP(num_present_cpus(), 2));
+	if (xordev->xor_type == XOR_ARMADA_37XX)
+		max_channels =	num_present_cpus();
+	else
+		max_channels = min_t(unsigned int,
+				     MV_XOR_MAX_CHANNELS,
+				     DIV_ROUND_UP(num_present_cpus(), 2));
 
 	if (mv_xor_engine_count >= max_engines)
 		return 0;
@@ -1197,15 +1277,11 @@ static int mv_xor_probe(struct platform_device *pdev)
 	if (pdev->dev.of_node) {
 		struct device_node *np;
 		int i = 0;
-		const struct of_device_id *of_id =
-			of_match_device(mv_xor_dt_ids,
-					&pdev->dev);
 
 		for_each_child_of_node(pdev->dev.of_node, np) {
 			struct mv_xor_chan *chan;
 			dma_cap_mask_t cap_mask;
 			int irq;
-			op_in_desc = (int)of_id->data;
 
 			if (i >= max_channels)
 				continue;
@@ -1222,7 +1298,7 @@ static int mv_xor_probe(struct platform_device *pdev)
 			}
 
 			chan = mv_xor_channel_add(xordev, pdev, i,
-						  cap_mask, irq, op_in_desc);
+						  cap_mask, irq);
 			if (IS_ERR(chan)) {
 				ret = PTR_ERR(chan);
 				irq_dispose_mapping(irq);
@@ -1251,8 +1327,7 @@ static int mv_xor_probe(struct platform_device *pdev)
 			}
 
 			chan = mv_xor_channel_add(xordev, pdev, i,
-						  cd->cap_mask, irq,
-						  XOR_MODE_IN_REG);
+						  cd->cap_mask, irq);
 			if (IS_ERR(chan)) {
 				ret = PTR_ERR(chan);
 				goto err_channel_add;
@@ -1282,6 +1357,8 @@ err_channel_add:
 
 static struct platform_driver mv_xor_driver = {
 	.probe		= mv_xor_probe,
+	.suspend        = mv_xor_suspend,
+	.resume         = mv_xor_resume,
 	.driver		= {
 		.name	        = MV_XOR_NAME,
 		.of_match_table = of_match_ptr(mv_xor_dt_ids),

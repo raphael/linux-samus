@@ -132,7 +132,7 @@ static struct dentry *ufs_get_parent(struct dentry *child)
 	ino = ufs_inode_by_name(d_inode(child), &dot_dot);
 	if (!ino)
 		return ERR_PTR(-ENOENT);
-	return d_obtain_alias(ufs_iget(d_inode(child)->i_sb, ino));
+	return d_obtain_alias(ufs_iget(child->d_sb, ino));
 }
 
 static const struct export_operations ufs_export_ops = {
@@ -1427,7 +1427,7 @@ static int __init init_inodecache(void)
 	ufs_inode_cachep = kmem_cache_create("ufs_inode_cache",
 					     sizeof(struct ufs_inode_info),
 					     0, (SLAB_RECLAIM_ACCOUNT|
-						SLAB_MEM_SPREAD),
+						SLAB_MEM_SPREAD|SLAB_ACCOUNT),
 					     init_once);
 	if (ufs_inode_cachep == NULL)
 		return -ENOMEM;

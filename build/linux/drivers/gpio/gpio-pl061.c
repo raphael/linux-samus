@@ -1,6 +1,8 @@
 /*
  * Copyright (C) 2008, 2009 Provigent Ltd.
  *
+ * Author: Baruch Siach <baruch@tkos.co.il>
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -11,9 +13,10 @@
  */
 #include <linux/spinlock.h>
 #include <linux/errno.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/io.h>
 #include <linux/ioport.h>
+#include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/irqchip/chained_irq.h>
 #include <linux/bitops.h>
@@ -58,14 +61,18 @@ struct pl061_gpio {
 #endif
 };
 
+static int pl061_get_direction(struct gpio_chip *gc, unsigned offset)
+{
+	struct pl061_gpio *chip = gpiochip_get_data(gc);
+
+	return !(readb(chip->base + GPIODIR) & BIT(offset));
+}
+
 static int pl061_direction_input(struct gpio_chip *gc, unsigned offset)
 {
-	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+	struct pl061_gpio *chip = gpiochip_get_data(gc);
 	unsigned long flags;
 	unsigned char gpiodir;
-
-	if (offset >= gc->ngpio)
-		return -EINVAL;
 
 	spin_lock_irqsave(&chip->lock, flags);
 	gpiodir = readb(chip->base + GPIODIR);
@@ -79,12 +86,9 @@ static int pl061_direction_input(struct gpio_chip *gc, unsigned offset)
 static int pl061_direction_output(struct gpio_chip *gc, unsigned offset,
 		int value)
 {
-	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+	struct pl061_gpio *chip = gpiochip_get_data(gc);
 	unsigned long flags;
 	unsigned char gpiodir;
-
-	if (offset >= gc->ngpio)
-		return -EINVAL;
 
 	spin_lock_irqsave(&chip->lock, flags);
 	writeb(!!value << offset, chip->base + (BIT(offset + 2)));
@@ -104,14 +108,14 @@ static int pl061_direction_output(struct gpio_chip *gc, unsigned offset,
 
 static int pl061_get_value(struct gpio_chip *gc, unsigned offset)
 {
-	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+	struct pl061_gpio *chip = gpiochip_get_data(gc);
 
 	return !!readb(chip->base + (BIT(offset + 2)));
 }
 
 static void pl061_set_value(struct gpio_chip *gc, unsigned offset, int value)
 {
-	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+	struct pl061_gpio *chip = gpiochip_get_data(gc);
 
 	writeb(!!value << offset, chip->base + (BIT(offset + 2)));
 }
@@ -119,7 +123,7 @@ static void pl061_set_value(struct gpio_chip *gc, unsigned offset, int value)
 static int pl061_irq_type(struct irq_data *d, unsigned trigger)
 {
 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+	struct pl061_gpio *chip = gpiochip_get_data(gc);
 	int offset = irqd_to_hwirq(d);
 	unsigned long flags;
 	u8 gpiois, gpioibe, gpioiev;
@@ -131,7 +135,7 @@ static int pl061_irq_type(struct irq_data *d, unsigned trigger)
 	if ((trigger & (IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW)) &&
 	    (trigger & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING)))
 	{
-		dev_err(gc->dev,
+		dev_err(gc->parent,
 			"trying to configure line %d for both level and edge "
 			"detection, choose one!\n",
 			offset);
@@ -158,7 +162,7 @@ static int pl061_irq_type(struct irq_data *d, unsigned trigger)
 		else
 			gpioiev &= ~bit;
 		irq_set_handler_locked(d, handle_level_irq);
-		dev_dbg(gc->dev, "line %d: IRQ on %s level\n",
+		dev_dbg(gc->parent, "line %d: IRQ on %s level\n",
 			offset,
 			polarity ? "HIGH" : "LOW");
 	} else if ((trigger & IRQ_TYPE_EDGE_BOTH) == IRQ_TYPE_EDGE_BOTH) {
@@ -167,7 +171,7 @@ static int pl061_irq_type(struct irq_data *d, unsigned trigger)
 		/* Select both edges, setting this makes GPIOEV be ignored */
 		gpioibe |= bit;
 		irq_set_handler_locked(d, handle_edge_irq);
-		dev_dbg(gc->dev, "line %d: IRQ on both edges\n", offset);
+		dev_dbg(gc->parent, "line %d: IRQ on both edges\n", offset);
 	} else if ((trigger & IRQ_TYPE_EDGE_RISING) ||
 		   (trigger & IRQ_TYPE_EDGE_FALLING)) {
 		bool rising = trigger & IRQ_TYPE_EDGE_RISING;
@@ -182,7 +186,7 @@ static int pl061_irq_type(struct irq_data *d, unsigned trigger)
 		else
 			gpioiev &= ~bit;
 		irq_set_handler_locked(d, handle_edge_irq);
-		dev_dbg(gc->dev, "line %d: IRQ on %s edge\n",
+		dev_dbg(gc->parent, "line %d: IRQ on %s edge\n",
 			offset,
 			rising ? "RISING" : "FALLING");
 	} else {
@@ -191,7 +195,7 @@ static int pl061_irq_type(struct irq_data *d, unsigned trigger)
 		gpioibe &= ~bit;
 		gpioiev &= ~bit;
 		irq_set_handler_locked(d, handle_bad_irq);
-		dev_warn(gc->dev, "no trigger selected for line %d\n",
+		dev_warn(gc->parent, "no trigger selected for line %d\n",
 			 offset);
 	}
 
@@ -209,7 +213,7 @@ static void pl061_irq_handler(struct irq_desc *desc)
 	unsigned long pending;
 	int offset;
 	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
-	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+	struct pl061_gpio *chip = gpiochip_get_data(gc);
 	struct irq_chip *irqchip = irq_desc_get_chip(desc);
 
 	chained_irq_enter(irqchip, desc);
@@ -227,7 +231,7 @@ static void pl061_irq_handler(struct irq_desc *desc)
 static void pl061_irq_mask(struct irq_data *d)
 {
 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+	struct pl061_gpio *chip = gpiochip_get_data(gc);
 	u8 mask = BIT(irqd_to_hwirq(d) % PL061_GPIO_NR);
 	u8 gpioie;
 
@@ -240,7 +244,7 @@ static void pl061_irq_mask(struct irq_data *d)
 static void pl061_irq_unmask(struct irq_data *d)
 {
 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+	struct pl061_gpio *chip = gpiochip_get_data(gc);
 	u8 mask = BIT(irqd_to_hwirq(d) % PL061_GPIO_NR);
 	u8 gpioie;
 
@@ -261,12 +265,19 @@ static void pl061_irq_unmask(struct irq_data *d)
 static void pl061_irq_ack(struct irq_data *d)
 {
 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+	struct pl061_gpio *chip = gpiochip_get_data(gc);
 	u8 mask = BIT(irqd_to_hwirq(d) % PL061_GPIO_NR);
 
 	spin_lock(&chip->lock);
 	writeb(mask, chip->base + GPIOIC);
 	spin_unlock(&chip->lock);
+}
+
+static int pl061_irq_set_wake(struct irq_data *d, unsigned int state)
+{
+	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
+
+	return irq_set_irq_wake(gc->irq_parent, state);
 }
 
 static struct irq_chip pl061_irqchip = {
@@ -275,6 +286,7 @@ static struct irq_chip pl061_irqchip = {
 	.irq_mask	= pl061_irq_mask,
 	.irq_unmask	= pl061_irq_unmask,
 	.irq_set_type	= pl061_irq_type,
+	.irq_set_wake	= pl061_irq_set_wake,
 };
 
 static int pl061_probe(struct amba_device *adev, const struct amba_id *id)
@@ -310,16 +322,17 @@ static int pl061_probe(struct amba_device *adev, const struct amba_id *id)
 		chip->gc.free = gpiochip_generic_free;
 	}
 
+	chip->gc.get_direction = pl061_get_direction;
 	chip->gc.direction_input = pl061_direction_input;
 	chip->gc.direction_output = pl061_direction_output;
 	chip->gc.get = pl061_get_value;
 	chip->gc.set = pl061_set_value;
 	chip->gc.ngpio = PL061_GPIO_NR;
 	chip->gc.label = dev_name(dev);
-	chip->gc.dev = dev;
+	chip->gc.parent = dev;
 	chip->gc.owner = THIS_MODULE;
 
-	ret = gpiochip_add(&chip->gc);
+	ret = gpiochip_add_data(&chip->gc, chip);
 	if (ret)
 		return ret;
 
@@ -420,8 +433,6 @@ static struct amba_id pl061_ids[] = {
 	{ 0, 0 },
 };
 
-MODULE_DEVICE_TABLE(amba, pl061_ids);
-
 static struct amba_driver pl061_gpio_driver = {
 	.drv = {
 		.name	= "pl061_gpio",
@@ -437,8 +448,4 @@ static int __init pl061_gpio_init(void)
 {
 	return amba_driver_register(&pl061_gpio_driver);
 }
-module_init(pl061_gpio_init);
-
-MODULE_AUTHOR("Baruch Siach <baruch@tkos.co.il>");
-MODULE_DESCRIPTION("PL061 GPIO driver");
-MODULE_LICENSE("GPL");
+device_initcall(pl061_gpio_init);

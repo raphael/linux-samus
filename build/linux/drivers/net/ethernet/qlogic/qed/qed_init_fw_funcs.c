@@ -513,17 +513,14 @@ static int qed_pf_rl_rt_init(struct qed_hwfn *p_hwfn,
  * Return -1 on error.
  */
 static int qed_vp_wfq_rt_init(struct qed_hwfn *p_hwfn,
-			      u8 start_vport,
 			      u8 num_vports,
 			      struct init_qm_vport_params *vport_params)
 {
-	u8 tc, i, vport_id;
 	u32 inc_val;
+	u8 tc, i;
 
 	/* go over all PF VPORTs */
-	for (i = 0, vport_id = start_vport; i < num_vports; i++, vport_id++) {
-		u32 temp = QM_REG_WFQVPUPPERBOUND_RT_OFFSET;
-		u16 *pq_ids = &vport_params[i].first_tx_pq_id[0];
+	for (i = 0; i < num_vports; i++) {
 
 		if (!vport_params[i].vport_wfq)
 			continue;
@@ -539,20 +536,16 @@ static int qed_vp_wfq_rt_init(struct qed_hwfn *p_hwfn,
 		 * different TCs
 		 */
 		for (tc = 0; tc < NUM_OF_TCS; tc++) {
-			u16 vport_pq_id = pq_ids[tc];
+			u16 vport_pq_id = vport_params[i].first_tx_pq_id[tc];
 
 			if (vport_pq_id != QM_INVALID_PQ_ID) {
 				STORE_RT_REG(p_hwfn,
-					     QM_REG_WFQVPWEIGHT_RT_OFFSET +
-					     vport_pq_id, inc_val);
-				STORE_RT_REG(p_hwfn, temp + vport_pq_id,
-					     QM_WFQ_UPPER_BOUND |
-					     QM_WFQ_CRD_REG_SIGN_BIT);
-				STORE_RT_REG(p_hwfn,
 					     QM_REG_WFQVPCRD_RT_OFFSET +
 					     vport_pq_id,
-					     QM_WFQ_INIT_CRD(inc_val) |
 					     QM_WFQ_CRD_REG_SIGN_BIT);
+				STORE_RT_REG(p_hwfn,
+					     QM_REG_WFQVPWEIGHT_RT_OFFSET +
+					     vport_pq_id, inc_val);
 			}
 		}
 	}
@@ -709,14 +702,28 @@ int qed_qm_pf_rt_init(struct qed_hwfn *p_hwfn,
 	if (qed_pf_rl_rt_init(p_hwfn, p_params->pf_id, p_params->pf_rl))
 		return -1;
 
-	if (qed_vp_wfq_rt_init(p_hwfn, p_params->start_vport,
-			       p_params->num_vports, vport_params))
+	if (qed_vp_wfq_rt_init(p_hwfn, p_params->num_vports, vport_params))
 		return -1;
 
 	if (qed_vport_rl_rt_init(p_hwfn, p_params->start_vport,
 				 p_params->num_vports, vport_params))
 		return -1;
 
+	return 0;
+}
+
+int qed_init_pf_wfq(struct qed_hwfn *p_hwfn,
+		    struct qed_ptt *p_ptt,
+		    u8 pf_id, u16 pf_wfq)
+{
+	u32 inc_val = QM_WFQ_INC_VAL(pf_wfq);
+
+	if (!inc_val || inc_val > QM_WFQ_MAX_INC_VAL) {
+		DP_NOTICE(p_hwfn, "Invalid PF WFQ weight configuration");
+		return -1;
+	}
+
+	qed_wr(p_hwfn, p_ptt, QM_REG_WFQPFWEIGHT + pf_id * 4, inc_val);
 	return 0;
 }
 
@@ -736,6 +743,31 @@ int qed_init_pf_rl(struct qed_hwfn *p_hwfn,
 	       QM_REG_RLPFCRD + pf_id * 4,
 	       QM_RL_CRD_REG_SIGN_BIT);
 	qed_wr(p_hwfn, p_ptt, QM_REG_RLPFINCVAL + pf_id * 4, inc_val);
+
+	return 0;
+}
+
+int qed_init_vport_wfq(struct qed_hwfn *p_hwfn,
+		       struct qed_ptt *p_ptt,
+		       u16 first_tx_pq_id[NUM_OF_TCS],
+		       u16 vport_wfq)
+{
+	u32 inc_val = QM_WFQ_INC_VAL(vport_wfq);
+	u8 tc;
+
+	if (!inc_val || inc_val > QM_WFQ_MAX_INC_VAL) {
+		DP_NOTICE(p_hwfn, "Invalid VPORT WFQ weight configuration");
+		return -1;
+	}
+
+	for (tc = 0; tc < NUM_OF_TCS; tc++) {
+		u16 vport_pq_id = first_tx_pq_id[tc];
+
+		if (vport_pq_id != QM_INVALID_PQ_ID)
+			qed_wr(p_hwfn, p_ptt,
+			       QM_REG_WFQVPWEIGHT + vport_pq_id * 4,
+			       inc_val);
+	}
 
 	return 0;
 }
@@ -795,4 +827,131 @@ bool qed_send_qm_stop_cmd(struct qed_hwfn *p_hwfn,
 	}
 
 	return true;
+}
+
+static void
+qed_set_tunnel_type_enable_bit(unsigned long *var, int bit, bool enable)
+{
+	if (enable)
+		set_bit(bit, var);
+	else
+		clear_bit(bit, var);
+}
+
+#define PRS_ETH_TUNN_FIC_FORMAT	-188897008
+
+void qed_set_vxlan_dest_port(struct qed_hwfn *p_hwfn,
+			     struct qed_ptt *p_ptt,
+			     u16 dest_port)
+{
+	qed_wr(p_hwfn, p_ptt, PRS_REG_VXLAN_PORT, dest_port);
+	qed_wr(p_hwfn, p_ptt, NIG_REG_VXLAN_PORT, dest_port);
+	qed_wr(p_hwfn, p_ptt, PBF_REG_VXLAN_PORT, dest_port);
+}
+
+void qed_set_vxlan_enable(struct qed_hwfn *p_hwfn,
+			  struct qed_ptt *p_ptt,
+			  bool vxlan_enable)
+{
+	unsigned long reg_val = 0;
+	u8 shift;
+
+	reg_val = qed_rd(p_hwfn, p_ptt, PRS_REG_ENCAPSULATION_TYPE_EN);
+	shift = PRS_REG_ENCAPSULATION_TYPE_EN_VXLAN_ENABLE_SHIFT;
+	qed_set_tunnel_type_enable_bit(&reg_val, shift, vxlan_enable);
+
+	qed_wr(p_hwfn, p_ptt, PRS_REG_ENCAPSULATION_TYPE_EN, reg_val);
+
+	if (reg_val)
+		qed_wr(p_hwfn, p_ptt, PRS_REG_OUTPUT_FORMAT_4_0,
+		       PRS_ETH_TUNN_FIC_FORMAT);
+
+	reg_val = qed_rd(p_hwfn, p_ptt, NIG_REG_ENC_TYPE_ENABLE);
+	shift = NIG_REG_ENC_TYPE_ENABLE_VXLAN_ENABLE_SHIFT;
+	qed_set_tunnel_type_enable_bit(&reg_val, shift, vxlan_enable);
+
+	qed_wr(p_hwfn, p_ptt, NIG_REG_ENC_TYPE_ENABLE, reg_val);
+
+	qed_wr(p_hwfn, p_ptt, DORQ_REG_L2_EDPM_TUNNEL_VXLAN_EN,
+	       vxlan_enable ? 1 : 0);
+}
+
+void qed_set_gre_enable(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt,
+			bool eth_gre_enable, bool ip_gre_enable)
+{
+	unsigned long reg_val = 0;
+	u8 shift;
+
+	reg_val = qed_rd(p_hwfn, p_ptt, PRS_REG_ENCAPSULATION_TYPE_EN);
+	shift = PRS_REG_ENCAPSULATION_TYPE_EN_ETH_OVER_GRE_ENABLE_SHIFT;
+	qed_set_tunnel_type_enable_bit(&reg_val, shift, eth_gre_enable);
+
+	shift = PRS_REG_ENCAPSULATION_TYPE_EN_IP_OVER_GRE_ENABLE_SHIFT;
+	qed_set_tunnel_type_enable_bit(&reg_val, shift, ip_gre_enable);
+	qed_wr(p_hwfn, p_ptt, PRS_REG_ENCAPSULATION_TYPE_EN, reg_val);
+	if (reg_val)
+		qed_wr(p_hwfn, p_ptt, PRS_REG_OUTPUT_FORMAT_4_0,
+		       PRS_ETH_TUNN_FIC_FORMAT);
+
+	reg_val = qed_rd(p_hwfn, p_ptt, NIG_REG_ENC_TYPE_ENABLE);
+	shift = NIG_REG_ENC_TYPE_ENABLE_ETH_OVER_GRE_ENABLE_SHIFT;
+	qed_set_tunnel_type_enable_bit(&reg_val, shift, eth_gre_enable);
+
+	shift = NIG_REG_ENC_TYPE_ENABLE_IP_OVER_GRE_ENABLE_SHIFT;
+	qed_set_tunnel_type_enable_bit(&reg_val, shift, ip_gre_enable);
+	qed_wr(p_hwfn, p_ptt, NIG_REG_ENC_TYPE_ENABLE, reg_val);
+
+	qed_wr(p_hwfn, p_ptt, DORQ_REG_L2_EDPM_TUNNEL_GRE_ETH_EN,
+	       eth_gre_enable ? 1 : 0);
+	qed_wr(p_hwfn, p_ptt, DORQ_REG_L2_EDPM_TUNNEL_GRE_IP_EN,
+	       ip_gre_enable ? 1 : 0);
+}
+
+void qed_set_geneve_dest_port(struct qed_hwfn *p_hwfn,
+			      struct qed_ptt *p_ptt,
+			      u16 dest_port)
+{
+	qed_wr(p_hwfn, p_ptt, PRS_REG_NGE_PORT, dest_port);
+	qed_wr(p_hwfn, p_ptt, NIG_REG_NGE_PORT, dest_port);
+	qed_wr(p_hwfn, p_ptt, PBF_REG_NGE_PORT, dest_port);
+}
+
+void qed_set_geneve_enable(struct qed_hwfn *p_hwfn,
+			   struct qed_ptt *p_ptt,
+			   bool eth_geneve_enable,
+			   bool ip_geneve_enable)
+{
+	unsigned long reg_val = 0;
+	u8 shift;
+
+	reg_val = qed_rd(p_hwfn, p_ptt, PRS_REG_ENCAPSULATION_TYPE_EN);
+	shift = PRS_REG_ENCAPSULATION_TYPE_EN_ETH_OVER_GENEVE_ENABLE_SHIFT;
+	qed_set_tunnel_type_enable_bit(&reg_val, shift, eth_geneve_enable);
+
+	shift = PRS_REG_ENCAPSULATION_TYPE_EN_IP_OVER_GENEVE_ENABLE_SHIFT;
+	qed_set_tunnel_type_enable_bit(&reg_val, shift, ip_geneve_enable);
+
+	qed_wr(p_hwfn, p_ptt, PRS_REG_ENCAPSULATION_TYPE_EN, reg_val);
+	if (reg_val)
+		qed_wr(p_hwfn, p_ptt, PRS_REG_OUTPUT_FORMAT_4_0,
+		       PRS_ETH_TUNN_FIC_FORMAT);
+
+	qed_wr(p_hwfn, p_ptt, NIG_REG_NGE_ETH_ENABLE,
+	       eth_geneve_enable ? 1 : 0);
+	qed_wr(p_hwfn, p_ptt, NIG_REG_NGE_IP_ENABLE, ip_geneve_enable ? 1 : 0);
+
+	/* comp ver */
+	reg_val = (ip_geneve_enable || eth_geneve_enable) ? 1 : 0;
+	qed_wr(p_hwfn, p_ptt, NIG_REG_NGE_COMP_VER, reg_val);
+	qed_wr(p_hwfn, p_ptt, PBF_REG_NGE_COMP_VER, reg_val);
+	qed_wr(p_hwfn, p_ptt, PRS_REG_NGE_COMP_VER, reg_val);
+
+	/* EDPM with geneve tunnel not supported in BB_B0 */
+	if (QED_IS_BB_B0(p_hwfn->cdev))
+		return;
+
+	qed_wr(p_hwfn, p_ptt, DORQ_REG_L2_EDPM_TUNNEL_NGE_ETH_EN,
+	       eth_geneve_enable ? 1 : 0);
+	qed_wr(p_hwfn, p_ptt, DORQ_REG_L2_EDPM_TUNNEL_NGE_IP_EN,
+	       ip_geneve_enable ? 1 : 0);
 }

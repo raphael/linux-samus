@@ -91,11 +91,18 @@ struct igb_adapter;
 #define NVM_COMB_VER_OFF	0x0083
 #define NVM_COMB_VER_PTR	0x003d
 
+/* Transmit and receive latency (for PTP timestamps) */
+#define IGB_I210_TX_LATENCY_10		9542
+#define IGB_I210_TX_LATENCY_100		1024
+#define IGB_I210_TX_LATENCY_1000	178
+#define IGB_I210_RX_LATENCY_10		20662
+#define IGB_I210_RX_LATENCY_100		2213
+#define IGB_I210_RX_LATENCY_1000	448
+
 struct vf_data_storage {
 	unsigned char vf_mac_addresses[ETH_ALEN];
 	u16 vf_mc_hashes[IGB_MAX_VF_MC_ENTRIES];
 	u16 num_vf_mc_hashes;
-	u16 vlans_enabled;
 	u32 flags;
 	unsigned long last_nack;
 	u16 pf_vlan; /* When set, guest VLAN config not allowed. */
@@ -170,7 +177,7 @@ enum igb_tx_flags {
  * maintain a power of two alignment we have to limit ourselves to 32K.
  */
 #define IGB_MAX_TXD_PWR	15
-#define IGB_MAX_DATA_PER_TXD	(1 << IGB_MAX_TXD_PWR)
+#define IGB_MAX_DATA_PER_TXD	(1u << IGB_MAX_TXD_PWR)
 
 /* Tx Descriptors needed, worst case */
 #define TXD_USE_COUNT(S) DIV_ROUND_UP((S), IGB_MAX_DATA_PER_TXD)
@@ -389,6 +396,8 @@ struct igb_adapter {
 	u16 link_speed;
 	u16 link_duplex;
 
+	u8 __iomem *io_addr; /* Mainly for iounmap use */
+
 	struct work_struct reset_task;
 	struct work_struct watchdog_task;
 	bool fc_autoneg;
@@ -465,21 +474,22 @@ struct igb_adapter {
 	u16 eee_advert;
 };
 
-#define IGB_FLAG_HAS_MSI		(1 << 0)
-#define IGB_FLAG_DCA_ENABLED		(1 << 1)
-#define IGB_FLAG_QUAD_PORT_A		(1 << 2)
-#define IGB_FLAG_QUEUE_PAIRS		(1 << 3)
-#define IGB_FLAG_DMAC			(1 << 4)
-#define IGB_FLAG_PTP			(1 << 5)
-#define IGB_FLAG_RSS_FIELD_IPV4_UDP	(1 << 6)
-#define IGB_FLAG_RSS_FIELD_IPV6_UDP	(1 << 7)
-#define IGB_FLAG_WOL_SUPPORTED		(1 << 8)
-#define IGB_FLAG_NEED_LINK_UPDATE	(1 << 9)
-#define IGB_FLAG_MEDIA_RESET		(1 << 10)
-#define IGB_FLAG_MAS_CAPABLE		(1 << 11)
-#define IGB_FLAG_MAS_ENABLE		(1 << 12)
-#define IGB_FLAG_HAS_MSIX		(1 << 13)
-#define IGB_FLAG_EEE			(1 << 14)
+#define IGB_FLAG_HAS_MSI		BIT(0)
+#define IGB_FLAG_DCA_ENABLED		BIT(1)
+#define IGB_FLAG_QUAD_PORT_A		BIT(2)
+#define IGB_FLAG_QUEUE_PAIRS		BIT(3)
+#define IGB_FLAG_DMAC			BIT(4)
+#define IGB_FLAG_PTP			BIT(5)
+#define IGB_FLAG_RSS_FIELD_IPV4_UDP	BIT(6)
+#define IGB_FLAG_RSS_FIELD_IPV6_UDP	BIT(7)
+#define IGB_FLAG_WOL_SUPPORTED		BIT(8)
+#define IGB_FLAG_NEED_LINK_UPDATE	BIT(9)
+#define IGB_FLAG_MEDIA_RESET		BIT(10)
+#define IGB_FLAG_MAS_CAPABLE		BIT(11)
+#define IGB_FLAG_MAS_ENABLE		BIT(12)
+#define IGB_FLAG_HAS_MSIX		BIT(13)
+#define IGB_FLAG_EEE			BIT(14)
+#define IGB_FLAG_VLAN_PROMISC		BIT(15)
 
 /* Media Auto Sense */
 #define IGB_MAS_ENABLE_0		0X0001
@@ -508,6 +518,8 @@ enum igb_boards {
 extern char igb_driver_name[];
 extern char igb_driver_version[];
 
+int igb_open(struct net_device *netdev);
+int igb_close(struct net_device *netdev);
 int igb_up(struct igb_adapter *);
 void igb_down(struct igb_adapter *);
 void igb_reinit_locked(struct igb_adapter *);

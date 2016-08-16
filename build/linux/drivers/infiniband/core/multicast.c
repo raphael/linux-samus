@@ -93,6 +93,18 @@ enum {
 
 struct mcast_member;
 
+/*
+* There are 4 types of join states:
+* FullMember, NonMember, SendOnlyNonMember, SendOnlyFullMember.
+*/
+enum {
+	FULLMEMBER_JOIN,
+	NONMEMBER_JOIN,
+	SENDONLY_NONMEBER_JOIN,
+	SENDONLY_FULLMEMBER_JOIN,
+	NUM_JOIN_MEMBERSHIP_TYPES,
+};
+
 struct mcast_group {
 	struct ib_sa_mcmember_rec rec;
 	struct rb_node		node;
@@ -102,7 +114,7 @@ struct mcast_group {
 	struct list_head	pending_list;
 	struct list_head	active_list;
 	struct mcast_member	*last_join;
-	int			members[3];
+	int			members[NUM_JOIN_MEMBERSHIP_TYPES];
 	atomic_t		refcount;
 	enum mcast_group_state	state;
 	struct ib_sa_query	*query;
@@ -220,8 +232,9 @@ static void queue_join(struct mcast_member *member)
 }
 
 /*
- * A multicast group has three types of members: full member, non member, and
- * send only member.  We need to keep track of the number of members of each
+ * A multicast group has four types of members: full member, non member,
+ * sendonly non member and sendonly full member.
+ * We need to keep track of the number of members of each
  * type based on their join state.  Adjust the number of members the belong to
  * the specified join states.
  */
@@ -229,7 +242,7 @@ static void adjust_membership(struct mcast_group *group, u8 join_state, int inc)
 {
 	int i;
 
-	for (i = 0; i < 3; i++, join_state >>= 1)
+	for (i = 0; i < NUM_JOIN_MEMBERSHIP_TYPES; i++, join_state >>= 1)
 		if (join_state & 0x1)
 			group->members[i] += inc;
 }
@@ -245,7 +258,7 @@ static u8 get_leave_state(struct mcast_group *group)
 	u8 leave_state = 0;
 	int i;
 
-	for (i = 0; i < 3; i++)
+	for (i = 0; i < NUM_JOIN_MEMBERSHIP_TYPES; i++)
 		if (!group->members[i])
 			leave_state |= (0x1 << i);
 
@@ -723,14 +736,27 @@ EXPORT_SYMBOL(ib_sa_get_mcmember_rec);
 
 int ib_init_ah_from_mcmember(struct ib_device *device, u8 port_num,
 			     struct ib_sa_mcmember_rec *rec,
+			     struct net_device *ndev,
+			     enum ib_gid_type gid_type,
 			     struct ib_ah_attr *ah_attr)
 {
 	int ret;
 	u16 gid_index;
 	u8 p;
 
-	ret = ib_find_cached_gid(device, &rec->port_gid,
-				 NULL, &p, &gid_index);
+	if (rdma_protocol_roce(device, port_num)) {
+		ret = ib_find_cached_gid_by_port(device, &rec->port_gid,
+						 gid_type, port_num,
+						 ndev,
+						 &gid_index);
+	} else if (rdma_protocol_ib(device, port_num)) {
+		ret = ib_find_cached_gid(device, &rec->port_gid,
+					 IB_GID_TYPE_IB, NULL, &p,
+					 &gid_index);
+	} else {
+		ret = -EINVAL;
+	}
+
 	if (ret)
 		return ret;
 

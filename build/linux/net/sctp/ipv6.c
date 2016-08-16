@@ -162,7 +162,7 @@ static void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	skb->network_header   = saveip;
 	skb->transport_header = savesctp;
 	if (!sk) {
-		ICMP6_INC_STATS_BH(net, idev, ICMP6_MIB_INERRORS);
+		__ICMP6_INC_STATS(net, idev, ICMP6_MIB_INERRORS);
 		goto out;
 	}
 
@@ -526,6 +526,8 @@ static int sctp_v6_cmp_addr(const union sctp_addr *addr1,
 		}
 		return 0;
 	}
+	if (addr1->v6.sin6_port != addr2->v6.sin6_port)
+		return 0;
 	if (!ipv6_addr_equal(&addr1->v6.sin6_addr, &addr2->v6.sin6_addr))
 		return 0;
 	/* If this is a linklocal address, compare the scope_id. */

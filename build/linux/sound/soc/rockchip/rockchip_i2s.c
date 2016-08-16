@@ -41,6 +41,7 @@ struct rk_i2s_dev {
 */
 	bool tx_start;
 	bool rx_start;
+	bool is_master_mode;
 };
 
 static int i2s_runtime_suspend(struct device *dev)
@@ -174,9 +175,11 @@ static int rockchip_i2s_set_fmt(struct snd_soc_dai *cpu_dai,
 	case SND_SOC_DAIFMT_CBS_CFS:
 		/* Set source clock in Master mode */
 		val = I2S_CKR_MSS_MASTER;
+		i2s->is_master_mode = true;
 		break;
 	case SND_SOC_DAIFMT_CBM_CFM:
 		val = I2S_CKR_MSS_SLAVE;
+		i2s->is_master_mode = false;
 		break;
 	default:
 		return -EINVAL;
@@ -228,6 +231,26 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
 	struct rk_i2s_dev *i2s = to_info(dai);
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	unsigned int val = 0;
+	unsigned int mclk_rate, bclk_rate, div_bclk, div_lrck;
+
+	if (i2s->is_master_mode) {
+		mclk_rate = clk_get_rate(i2s->mclk);
+		bclk_rate = 2 * 32 * params_rate(params);
+		if (bclk_rate && mclk_rate % bclk_rate)
+			return -EINVAL;
+
+		div_bclk = mclk_rate / bclk_rate;
+		div_lrck = bclk_rate / params_rate(params);
+		regmap_update_bits(i2s->regmap, I2S_CKR,
+				   I2S_CKR_MDIV_MASK,
+				   I2S_CKR_MDIV(div_bclk));
+
+		regmap_update_bits(i2s->regmap, I2S_CKR,
+				   I2S_CKR_TSD_MASK |
+				   I2S_CKR_RSD_MASK,
+				   I2S_CKR_TSD(div_lrck) |
+				   I2S_CKR_RSD(div_lrck));
+	}
 
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S8:
@@ -241,6 +264,9 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
 		break;
 	case SNDRV_PCM_FORMAT_S24_LE:
 		val |= I2S_TXCR_VDW(24);
+		break;
+	case SNDRV_PCM_FORMAT_S32_LE:
+		val |= I2S_TXCR_VDW(32);
 		break;
 	default:
 		return -EINVAL;
@@ -360,7 +386,8 @@ static struct snd_soc_dai_driver rockchip_i2s_dai = {
 		.formats = (SNDRV_PCM_FMTBIT_S8 |
 			    SNDRV_PCM_FMTBIT_S16_LE |
 			    SNDRV_PCM_FMTBIT_S20_3LE |
-			    SNDRV_PCM_FMTBIT_S24_LE),
+			    SNDRV_PCM_FMTBIT_S24_LE |
+			    SNDRV_PCM_FMTBIT_S32_LE),
 	},
 	.capture = {
 		.stream_name = "Capture",
@@ -370,7 +397,8 @@ static struct snd_soc_dai_driver rockchip_i2s_dai = {
 		.formats = (SNDRV_PCM_FMTBIT_S8 |
 			    SNDRV_PCM_FMTBIT_S16_LE |
 			    SNDRV_PCM_FMTBIT_S20_3LE |
-			    SNDRV_PCM_FMTBIT_S24_LE),
+			    SNDRV_PCM_FMTBIT_S24_LE |
+			    SNDRV_PCM_FMTBIT_S32_LE),
 	},
 	.ops = &rockchip_i2s_dai_ops,
 	.symmetric_rates = 1,
@@ -435,11 +463,21 @@ static bool rockchip_i2s_precious_reg(struct device *dev, unsigned int reg)
 	}
 }
 
+static const struct reg_default rockchip_i2s_reg_defaults[] = {
+	{0x00, 0x0000000f},
+	{0x04, 0x0000000f},
+	{0x08, 0x00071f1f},
+	{0x10, 0x001f0000},
+	{0x14, 0x01f00000},
+};
+
 static const struct regmap_config rockchip_i2s_regmap_config = {
 	.reg_bits = 32,
 	.reg_stride = 4,
 	.val_bits = 32,
 	.max_register = I2S_RXDR,
+	.reg_defaults = rockchip_i2s_reg_defaults,
+	.num_reg_defaults = ARRAY_SIZE(rockchip_i2s_reg_defaults),
 	.writeable_reg = rockchip_i2s_wr_reg,
 	.readable_reg = rockchip_i2s_rd_reg,
 	.volatile_reg = rockchip_i2s_volatile_reg,
@@ -451,6 +489,7 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node;
 	struct rk_i2s_dev *i2s;
+	struct snd_soc_dai_driver *soc_dai;
 	struct resource *res;
 	void __iomem *regs;
 	int ret;
@@ -511,17 +550,26 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
 			goto err_pm_disable;
 	}
 
-	/* refine capture channels */
+	soc_dai = devm_kzalloc(&pdev->dev,
+			       sizeof(*soc_dai), GFP_KERNEL);
+	if (!soc_dai)
+		return -ENOMEM;
+
+	memcpy(soc_dai, &rockchip_i2s_dai, sizeof(*soc_dai));
+	if (!of_property_read_u32(node, "rockchip,playback-channels", &val)) {
+		if (val >= 2 && val <= 8)
+			soc_dai->playback.channels_max = val;
+	}
+
 	if (!of_property_read_u32(node, "rockchip,capture-channels", &val)) {
 		if (val >= 2 && val <= 8)
-			rockchip_i2s_dai.capture.channels_max = val;
-		else
-			rockchip_i2s_dai.capture.channels_max = 2;
+			soc_dai->capture.channels_max = val;
 	}
 
 	ret = devm_snd_soc_register_component(&pdev->dev,
 					      &rockchip_i2s_component,
-					      &rockchip_i2s_dai, 1);
+					      soc_dai, 1);
+
 	if (ret) {
 		dev_err(&pdev->dev, "Could not register DAI\n");
 		goto err_suspend;
@@ -560,6 +608,9 @@ static int rockchip_i2s_remove(struct platform_device *pdev)
 
 static const struct of_device_id rockchip_i2s_match[] = {
 	{ .compatible = "rockchip,rk3066-i2s", },
+	{ .compatible = "rockchip,rk3188-i2s", },
+	{ .compatible = "rockchip,rk3288-i2s", },
+	{ .compatible = "rockchip,rk3399-i2s", },
 	{},
 };
 

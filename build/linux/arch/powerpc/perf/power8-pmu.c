@@ -17,48 +17,16 @@
 #include <asm/firmware.h>
 #include <asm/cputable.h>
 
-
 /*
  * Some power8 event codes.
  */
-#define PM_CYC				0x0001e
-#define PM_GCT_NOSLOT_CYC		0x100f8
-#define PM_CMPLU_STALL			0x4000a
-#define PM_INST_CMPL			0x00002
-#define PM_BRU_FIN			0x10068
-#define PM_BR_MPRED_CMPL		0x400f6
+#define EVENT(_name, _code)	_name = _code,
 
-/* All L1 D cache load references counted at finish, gated by reject */
-#define PM_LD_REF_L1			0x100ee
-/* Load Missed L1 */
-#define PM_LD_MISS_L1			0x3e054
-/* Store Missed L1 */
-#define PM_ST_MISS_L1			0x300f0
-/* L1 cache data prefetches */
-#define PM_L1_PREF			0x0d8b8
-/* Instruction fetches from L1 */
-#define PM_INST_FROM_L1			0x04080
-/* Demand iCache Miss */
-#define PM_L1_ICACHE_MISS		0x200fd
-/* Instruction Demand sectors wriittent into IL1 */
-#define PM_L1_DEMAND_WRITE		0x0408c
-/* Instruction prefetch written into IL1 */
-#define PM_IC_PREF_WRITE		0x0408e
-/* The data cache was reloaded from local core's L3 due to a demand load */
-#define PM_DATA_FROM_L3			0x4c042
-/* Demand LD - L3 Miss (not L2 hit and not L3 hit) */
-#define PM_DATA_FROM_L3MISS		0x300fe
-/* All successful D-side store dispatches for this thread */
-#define PM_L2_ST			0x17080
-/* All successful D-side store dispatches for this thread that were L2 Miss */
-#define PM_L2_ST_MISS			0x17082
-/* Total HW L3 prefetches(Load+store) */
-#define PM_L3_PREF_ALL			0x4e052
-/* Data PTEG reload */
-#define PM_DTLB_MISS			0x300fc
-/* ITLB Reloaded */
-#define PM_ITLB_MISS			0x400fc
+enum {
+#include "power8-events-list.h"
+};
 
+#undef EVENT
 
 /*
  * Raw event encoding for POWER8:
@@ -306,7 +274,8 @@ static int power8_get_constraint(u64 event, unsigned long *maskp, unsigned long 
 		/* Ignore Linux defined bits when checking event below */
 		base_event = event & ~EVENT_LINUX_MASK;
 
-		if (pmc >= 5 && base_event != 0x500fa && base_event != 0x600f4)
+		if (pmc >= 5 && base_event != PM_RUN_INST_CMPL &&
+				base_event != PM_RUN_CYC)
 			return -1;
 
 		mask  |= CNST_PMC_MASK(pmc);
@@ -415,7 +384,7 @@ static int power8_compute_mmcr(u64 event[], int n_ev,
 			pmc_inuse |= 1 << pmc;
 	}
 
-	/* In continous sampling mode, update SDAR on TLB miss */
+	/* In continuous sampling mode, update SDAR on TLB miss */
 	mmcra = MMCRA_SDAR_MODE_TLB;
 	mmcr1 = mmcr2 = 0;
 
@@ -520,17 +489,17 @@ static int power8_compute_mmcr(u64 event[], int n_ev,
 
 /* Table of alternatives, sorted by column 0 */
 static const unsigned int event_alternatives[][MAX_ALT] = {
-	{ 0x10134, 0x301e2 },		/* PM_MRK_ST_CMPL */
-	{ 0x10138, 0x40138 },		/* PM_BR_MRK_2PATH */
-	{ 0x18082, 0x3e05e },		/* PM_L3_CO_MEPF */
-	{ 0x1d14e, 0x401e8 },		/* PM_MRK_DATA_FROM_L2MISS */
-	{ 0x1e054, 0x4000a },		/* PM_CMPLU_STALL */
-	{ 0x20036, 0x40036 },		/* PM_BR_2PATH */
-	{ 0x200f2, 0x300f2 },		/* PM_INST_DISP */
-	{ 0x200f4, 0x600f4 },		/* PM_RUN_CYC */
-	{ 0x2013c, 0x3012e },		/* PM_MRK_FILT_MATCH */
-	{ 0x3e054, 0x400f0 },		/* PM_LD_MISS_L1 */
-	{ 0x400fa, 0x500fa },		/* PM_RUN_INST_CMPL */
+	{ PM_MRK_ST_CMPL,		PM_MRK_ST_CMPL_ALT },
+	{ PM_BR_MRK_2PATH,		PM_BR_MRK_2PATH_ALT },
+	{ PM_L3_CO_MEPF,		PM_L3_CO_MEPF_ALT },
+	{ PM_MRK_DATA_FROM_L2MISS,	PM_MRK_DATA_FROM_L2MISS_ALT },
+	{ PM_CMPLU_STALL_ALT,		PM_CMPLU_STALL },
+	{ PM_BR_2PATH,			PM_BR_2PATH_ALT },
+	{ PM_INST_DISP,			PM_INST_DISP_ALT },
+	{ PM_RUN_CYC_ALT,		PM_RUN_CYC },
+	{ PM_MRK_FILT_MATCH,		PM_MRK_FILT_MATCH_ALT },
+	{ PM_LD_MISS_L1,		PM_LD_MISS_L1_ALT },
+	{ PM_RUN_INST_CMPL_ALT,		PM_RUN_INST_CMPL },
 };
 
 /*
@@ -578,17 +547,17 @@ static int power8_get_alternatives(u64 event, unsigned int flags, u64 alt[])
 		j = num_alt;
 		for (i = 0; i < num_alt; ++i) {
 			switch (alt[i]) {
-			case 0x1e:	/* PM_CYC */
-				alt[j++] = 0x600f4;	/* PM_RUN_CYC */
+			case PM_CYC:
+				alt[j++] = PM_RUN_CYC;
 				break;
-			case 0x600f4:	/* PM_RUN_CYC */
-				alt[j++] = 0x1e;
+			case PM_RUN_CYC:
+				alt[j++] = PM_CYC;
 				break;
-			case 0x2:	/* PM_PPC_CMPL */
-				alt[j++] = 0x500fa;	/* PM_RUN_INST_CMPL */
+			case PM_INST_CMPL:
+				alt[j++] = PM_RUN_INST_CMPL;
 				break;
-			case 0x500fa:	/* PM_RUN_INST_CMPL */
-				alt[j++] = 0x2;	/* PM_PPC_CMPL */
+			case PM_RUN_INST_CMPL:
+				alt[j++] = PM_INST_CMPL;
 				break;
 			}
 		}
@@ -603,6 +572,71 @@ static void power8_disable_pmc(unsigned int pmc, unsigned long mmcr[])
 	if (pmc <= 3)
 		mmcr[1] &= ~(0xffUL << MMCR1_PMCSEL_SHIFT(pmc + 1));
 }
+
+GENERIC_EVENT_ATTR(cpu-cycles,			PM_CYC);
+GENERIC_EVENT_ATTR(stalled-cycles-frontend,	PM_GCT_NOSLOT_CYC);
+GENERIC_EVENT_ATTR(stalled-cycles-backend,	PM_CMPLU_STALL);
+GENERIC_EVENT_ATTR(instructions,		PM_INST_CMPL);
+GENERIC_EVENT_ATTR(branch-instructions,		PM_BRU_FIN);
+GENERIC_EVENT_ATTR(branch-misses,		PM_BR_MPRED_CMPL);
+GENERIC_EVENT_ATTR(cache-references,		PM_LD_REF_L1);
+GENERIC_EVENT_ATTR(cache-misses,		PM_LD_MISS_L1);
+
+CACHE_EVENT_ATTR(L1-dcache-load-misses,		PM_LD_MISS_L1);
+CACHE_EVENT_ATTR(L1-dcache-loads,		PM_LD_REF_L1);
+
+CACHE_EVENT_ATTR(L1-dcache-prefetches,		PM_L1_PREF);
+CACHE_EVENT_ATTR(L1-dcache-store-misses,	PM_ST_MISS_L1);
+CACHE_EVENT_ATTR(L1-icache-load-misses,		PM_L1_ICACHE_MISS);
+CACHE_EVENT_ATTR(L1-icache-loads,		PM_INST_FROM_L1);
+CACHE_EVENT_ATTR(L1-icache-prefetches,		PM_IC_PREF_WRITE);
+
+CACHE_EVENT_ATTR(LLC-load-misses,		PM_DATA_FROM_L3MISS);
+CACHE_EVENT_ATTR(LLC-loads,			PM_DATA_FROM_L3);
+CACHE_EVENT_ATTR(LLC-prefetches,		PM_L3_PREF_ALL);
+CACHE_EVENT_ATTR(LLC-store-misses,		PM_L2_ST_MISS);
+CACHE_EVENT_ATTR(LLC-stores,			PM_L2_ST);
+
+CACHE_EVENT_ATTR(branch-load-misses,		PM_BR_MPRED_CMPL);
+CACHE_EVENT_ATTR(branch-loads,			PM_BRU_FIN);
+CACHE_EVENT_ATTR(dTLB-load-misses,		PM_DTLB_MISS);
+CACHE_EVENT_ATTR(iTLB-load-misses,		PM_ITLB_MISS);
+
+static struct attribute *power8_events_attr[] = {
+	GENERIC_EVENT_PTR(PM_CYC),
+	GENERIC_EVENT_PTR(PM_GCT_NOSLOT_CYC),
+	GENERIC_EVENT_PTR(PM_CMPLU_STALL),
+	GENERIC_EVENT_PTR(PM_INST_CMPL),
+	GENERIC_EVENT_PTR(PM_BRU_FIN),
+	GENERIC_EVENT_PTR(PM_BR_MPRED_CMPL),
+	GENERIC_EVENT_PTR(PM_LD_REF_L1),
+	GENERIC_EVENT_PTR(PM_LD_MISS_L1),
+
+	CACHE_EVENT_PTR(PM_LD_MISS_L1),
+	CACHE_EVENT_PTR(PM_LD_REF_L1),
+	CACHE_EVENT_PTR(PM_L1_PREF),
+	CACHE_EVENT_PTR(PM_ST_MISS_L1),
+	CACHE_EVENT_PTR(PM_L1_ICACHE_MISS),
+	CACHE_EVENT_PTR(PM_INST_FROM_L1),
+	CACHE_EVENT_PTR(PM_IC_PREF_WRITE),
+	CACHE_EVENT_PTR(PM_DATA_FROM_L3MISS),
+	CACHE_EVENT_PTR(PM_DATA_FROM_L3),
+	CACHE_EVENT_PTR(PM_L3_PREF_ALL),
+	CACHE_EVENT_PTR(PM_L2_ST_MISS),
+	CACHE_EVENT_PTR(PM_L2_ST),
+
+	CACHE_EVENT_PTR(PM_BR_MPRED_CMPL),
+	CACHE_EVENT_PTR(PM_BRU_FIN),
+
+	CACHE_EVENT_PTR(PM_DTLB_MISS),
+	CACHE_EVENT_PTR(PM_ITLB_MISS),
+	NULL
+};
+
+static struct attribute_group power8_pmu_events_group = {
+	.name = "events",
+	.attrs = power8_events_attr,
+};
 
 PMU_FORMAT_ATTR(event,		"config:0-49");
 PMU_FORMAT_ATTR(pmcxsel,	"config:0-7");
@@ -640,6 +674,7 @@ struct attribute_group power8_pmu_format_group = {
 
 static const struct attribute_group *power8_pmu_attr_groups[] = {
 	&power8_pmu_format_group,
+	&power8_pmu_events_group,
 	NULL,
 };
 
@@ -816,7 +851,7 @@ static struct power_pmu power8_pmu = {
 	.get_constraint		= power8_get_constraint,
 	.get_alternatives	= power8_get_alternatives,
 	.disable_pmc		= power8_disable_pmc,
-	.flags			= PPMU_HAS_SSLOT | PPMU_HAS_SIER | PPMU_ARCH_207S,
+	.flags			= PPMU_HAS_SIER | PPMU_ARCH_207S,
 	.n_generic		= ARRAY_SIZE(power8_generic_events),
 	.generic_events		= power8_generic_events,
 	.cache_events		= &power8_cache_events,

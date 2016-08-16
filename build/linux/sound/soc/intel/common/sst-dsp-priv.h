@@ -22,6 +22,8 @@
 #include <linux/interrupt.h>
 #include <linux/firmware.h>
 
+#include "../skylake/skl-sst-dsp.h"
+
 struct sst_mem_block;
 struct sst_module;
 struct sst_fw;
@@ -173,6 +175,16 @@ struct sst_module_runtime_context {
 };
 
 /*
+ * Audio DSP Module State
+ */
+enum sst_module_state {
+	SST_MODULE_STATE_UNLOADED = 0,	/* default state */
+	SST_MODULE_STATE_LOADED,
+	SST_MODULE_STATE_INITIALIZED,	/* and inactive */
+	SST_MODULE_STATE_ACTIVE,
+};
+
+/*
  * Audio DSP Generic Module.
  *
  * Each Firmware file can consist of 1..N modules. A module can span multiple
@@ -203,6 +215,9 @@ struct sst_module {
 	struct list_head list;		/* DSP list of modules */
 	struct list_head list_fw;	/* FW list of modules */
 	struct list_head runtime_list;	/* list of runtime module objects*/
+
+	/* state */
+	enum sst_module_state state;
 };
 
 /*
@@ -228,7 +243,7 @@ struct sst_mem_block {
 	u32 size;			/* block size */
 	u32 index;			/* block index 0..N */
 	enum sst_mem_type type;		/* block memory type IRAM/DRAM */
-	struct sst_block_ops *ops;	/* block operations, if any */
+	const struct sst_block_ops *ops;/* block operations, if any */
 
 	/* block status */
 	u32 bytes_used;			/* bytes in use by modules */
@@ -245,6 +260,8 @@ struct sst_mem_block {
  */
 struct sst_dsp {
 
+	/* Shared for all platforms */
+
 	/* runtime */
 	struct sst_dsp_device *sst_dev;
 	spinlock_t spinlock;	/* IPC locking */
@@ -254,10 +271,6 @@ struct sst_dsp {
 	void *thread_context;
 	int irq;
 	u32 id;
-
-	/* list of free and used ADSP memory blocks */
-	struct list_head used_block_list;
-	struct list_head free_block_list;
 
 	/* operations */
 	struct sst_ops *ops;
@@ -270,6 +283,12 @@ struct sst_dsp {
 
 	/* mailbox */
 	struct sst_mailbox mailbox;
+
+	/* HSW/Byt data */
+
+	/* list of free and used ADSP memory blocks */
+	struct list_head used_block_list;
+	struct list_head free_block_list;
 
 	/* SST FW files loaded and their modules */
 	struct list_head module_list;
@@ -287,9 +306,18 @@ struct sst_dsp {
 	struct sst_dma *dma;
 	bool fw_use_dma;
 
-	/* debugfs support */
-	void *debugfs_bar0;	/* DRAM and IRAM */
-	void *debugfs_bar1;	/* configuration space */
+	/* SKL data */
+
+	const char *fw_name;
+
+	/* To allocate CL dma buffers */
+	struct skl_dsp_loader_ops dsp_ops;
+	struct skl_dsp_fw_ops fw_ops;
+	int sst_state;
+	struct skl_cl_dev cl_dev;
+	u32 intr_status;
+	const struct firmware *fw;
+	struct snd_dma_buffer dmab;
 };
 
 /* Size optimised DRAM/IRAM memcpy */
@@ -351,8 +379,8 @@ void sst_block_free_scratch(struct sst_dsp *dsp);
 
 /* Register the DSPs memory blocks - would be nice to read from ACPI */
 struct sst_mem_block *sst_mem_block_register(struct sst_dsp *dsp, u32 offset,
-	u32 size, enum sst_mem_type type, struct sst_block_ops *ops, u32 index,
-	void *private);
+	u32 size, enum sst_mem_type type, const struct sst_block_ops *ops,
+	u32 index, void *private);
 void sst_mem_block_unregister_all(struct sst_dsp *dsp);
 
 /* Create/Free DMA resources */

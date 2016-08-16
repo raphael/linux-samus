@@ -30,7 +30,7 @@
 #include <media/v4l2-subdev.h>
 #include <media/v4l2-event.h>
 #include <media/videobuf2-vmalloc.h>
-#include <media/saa7115.h>
+#include <media/i2c/saa7115.h>
 
 #include "go7007-priv.h"
 
@@ -369,7 +369,6 @@ static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
 }
 
 static int go7007_queue_setup(struct vb2_queue *q,
-		const void *parg,
 		unsigned int *num_buffers, unsigned int *num_planes,
 		unsigned int sizes[], void *alloc_ctxs[])
 {
@@ -1126,7 +1125,7 @@ int go7007_v4l2_init(struct go7007 *go)
 	vdev->queue = &go->vidq;
 	video_set_drvdata(vdev, go);
 	vdev->v4l2_dev = &go->v4l2_dev;
-	if (!v4l2_device_has_op(&go->v4l2_dev, video, querystd))
+	if (!v4l2_device_has_op(&go->v4l2_dev, 0, video, querystd))
 		v4l2_disable_ioctl(vdev, VIDIOC_QUERYSTD);
 	if (!(go->board_info->flags & GO7007_BOARD_HAS_TUNER)) {
 		v4l2_disable_ioctl(vdev, VIDIOC_S_FREQUENCY);

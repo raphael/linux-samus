@@ -53,6 +53,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <term.h>
 #include <errno.h>
 #include <limits.h>
 #include <sys/param.h>
@@ -78,9 +79,12 @@
 #include <termios.h>
 #include <linux/bitops.h>
 #include <termios.h>
+#include "strlist.h"
 
 extern const char *graph_line;
 extern const char *graph_dotted_line;
+extern const char *spaces;
+extern const char *dots;
 extern char buildid_dir[];
 
 /* On most systems <limits.h> would have given us this, but
@@ -130,31 +134,15 @@ extern char buildid_dir[];
 #define PERF_GTK_DSO  "libperf-gtk.so"
 
 /* General helper functions */
-extern void usage(const char *err) NORETURN;
-extern void die(const char *err, ...) NORETURN __attribute__((format (printf, 1, 2)));
-extern int error(const char *err, ...) __attribute__((format (printf, 1, 2)));
-extern void warning(const char *err, ...) __attribute__((format (printf, 1, 2)));
+void usage(const char *err) NORETURN;
+void die(const char *err, ...) NORETURN __attribute__((format (printf, 1, 2)));
+int error(const char *err, ...) __attribute__((format (printf, 1, 2)));
+void warning(const char *err, ...) __attribute__((format (printf, 1, 2)));
 
-#include "../../../include/linux/stringify.h"
+void set_warning_routine(void (*routine)(const char *err, va_list params));
 
-#define DIE_IF(cnd)	\
-	do { if (cnd)	\
-		die(" at (" __FILE__ ":" __stringify(__LINE__) "): "	\
-		    __stringify(cnd) "\n");				\
-	} while (0)
-
-
-extern void set_die_routine(void (*routine)(const char *err, va_list params) NORETURN);
-extern void set_warning_routine(void (*routine)(const char *err, va_list params));
-
-extern int prefixcmp(const char *str, const char *prefix);
-extern void set_buildid_dir(const char *dir);
-
-static inline const char *skip_prefix(const char *str, const char *prefix)
-{
-	size_t len = strlen(prefix);
-	return strncmp(str, prefix, len) ? NULL : str + len;
-}
+int prefixcmp(const char *str, const char *prefix);
+void set_buildid_dir(const char *dir);
 
 #ifdef __GLIBC_PREREQ
 #if __GLIBC_PREREQ(2, 1)
@@ -172,27 +160,12 @@ static inline char *gitstrchrnul(const char *s, int c)
 }
 #endif
 
-/*
- * Wrappers:
- */
-extern char *xstrdup(const char *str);
-extern void *xrealloc(void *ptr, size_t size) __attribute__((weak));
-
-
 static inline void *zalloc(size_t size)
 {
 	return calloc(1, size);
 }
 
 #define zfree(ptr) ({ free(*ptr); *ptr = NULL; })
-
-static inline int has_extension(const char *filename, const char *ext)
-{
-	size_t len = strlen(filename);
-	size_t extlen = strlen(ext);
-
-	return len > extlen && !memcmp(filename + len - extlen, ext, extlen);
-}
 
 /* Sane ctype - no locale, and works with signed chars */
 #undef isascii
@@ -244,6 +217,8 @@ static inline int sane_case(int x, int high)
 
 int mkdir_p(char *path, mode_t mode);
 int rm_rf(char *path);
+struct strlist *lsdir(const char *name, bool (*filter)(const char *, struct dirent *));
+bool lsdir_no_dot_filter(const char *name, struct dirent *d);
 int copyfile(const char *from, const char *to);
 int copyfile_mode(const char *from, const char *to, mode_t mode);
 int copyfile_offset(int fromfd, loff_t from_ofs, int tofd, loff_t to_ofs, u64 size);
@@ -276,14 +251,18 @@ int hex2u64(const char *ptr, u64 *val);
 char *ltrim(char *s);
 char *rtrim(char *s);
 
+static inline char *trim(char *s)
+{
+	return ltrim(rtrim(s));
+}
+
 void dump_stack(void);
 void sighandler_dump_stack(int sig);
 
 extern unsigned int page_size;
 extern int cacheline_size;
-
-void get_term_dimensions(struct winsize *ws);
-void set_term_quiet_input(struct termios *old);
+extern int sysctl_perf_event_max_stack;
+extern int sysctl_perf_event_max_contexts_per_stack;
 
 struct parse_tag {
 	char tag;
@@ -319,7 +298,6 @@ char *__get_srcline(struct dso *dso, u64 addr, struct symbol *sym,
 		  bool show_sym, bool unwind_inlines);
 void free_srcline(char *srcline);
 
-int filename__read_str(const char *filename, char **buf, size_t *sizep);
 int perf_event_paranoid(void);
 
 void mem_bswap_64(void *src, int byte_size);
@@ -358,4 +336,28 @@ int fetch_kernel_version(unsigned int *puint,
 #define KVER_FMT	"%d.%d.%d"
 #define KVER_PARAM(x)	KVER_VERSION(x), KVER_PATCHLEVEL(x), KVER_SUBLEVEL(x)
 
+const char *perf_tip(const char *dirpath);
+bool is_regular_file(const char *file);
+int fetch_current_timestamp(char *buf, size_t sz);
+
+enum binary_printer_ops {
+	BINARY_PRINT_DATA_BEGIN,
+	BINARY_PRINT_LINE_BEGIN,
+	BINARY_PRINT_ADDR,
+	BINARY_PRINT_NUM_DATA,
+	BINARY_PRINT_NUM_PAD,
+	BINARY_PRINT_SEP,
+	BINARY_PRINT_CHAR_DATA,
+	BINARY_PRINT_CHAR_PAD,
+	BINARY_PRINT_LINE_END,
+	BINARY_PRINT_DATA_END,
+};
+
+typedef void (*print_binary_t)(enum binary_printer_ops,
+			       unsigned int val,
+			       void *extra);
+
+void print_binary(unsigned char *data, size_t len,
+		  size_t bytes_per_line, print_binary_t printer,
+		  void *extra);
 #endif /* GIT_COMPAT_UTIL_H */

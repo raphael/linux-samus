@@ -65,6 +65,11 @@ static int call__parse(struct ins_operands *ops)
 
 	name++;
 
+#ifdef __arm__
+	if (strchr(name, '+'))
+		return -1;
+#endif
+
 	tok = strchr(name, '>');
 	if (tok == NULL)
 		return -1;
@@ -246,7 +251,11 @@ static int mov__parse(struct ins_operands *ops)
 		return -1;
 
 	target = ++s;
+#ifdef __arm__
+	comment = strchr(s, ';');
+#else
 	comment = strchr(s, '#');
+#endif
 
 	if (comment != NULL)
 		s = comment - 1;
@@ -345,15 +354,26 @@ static struct ins_ops nop_ops = {
 	.scnprintf = nop__scnprintf,
 };
 
-/*
- * Must be sorted by name!
- */
 static struct ins instructions[] = {
 	{ .name = "add",   .ops  = &mov_ops, },
 	{ .name = "addl",  .ops  = &mov_ops, },
 	{ .name = "addq",  .ops  = &mov_ops, },
 	{ .name = "addw",  .ops  = &mov_ops, },
 	{ .name = "and",   .ops  = &mov_ops, },
+#ifdef __arm__
+	{ .name = "b",     .ops  = &jump_ops, }, // might also be a call
+	{ .name = "bcc",   .ops  = &jump_ops, },
+	{ .name = "bcs",   .ops  = &jump_ops, },
+	{ .name = "beq",   .ops  = &jump_ops, },
+	{ .name = "bge",   .ops  = &jump_ops, },
+	{ .name = "bgt",   .ops  = &jump_ops, },
+	{ .name = "bhi",   .ops  = &jump_ops, },
+	{ .name = "bl",    .ops  = &call_ops, },
+	{ .name = "bls",   .ops  = &jump_ops, },
+	{ .name = "blt",   .ops  = &jump_ops, },
+	{ .name = "blx",   .ops  = &call_ops, },
+	{ .name = "bne",   .ops  = &jump_ops, },
+#endif
 	{ .name = "bts",   .ops  = &mov_ops, },
 	{ .name = "call",  .ops  = &call_ops, },
 	{ .name = "callq", .ops  = &call_ops, },
@@ -426,18 +446,39 @@ static struct ins instructions[] = {
 	{ .name = "xbeginq", .ops  = &jump_ops, },
 };
 
-static int ins__cmp(const void *name, const void *insp)
+static int ins__key_cmp(const void *name, const void *insp)
 {
 	const struct ins *ins = insp;
 
 	return strcmp(name, ins->name);
 }
 
-static struct ins *ins__find(const char *name)
+static int ins__cmp(const void *a, const void *b)
+{
+	const struct ins *ia = a;
+	const struct ins *ib = b;
+
+	return strcmp(ia->name, ib->name);
+}
+
+static void ins__sort(void)
 {
 	const int nmemb = ARRAY_SIZE(instructions);
 
-	return bsearch(name, instructions, nmemb, sizeof(struct ins), ins__cmp);
+	qsort(instructions, nmemb, sizeof(struct ins), ins__cmp);
+}
+
+static struct ins *ins__find(const char *name)
+{
+	const int nmemb = ARRAY_SIZE(instructions);
+	static bool sorted;
+
+	if (!sorted) {
+		ins__sort();
+		sorted = true;
+	}
+
+	return bsearch(name, instructions, nmemb, sizeof(struct ins), ins__key_cmp);
 }
 
 int symbol__annotate_init(struct map *map __maybe_unused, struct symbol *sym)
@@ -1099,7 +1140,7 @@ int symbol__annotate(struct symbol *sym, struct map *map, size_t privsize)
 	} else if (dso__is_kcore(dso)) {
 		goto fallback;
 	} else if (readlink(symfs_filename, command, sizeof(command)) < 0 ||
-		   strstr(command, "[kernel.kallsyms]") ||
+		   strstr(command, DSO__NAME_KALLSYMS) ||
 		   access(symfs_filename, R_OK)) {
 		free(filename);
 fallback:
@@ -1115,7 +1156,7 @@ fallback:
 
 	if (dso->symtab_type == DSO_BINARY_TYPE__KALLSYMS &&
 	    !dso__is_kcore(dso)) {
-		char bf[BUILD_ID_SIZE * 2 + 16] = " with build id ";
+		char bf[SBUILD_ID_SIZE + 15] = " with build id ";
 		char *build_id_msg = NULL;
 
 		if (dso->annotate_warned)
@@ -1642,5 +1683,5 @@ int hist_entry__annotate(struct hist_entry *he, size_t privsize)
 
 bool ui__has_annotation(void)
 {
-	return use_browser == 1 && sort__has_sym;
+	return use_browser == 1 && perf_hpp_list.sym;
 }

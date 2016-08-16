@@ -11,11 +11,6 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
  ******************************************************************************/
 #define _RTL8188E_PHYCFG_C_
 
@@ -178,32 +173,6 @@ static void get_tx_power_index(struct adapter *adapt, u8 channel, u8 *cck_pwr,
 
 			bw20_pwr[TxCount] = hal_data->Index24G_BW40_Base[RF_PATH_A][index]+
 			hal_data->BW20_24G_Diff[TxCount][RF_PATH_A]+
-			hal_data->BW20_24G_Diff[TxCount][index];
-			bw40_pwr[TxCount] = hal_data->Index24G_BW40_Base[TxCount][index];
-		} else if (TxCount == RF_PATH_C) {
-			cck_pwr[TxCount] = hal_data->Index24G_CCK_Base[TxCount][index];
-			ofdm_pwr[TxCount] = hal_data->Index24G_BW40_Base[RF_PATH_A][index]+
-			hal_data->BW20_24G_Diff[RF_PATH_A][index]+
-			hal_data->BW20_24G_Diff[RF_PATH_B][index]+
-			hal_data->BW20_24G_Diff[TxCount][index];
-
-			bw20_pwr[TxCount] = hal_data->Index24G_BW40_Base[RF_PATH_A][index]+
-			hal_data->BW20_24G_Diff[RF_PATH_A][index]+
-			hal_data->BW20_24G_Diff[RF_PATH_B][index]+
-			hal_data->BW20_24G_Diff[TxCount][index];
-			bw40_pwr[TxCount] = hal_data->Index24G_BW40_Base[TxCount][index];
-		} else if (TxCount == RF_PATH_D) {
-			cck_pwr[TxCount] = hal_data->Index24G_CCK_Base[TxCount][index];
-			ofdm_pwr[TxCount] = hal_data->Index24G_BW40_Base[RF_PATH_A][index]+
-			hal_data->BW20_24G_Diff[RF_PATH_A][index]+
-			hal_data->BW20_24G_Diff[RF_PATH_B][index]+
-			hal_data->BW20_24G_Diff[RF_PATH_C][index]+
-			hal_data->BW20_24G_Diff[TxCount][index];
-
-			bw20_pwr[TxCount] = hal_data->Index24G_BW40_Base[RF_PATH_A][index]+
-			hal_data->BW20_24G_Diff[RF_PATH_A][index]+
-			hal_data->BW20_24G_Diff[RF_PATH_B][index]+
-			hal_data->BW20_24G_Diff[RF_PATH_C][index]+
 			hal_data->BW20_24G_Diff[TxCount][index];
 			bw40_pwr[TxCount] = hal_data->Index24G_BW40_Base[TxCount][index];
 		}

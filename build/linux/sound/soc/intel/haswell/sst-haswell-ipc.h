@@ -20,10 +20,12 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
+#include <sound/asound.h>
 
-#define SST_HSW_NO_CHANNELS		2
+#define SST_HSW_NO_CHANNELS		4
 #define SST_HSW_MAX_DX_REGIONS		14
 #define SST_HSW_DX_CONTEXT_SIZE        (640 * 1024)
+#define SST_HSW_CHANNELS_ALL		0xffffffff
 
 #define SST_HSW_FW_LOG_CONFIG_DWORDS	12
 #define SST_HSW_GLOBAL_LOG		15
@@ -35,6 +37,9 @@
 #define SST_HSW_IPC_MAX_PAYLOAD_SIZE	400
 #define SST_HSW_MAX_INFO_SIZE		64
 #define SST_HSW_BUILD_HASH_LENGTH	40
+#define SST_HSW_IPC_MAX_SHORT_PARAMETER_SIZE	500
+#define WAVES_PARAM_COUNT		128
+#define WAVES_PARAM_LINES		160
 
 struct sst_hsw;
 struct sst_hsw_stream;
@@ -185,6 +190,28 @@ enum sst_hsw_performance_action {
 	SST_HSW_PERF_STOP = 1,
 };
 
+struct sst_hsw_transfer_info {
+	uint32_t destination;       /* destination address */
+	uint32_t reverse:1;         /* if 1 data flows from destination */
+	uint32_t size:31;           /* transfer size in bytes.*/
+	uint16_t first_page_offset; /* offset to data in the first page. */
+	uint8_t  packed_pages;   /* page addresses. Each occupies 20 bits */
+} __attribute__((packed));
+
+struct sst_hsw_transfer_list {
+	uint32_t transfers_count;
+	struct sst_hsw_transfer_info transfers;
+} __attribute__((packed));
+
+struct sst_hsw_transfer_parameter {
+	uint32_t parameter_id;
+	uint32_t data_size;
+	union {
+		uint8_t data[1];
+		struct sst_hsw_transfer_list transfer_list;
+	};
+} __attribute__((packed));
+
 /* SST firmware module info */
 struct sst_hsw_module_info {
 	u8 name[SST_HSW_MAX_INFO_SIZE];
@@ -211,6 +238,12 @@ struct sst_hsw_memory_info {
 struct sst_hsw_fx_enable {
 	struct sst_hsw_module_map module_map;
 	struct sst_hsw_memory_info persistent_mem;
+} __attribute__((packed));
+
+struct sst_hsw_ipc_module_config {
+	struct sst_hsw_module_map map;
+	struct sst_hsw_memory_info persistent_mem;
+	struct sst_hsw_memory_info scratch_mem;
 } __attribute__((packed));
 
 struct sst_hsw_get_fx_param {
@@ -375,31 +408,16 @@ int sst_hsw_fw_get_version(struct sst_hsw *hsw,
 u32 create_channel_map(enum sst_hsw_channel_config config);
 
 /* Stream Mixer Controls - */
-int sst_hsw_stream_mute(struct sst_hsw *hsw, struct sst_hsw_stream *stream,
-	u32 stage_id, u32 channel);
-int sst_hsw_stream_unmute(struct sst_hsw *hsw, struct sst_hsw_stream *stream,
-	u32 stage_id, u32 channel);
-
 int sst_hsw_stream_set_volume(struct sst_hsw *hsw,
 	struct sst_hsw_stream *stream, u32 stage_id, u32 channel, u32 volume);
 int sst_hsw_stream_get_volume(struct sst_hsw *hsw,
 	struct sst_hsw_stream *stream, u32 stage_id, u32 channel, u32 *volume);
 
-int sst_hsw_stream_set_volume_curve(struct sst_hsw *hsw,
-	struct sst_hsw_stream *stream, u64 curve_duration,
-	enum sst_hsw_volume_curve curve);
-
 /* Global Mixer Controls - */
-int sst_hsw_mixer_mute(struct sst_hsw *hsw, u32 stage_id, u32 channel);
-int sst_hsw_mixer_unmute(struct sst_hsw *hsw, u32 stage_id, u32 channel);
-
 int sst_hsw_mixer_set_volume(struct sst_hsw *hsw, u32 stage_id, u32 channel,
 	u32 volume);
 int sst_hsw_mixer_get_volume(struct sst_hsw *hsw, u32 stage_id, u32 channel,
 	u32 *volume);
-
-int sst_hsw_mixer_set_volume_curve(struct sst_hsw *hsw,
-	u64 curve_duration, enum sst_hsw_volume_curve curve);
 
 /* Stream API */
 struct sst_hsw_stream *sst_hsw_stream_new(struct sst_hsw *hsw, int id,
@@ -439,18 +457,14 @@ int sst_hsw_stream_set_pmemory_info(struct sst_hsw *hsw,
 	struct sst_hsw_stream *stream, u32 offset, u32 size);
 int sst_hsw_stream_set_smemory_info(struct sst_hsw *hsw,
 	struct sst_hsw_stream *stream, u32 offset, u32 size);
-int sst_hsw_stream_get_hw_id(struct sst_hsw *hsw,
+snd_pcm_uframes_t sst_hsw_stream_get_old_position(struct sst_hsw *hsw,
 	struct sst_hsw_stream *stream);
-int sst_hsw_stream_get_mixer_id(struct sst_hsw *hsw,
+void sst_hsw_stream_set_old_position(struct sst_hsw *hsw,
+	struct sst_hsw_stream *stream, snd_pcm_uframes_t val);
+bool sst_hsw_stream_get_silence_start(struct sst_hsw *hsw,
 	struct sst_hsw_stream *stream);
-u32 sst_hsw_stream_get_read_reg(struct sst_hsw *hsw,
-	struct sst_hsw_stream *stream);
-u32 sst_hsw_stream_get_pointer_reg(struct sst_hsw *hsw,
-	struct sst_hsw_stream *stream);
-u32 sst_hsw_stream_get_peak_reg(struct sst_hsw *hsw,
-	struct sst_hsw_stream *stream, u32 channel);
-u32 sst_hsw_stream_get_vol_reg(struct sst_hsw *hsw,
-	struct sst_hsw_stream *stream, u32 channel);
+void sst_hsw_stream_set_silence_start(struct sst_hsw *hsw,
+	struct sst_hsw_stream *stream, bool val);
 int sst_hsw_mixer_get_info(struct sst_hsw *hsw);
 
 /* Stream ALSA trigger operations */
@@ -465,8 +479,6 @@ int sst_hsw_stream_get_read_pos(struct sst_hsw *hsw,
 	struct sst_hsw_stream *stream, u32 *position);
 int sst_hsw_stream_get_write_pos(struct sst_hsw *hsw,
 	struct sst_hsw_stream *stream, u32 *position);
-int sst_hsw_stream_set_write_position(struct sst_hsw *hsw,
-	struct sst_hsw_stream *stream, u32 stage_id, u32 position);
 u32 sst_hsw_get_dsp_position(struct sst_hsw *hsw,
 	struct sst_hsw_stream *stream);
 u64 sst_hsw_get_dsp_presentation_position(struct sst_hsw *hsw,
@@ -480,15 +492,33 @@ int sst_hsw_device_set_config(struct sst_hsw *hsw,
 /* DX Config */
 int sst_hsw_dx_set_state(struct sst_hsw *hsw,
 	enum sst_hsw_dx_state state, struct sst_hsw_ipc_dx_reply *dx);
-int sst_hsw_dx_get_state(struct sst_hsw *hsw, u32 item,
-	u32 *offset, u32 *size, u32 *source);
 
 /* init */
 int sst_hsw_dsp_init(struct device *dev, struct sst_pdata *pdata);
 void sst_hsw_dsp_free(struct device *dev, struct sst_pdata *pdata);
 struct sst_dsp *sst_hsw_get_dsp(struct sst_hsw *hsw);
-int sst_hsw_dbg_enable(struct sst_hsw *hsw,
-	struct dentry *debugfs_card_root);
+
+/* fw module function */
+void sst_hsw_init_module_state(struct sst_hsw *hsw);
+bool sst_hsw_is_module_loaded(struct sst_hsw *hsw, u32 module_id);
+bool sst_hsw_is_module_active(struct sst_hsw *hsw, u32 module_id);
+void sst_hsw_set_module_enabled_rtd3(struct sst_hsw *hsw, u32 module_id);
+void sst_hsw_set_module_disabled_rtd3(struct sst_hsw *hsw, u32 module_id);
+bool sst_hsw_is_module_enabled_rtd3(struct sst_hsw *hsw, u32 module_id);
+void sst_hsw_reset_param_buf(struct sst_hsw *hsw);
+int sst_hsw_store_param_line(struct sst_hsw *hsw, u8 *buf);
+int sst_hsw_load_param_line(struct sst_hsw *hsw, u8 *buf);
+int sst_hsw_launch_param_buf(struct sst_hsw *hsw);
+
+int sst_hsw_module_load(struct sst_hsw *hsw,
+	u32 module_id, u32 instance_id, char *name);
+int sst_hsw_module_enable(struct sst_hsw *hsw,
+	u32 module_id, u32 instance_id);
+int sst_hsw_module_disable(struct sst_hsw *hsw,
+	u32 module_id, u32 instance_id);
+int sst_hsw_module_set_param(struct sst_hsw *hsw,
+	u32 module_id, u32 instance_id, u32 parameter_id,
+	u32 param_size, char *param);
 
 /* runtime module management */
 struct sst_module_runtime *sst_hsw_runtime_module_create(struct sst_hsw *hsw,

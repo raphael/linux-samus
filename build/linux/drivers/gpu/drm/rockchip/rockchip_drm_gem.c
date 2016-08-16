@@ -198,7 +198,7 @@ int rockchip_gem_dumb_map_offset(struct drm_file *file_priv,
 	struct drm_gem_object *obj;
 	int ret;
 
-	obj = drm_gem_object_lookup(dev, file_priv, handle);
+	obj = drm_gem_object_lookup(file_priv, handle);
 	if (!obj) {
 		DRM_ERROR("failed to lookup gem object.\n");
 		return -EINVAL;
@@ -234,13 +234,8 @@ int rockchip_gem_dumb_create(struct drm_file *file_priv,
 	/*
 	 * align to 64 bytes since Mali requires it.
 	 */
-	min_pitch = ALIGN(min_pitch, 64);
-
-	if (args->pitch < min_pitch)
-		args->pitch = min_pitch;
-
-	if (args->size < args->pitch * args->height)
-		args->size = args->pitch * args->height;
+	args->pitch = ALIGN(min_pitch, 64);
+	args->size = args->pitch * args->height;
 
 	rk_obj = rockchip_gem_create_with_handle(file_priv, dev, args->size,
 						 &args->handle);

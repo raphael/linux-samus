@@ -30,8 +30,7 @@
 
 #include "../common/sst-dsp.h"
 #include "../common/sst-dsp-priv.h"
-#include "sst-haswell-ipc.h"
-#include "../common/sst-debugfs.h"
+#include "../haswell/sst-haswell-ipc.h"
 
 #include <trace/events/hswadsp.h>
 
@@ -101,6 +100,7 @@ static int hsw_parse_module(struct sst_dsp *dsp, struct sst_fw *fw,
 		&& module->type != SST_HSW_MODULE_PCM
 		&& module->type != SST_HSW_MODULE_PCM_REFERENCE
 		&& module->type != SST_HSW_MODULE_PCM_CAPTURE
+		&& module->type != SST_HSW_MODULE_WAVES
 		&& module->type != SST_HSW_MODULE_LPAL)
 		return 0;
 
@@ -140,6 +140,7 @@ static int hsw_parse_module(struct sst_dsp *dsp, struct sst_fw *fw,
 			mod->type = SST_MEM_IRAM;
 			break;
 		case SST_HSW_DRAM:
+		case SST_HSW_REGS:
 			ram = dsp->addr.lpe;
 			mod->offset = block->ram_offset;
 			mod->type = SST_MEM_DRAM;
@@ -170,6 +171,7 @@ static int hsw_parse_module(struct sst_dsp *dsp, struct sst_fw *fw,
 
 		block = (void *)block + sizeof(*block) + block->size;
 	}
+	mod->state = SST_MODULE_STATE_LOADED;
 
 	return 0;
 }
@@ -207,9 +209,6 @@ static int hsw_parse_fw_image(struct sst_fw *sst_fw)
 		}
 		module = (void *)module + sizeof(*module) + module->mod_size;
 	}
-
-	/* allocate scratch mem regions */
-	sst_block_alloc_scratch(dsp);
 
 	return 0;
 }
@@ -251,6 +250,12 @@ static irqreturn_t hsw_irq(int irq, void *context)
 static void hsw_set_dsp_D3(struct sst_dsp *sst)
 {
 	u32 val;
+	u32 reg;
+
+	/* Disable core clock gating (VDRTCTL2.DCLCGE = 0) */
+	reg = readl(sst->addr.pci_cfg + SST_VDRTCTL2);
+	reg &= ~(SST_VDRTCL2_DCLCGE | SST_VDRTCL2_DTCGE);
+	writel(reg, sst->addr.pci_cfg + SST_VDRTCTL2);
 
 	/* enable power gating and switch off DRAM & IRAM blocks */
 	val = readl(sst->addr.pci_cfg + SST_VDRTCTL0);
@@ -264,10 +269,23 @@ static void hsw_set_dsp_D3(struct sst_dsp *sst)
 	val |= SST_VDRTCL2_APLLSE_MASK;
 	writel(val, sst->addr.pci_cfg + SST_VDRTCTL2);
 
-	/* Set D3 state */
+	/* disable MCLK(clkctl.smos = 0) */
+	sst_dsp_shim_update_bits_unlocked(sst, SST_CLKCTL,
+		SST_CLKCTL_MASK, 0);
+
+	/* Set D3 state, delay 50 us */
 	val = readl(sst->addr.pci_cfg + SST_PMCS);
 	val |= SST_PMCS_PS_MASK;
 	writel(val, sst->addr.pci_cfg + SST_PMCS);
+	udelay(50);
+
+	/* Enable core clock gating (VDRTCTL2.DCLCGE = 1), delay 50 us */
+	reg = readl(sst->addr.pci_cfg + SST_VDRTCTL2);
+	reg |= SST_VDRTCL2_DCLCGE | SST_VDRTCL2_DTCGE;
+	writel(reg, sst->addr.pci_cfg + SST_VDRTCTL2);
+
+	udelay(50);
+
 }
 
 static void hsw_reset(struct sst_dsp *sst)
@@ -288,7 +306,17 @@ static void hsw_reset(struct sst_dsp *sst)
 static int hsw_set_dsp_D0(struct sst_dsp *sst)
 {
 	int tries = 10;
-	u32 reg;
+	u32 reg, fw_dump_bit;
+
+	/* Disable core clock gating (VDRTCTL2.DCLCGE = 0) */
+	reg = readl(sst->addr.pci_cfg + SST_VDRTCTL2);
+	reg &= ~(SST_VDRTCL2_DCLCGE | SST_VDRTCL2_DTCGE);
+	writel(reg, sst->addr.pci_cfg + SST_VDRTCTL2);
+
+	/* Disable D3PG (VDRTCTL0.D3PGD = 1) */
+	reg = readl(sst->addr.pci_cfg + SST_VDRTCTL0);
+	reg |= SST_VDRTCL0_D3PGD;
+	writel(reg, sst->addr.pci_cfg + SST_VDRTCTL0);
 
 	/* Set D0 state */
 	reg = readl(sst->addr.pci_cfg + SST_PMCS);
@@ -307,17 +335,6 @@ static int hsw_set_dsp_D0(struct sst_dsp *sst)
 	return -ENODEV;
 
 finish:
-	hsw_reset(sst);
-
-	/* switch on audio PLL */
-	reg = readl(sst->addr.pci_cfg + SST_VDRTCTL2);
-	reg &= ~SST_VDRTCL2_APLLSE_MASK;
-	writel(reg, sst->addr.pci_cfg + SST_VDRTCTL2);
-
-	/* set default power gating control, enable power gating control for all blocks. that is,
-	can't be accessed, please enable each block before accessing. */
-	writel(0xffffffff, sst->addr.pci_cfg + SST_VDRTCTL0);
-
 	/* select SSP1 19.2MHz base clock, SSP clock 0, turn off Low Power Clock */
 	sst_dsp_shim_update_bits_unlocked(sst, SST_CSR,
 		SST_CSR_S1IOCS | SST_CSR_SBCS1 | SST_CSR_LPCS, 0x0);
@@ -331,6 +348,30 @@ finish:
 	sst_dsp_shim_update_bits_unlocked(sst, SST_CLKCTL,
 		SST_CLKCTL_MASK | SST_CLKCTL_DCPLCG | SST_CLKCTL_SCOE0,
 		SST_CLKCTL_MASK | SST_CLKCTL_DCPLCG | SST_CLKCTL_SCOE0);
+
+	/* Stall and reset core, set CSR */
+	hsw_reset(sst);
+
+	/* Enable core clock gating (VDRTCTL2.DCLCGE = 1), delay 50 us */
+	reg = readl(sst->addr.pci_cfg + SST_VDRTCTL2);
+	reg |= SST_VDRTCL2_DCLCGE | SST_VDRTCL2_DTCGE;
+	writel(reg, sst->addr.pci_cfg + SST_VDRTCTL2);
+
+	udelay(50);
+
+	/* switch on audio PLL */
+	reg = readl(sst->addr.pci_cfg + SST_VDRTCTL2);
+	reg &= ~SST_VDRTCL2_APLLSE_MASK;
+	writel(reg, sst->addr.pci_cfg + SST_VDRTCTL2);
+
+	/* set default power gating control, enable power gating control for all blocks. that is,
+	can't be accessed, please enable each block before accessing. */
+	reg = readl(sst->addr.pci_cfg + SST_VDRTCTL0);
+	reg |= SST_VDRTCL0_DSRAMPGE_MASK | SST_VDRTCL0_ISRAMPGE_MASK;
+	/* for D0, always enable the block(DSRAM[0]) used for FW dump */
+	fw_dump_bit = 1 << SST_VDRTCL0_DSRAMPGE_SHIFT;
+	writel(reg & ~fw_dump_bit, sst->addr.pci_cfg + SST_VDRTCTL0);
+
 
 	/* disable DMA finish function for SSP0 & SSP1 */
 	sst_dsp_shim_update_bits_unlocked(sst, SST_CSR2, SST_CSR2_SDFD_SSP1,
@@ -352,9 +393,6 @@ finish:
 	sst_dsp_shim_write(sst, SST_IPCD, 0x0);
 	sst_dsp_shim_write(sst, 0x80, 0x6);
 	sst_dsp_shim_write(sst, 0xe0, 0x300a);
-
-	/* disable all clock gating */
-	writel(0x0, sst->addr.pci_cfg + SST_VDRTCTL2);
 
 	return 0;
 }
@@ -442,13 +480,6 @@ static int hsw_acpi_resource_map(struct sst_dsp *sst, struct sst_pdata *pdata)
 
 	/* SST Shim */
 	sst->addr.shim = sst->addr.lpe + sst->addr.shim_offset;
-
-	sst_debugfs_init("intel_adsp");
-	sst_debugfs_add_mmio_entry("mem", sst->addr.lpe, pdata->lpe_size,
-				   &sst->debugfs_bar0);
-	sst_debugfs_add_mmio_entry("cfg", sst->addr.pci_cfg, pdata->pcicfg_size,
-				   &sst->debugfs_bar1);
-
 	return 0;
 }
 
@@ -462,6 +493,7 @@ static const struct sst_sram_shift sram_shift[] = {
 	{SST_DEV_ID_LYNX_POINT, 6, 16}, /* lp */
 	{SST_DEV_ID_WILDCAT_POINT, 2, 12}, /* wpt */
 };
+
 static u32 hsw_block_get_bit(struct sst_mem_block *block)
 {
 	u32 bit = 0, shift = 0, index;
@@ -514,12 +546,24 @@ static int hsw_block_enable(struct sst_mem_block *block)
 	dev_dbg(block->dsp->dev, " enabled block %d:%d at offset 0x%x\n",
 		block->type, block->index, block->offset);
 
+	/* Disable core clock gating (VDRTCTL2.DCLCGE = 0) */
+	val = readl(sst->addr.pci_cfg + SST_VDRTCTL2);
+	val &= ~SST_VDRTCL2_DCLCGE;
+	writel(val, sst->addr.pci_cfg + SST_VDRTCTL2);
+
 	val = readl(sst->addr.pci_cfg + SST_VDRTCTL0);
 	bit = hsw_block_get_bit(block);
 	writel(val & ~bit, sst->addr.pci_cfg + SST_VDRTCTL0);
 
 	/* wait 18 DSP clock ticks */
 	udelay(10);
+
+	/* Enable core clock gating (VDRTCTL2.DCLCGE = 1), delay 50 us */
+	val = readl(sst->addr.pci_cfg + SST_VDRTCTL2);
+	val |= SST_VDRTCL2_DCLCGE;
+	writel(val, sst->addr.pci_cfg + SST_VDRTCTL2);
+
+	udelay(50);
 
 	/*add a dummy read before the SRAM block is written, otherwise the writing may miss bytes sometimes.*/
 	sst_mem_block_dummy_read(block);
@@ -538,14 +582,32 @@ static int hsw_block_disable(struct sst_mem_block *block)
 	dev_dbg(block->dsp->dev, " disabled block %d:%d at offset 0x%x\n",
 		block->type, block->index, block->offset);
 
+	/* Disable core clock gating (VDRTCTL2.DCLCGE = 0) */
+	val = readl(sst->addr.pci_cfg + SST_VDRTCTL2);
+	val &= ~SST_VDRTCL2_DCLCGE;
+	writel(val, sst->addr.pci_cfg + SST_VDRTCTL2);
+
+
 	val = readl(sst->addr.pci_cfg + SST_VDRTCTL0);
 	bit = hsw_block_get_bit(block);
-	writel(val | bit, sst->addr.pci_cfg + SST_VDRTCTL0);
+	/* don't disable DSRAM[0], keep it always enable for FW dump*/
+	if (bit != (1 << SST_VDRTCL0_DSRAMPGE_SHIFT))
+		writel(val | bit, sst->addr.pci_cfg + SST_VDRTCTL0);
+
+	/* wait 18 DSP clock ticks */
+	udelay(10);
+
+	/* Enable core clock gating (VDRTCTL2.DCLCGE = 1), delay 50 us */
+	val = readl(sst->addr.pci_cfg + SST_VDRTCTL2);
+	val |= SST_VDRTCL2_DCLCGE;
+	writel(val, sst->addr.pci_cfg + SST_VDRTCTL2);
+
+	udelay(50);
 
 	return 0;
 }
 
-static struct sst_block_ops sst_hsw_ops = {
+static const struct sst_block_ops sst_hsw_ops = {
 	.enable = hsw_block_enable,
 	.disable = hsw_block_disable,
 };
@@ -555,7 +617,7 @@ static int hsw_init(struct sst_dsp *sst, struct sst_pdata *pdata)
 	const struct sst_adsp_memregion *region;
 	struct device *dev;
 	int ret = -ENODEV, i, j, region_count;
-	u32 offset, size;
+	u32 offset, size, fw_dump_bit;
 
 	dev = sst->dma_dev;
 
@@ -612,18 +674,17 @@ static int hsw_init(struct sst_dsp *sst, struct sst_pdata *pdata)
 		}
 	}
 
+	/* always enable the block(DSRAM[0]) used for FW dump */
+	fw_dump_bit = 1 << SST_VDRTCL0_DSRAMPGE_SHIFT;
 	/* set default power gating control, enable power gating control for all blocks. that is,
 	can't be accessed, please enable each block before accessing. */
-	writel(0xffffffff, sst->addr.pci_cfg + SST_VDRTCTL0);
+	writel(0xffffffff & ~fw_dump_bit, sst->addr.pci_cfg + SST_VDRTCTL0);
 
 	return 0;
 }
 
 static void hsw_free(struct sst_dsp *sst)
 {
-	sst_debugfs_remove_mmio_entry(sst->debugfs_bar0);
-	sst_debugfs_remove_mmio_entry(sst->debugfs_bar1);
-	sst_debugfs_exit();
 	sst_mem_block_unregister_all(sst);
 	iounmap(sst->addr.lpe);
 	iounmap(sst->addr.pci_cfg);

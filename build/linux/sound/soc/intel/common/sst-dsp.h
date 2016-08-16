@@ -28,7 +28,6 @@
 
 /* Supported SST DMA Devices */
 #define SST_DMA_TYPE_DW		1
-#define SST_DMA_TYPE_MID	2
 
 /* autosuspend delay 5s*/
 #define SST_RUNTIME_SUSPEND_DELAY	(5 * 1000)
@@ -161,12 +160,14 @@
 /* VDRTCTL0 */
 #define SST_VDRTCL0_D3PGD		(1 << 0)
 #define SST_VDRTCL0_D3SRAMPGD		(1 << 1)
-#define SST_VDRTCL0_DSRAMPGE_SHIFT	16
-#define SST_VDRTCL0_DSRAMPGE_MASK	(0xffff << SST_VDRTCL0_DSRAMPGE_SHIFT)
-#define SST_VDRTCL0_ISRAMPGE_SHIFT	6
+#define SST_VDRTCL0_DSRAMPGE_SHIFT	12
+#define SST_VDRTCL0_DSRAMPGE_MASK	(0xfffff << SST_VDRTCL0_DSRAMPGE_SHIFT)
+#define SST_VDRTCL0_ISRAMPGE_SHIFT	2
 #define SST_VDRTCL0_ISRAMPGE_MASK	(0x3ff << SST_VDRTCL0_ISRAMPGE_SHIFT)
 
 /* VDRTCTL2 */
+#define SST_VDRTCL2_DCLCGE		(1 << 1)
+#define SST_VDRTCL2_DTCGE		(1 << 10)
 #define SST_VDRTCL2_APLLSE_MASK		(1 << 31)
 
 /* PMCS */
@@ -204,6 +205,7 @@ struct sst_pdata {
 	const struct firmware *fw;
 
 	/* DMA */
+	int resindex_dma_base; /* other fields invalid if equals to -1 */
 	u32 dma_base;
 	u32 dma_size;
 	int dma_engine;
@@ -214,10 +216,12 @@ struct sst_pdata {
 	void *dsp;
 };
 
+#ifdef CONFIG_DW_DMAC_CORE
 /* Initialization */
 struct sst_dsp *sst_dsp_new(struct device *dev,
 	struct sst_dsp_device *sst_dev, struct sst_pdata *pdata);
 void sst_dsp_free(struct sst_dsp *sst);
+#endif
 
 /* SHIM Read / Write */
 void sst_dsp_shim_write(struct sst_dsp *sst, u32 offset, u32 value);
@@ -228,6 +232,8 @@ void sst_dsp_shim_write64(struct sst_dsp *sst, u32 offset, u64 value);
 u64 sst_dsp_shim_read64(struct sst_dsp *sst, u32 offset);
 int sst_dsp_shim_update_bits64(struct sst_dsp *sst, u32 offset,
 				u64 mask, u64 value);
+void sst_dsp_shim_update_bits_forced(struct sst_dsp *sst, u32 offset,
+				u32 mask, u32 value);
 
 /* SHIM Read / Write Unlocked for callers already holding sst lock */
 void sst_dsp_shim_write_unlocked(struct sst_dsp *sst, u32 offset, u32 value);
@@ -238,6 +244,8 @@ void sst_dsp_shim_write64_unlocked(struct sst_dsp *sst, u32 offset, u64 value);
 u64 sst_dsp_shim_read64_unlocked(struct sst_dsp *sst, u32 offset);
 int sst_dsp_shim_update_bits64_unlocked(struct sst_dsp *sst, u32 offset,
 					u64 mask, u64 value);
+void sst_dsp_shim_update_bits_forced_unlocked(struct sst_dsp *sst, u32 offset,
+				u32 mask, u32 value);
 
 /* Internal generic low-level SST IO functions - can be overidden */
 void sst_shim32_write(void __iomem *addr, u32 offset, u32 value);
@@ -276,6 +284,8 @@ void sst_dsp_inbox_read(struct sst_dsp *dsp, void *message, size_t bytes);
 void sst_dsp_outbox_write(struct sst_dsp *dsp, void *message, size_t bytes);
 void sst_dsp_outbox_read(struct sst_dsp *dsp, void *message, size_t bytes);
 void sst_dsp_mailbox_dump(struct sst_dsp *dsp, size_t bytes);
+int sst_dsp_register_poll(struct sst_dsp  *dsp, u32 offset, u32 mask,
+		 u32 expected_value, u32 timeout, char *operation);
 
 /* Debug */
 void sst_dsp_dump(struct sst_dsp *sst);

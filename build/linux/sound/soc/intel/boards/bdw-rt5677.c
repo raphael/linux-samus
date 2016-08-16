@@ -17,15 +17,6 @@
 
 #include "../../codecs/rt5677.h"
 
-/* GPIO indexes defined by ACPI */
-enum {
-	RT5677_GPIO_PLUG_DET,
-	RT5677_GPIO_MIC_PRESENT_L,
-	RT5677_GPIO_HOTWORD_DET_L,
-	RT5677_GPIO_DSP_INT,
-	RT5677_GPIO_HP_AMP_SHDN_L,
-};
-
 struct bdw_rt5677_priv {
 	struct gpio_desc *gpio_hp_en;
 	struct snd_soc_codec *codec;
@@ -103,15 +94,13 @@ static struct snd_soc_jack_pin mic_jack_pin = {
 };
 
 static struct snd_soc_jack_gpio headphone_jack_gpio = {
-	.name			= "RT5677_GPIO_PLUG_DET",
-	.idx			= RT5677_GPIO_PLUG_DET,
+	.name			= "plug-det",
 	.report			= SND_JACK_HEADPHONE,
 	.debounce_time		= 200,
 };
 
 static struct snd_soc_jack_gpio mic_jack_gpio = {
-	.name			= "RT5677_GPIO_MIC_PRESENT_L",
-	.idx			= RT5677_GPIO_MIC_PRESENT_L,
+	.name			= "mic-present",
 	.report			= SND_JACK_MICROPHONE,
 	.debounce_time		= 200,
 	.invert			= 1,
@@ -180,7 +169,7 @@ static int bdw_rt5677_init(struct snd_soc_pcm_runtime *rtd)
 	struct bdw_rt5677_priv *bdw_rt5677 =
 			snd_soc_card_get_drvdata(rtd->card);
 	struct snd_soc_codec *codec = rtd->codec;
-	struct snd_soc_dapm_context *dapm = &codec->dapm;
+	struct snd_soc_dapm_context *dapm = snd_soc_codec_get_dapm(codec);
 
 	/* Enable codec ASRC function for Stereo DAC/Stereo1 ADC/DMIC/I2S1.
 	 * The ASRC clock source is clk_i2s1_asrc.
@@ -191,7 +180,7 @@ static int bdw_rt5677_init(struct snd_soc_pcm_runtime *rtd)
 
 	/* Request rt5677 GPIO for headphone amp control */
 	bdw_rt5677->gpio_hp_en = devm_gpiod_get_index(codec->dev,
-		"RT5677_GPIO_HP_AMP_SHDN_L", RT5677_GPIO_HP_AMP_SHDN_L, GPIOD_ASIS);
+			"headphone-enable", 0, 0);
 	if (IS_ERR(bdw_rt5677->gpio_hp_en)) {
 		dev_err(codec->dev, "Can't find HP_AMP_SHDN_L gpio\n");
 		return PTR_ERR(bdw_rt5677->gpio_hp_en);
@@ -199,12 +188,9 @@ static int bdw_rt5677_init(struct snd_soc_pcm_runtime *rtd)
 	gpiod_direction_output(bdw_rt5677->gpio_hp_en, 0);
 
 	/* Create and initialize headphone jack */
-	if (!snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE,
-			&headphone_jack)) {
-		if (snd_soc_jack_add_pins(&headphone_jack, 1,
-				&headphone_jack_pin))
-			dev_err(codec->dev, "Can't add headphone jack pin\n");
-
+	if (!snd_soc_card_jack_new(rtd->card, "Headphone Jack",
+			SND_JACK_HEADPHONE, &headphone_jack,
+			&headphone_jack_pin, 1)) {
 		headphone_jack_gpio.gpiod_dev = codec->dev;
 		if (snd_soc_jack_add_gpios(&headphone_jack, 1,
 				&headphone_jack_gpio))
@@ -214,11 +200,9 @@ static int bdw_rt5677_init(struct snd_soc_pcm_runtime *rtd)
 	}
 
 	/* Create and initialize mic jack */
-	if (!snd_soc_jack_new(codec, "Mic Jack", SND_JACK_MICROPHONE,
-			&mic_jack)) {
-		if (snd_soc_jack_add_pins(&mic_jack, 1, &mic_jack_pin))
-			dev_err(codec->dev, "Can't add mic jack pin\n");
-
+	if (!snd_soc_card_jack_new(rtd->card, "Mic Jack",
+			SND_JACK_MICROPHONE, &mic_jack,
+			&mic_jack_pin, 1)) {
 		mic_jack_gpio.gpiod_dev = codec->dev;
 		if (snd_soc_jack_add_gpios(&mic_jack, 1, &mic_jack_gpio))
 			dev_err(codec->dev, "Can't add mic jack gpio\n");
@@ -236,7 +220,7 @@ static struct snd_soc_dai_link bdw_rt5677_dais[] = {
 	/* Front End DAI links */
 	{
 		.name = "System PCM",
-		.stream_name = "System Playback",
+		.stream_name = "System Playback/Capture",
 		.cpu_dai_name = "System Pin",
 		.platform_name = "haswell-pcm-audio",
 		.dynamic = 1,
@@ -247,39 +231,15 @@ static struct snd_soc_dai_link bdw_rt5677_dais[] = {
 			SND_SOC_DPCM_TRIGGER_POST,
 			SND_SOC_DPCM_TRIGGER_POST
 		},
-		.dpcm_playback = 1,
-	},
-	{
-		.name = "Capture PCM",
-		.stream_name = "Capture",
-		.cpu_dai_name = "Capture Pin",
-		.platform_name = "haswell-pcm-audio",
-		.dynamic = 1,
-		.codec_name = "snd-soc-dummy",
-		.codec_dai_name = "snd-soc-dummy-dai",
-		.trigger = {
-			SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST
-		},
 		.dpcm_capture = 1,
-	},
-
-	/* Non-DPCM links */
-	{
-		.name = "Codec DSP",
-		.stream_name = "Wake on Voice",
-		.cpu_name = "spi-RT5677AA:00",
-		.cpu_dai_name = "spi-RT5677AA:00",
-		.codec_name = "i2c-RT5677CE:00",
-		.codec_dai_name = "rt5677-dspbuffer",
-		.platform_name = "spi-RT5677AA:00",
+		.dpcm_playback = 1,
 	},
 
 	/* Back End DAI links */
 	{
 		/* SSP0 - Codec */
 		.name = "Codec",
-		.be_id = 0,
+		.id = 0,
 		.cpu_dai_name = "snd-soc-dummy-dai",
 		.platform_name = "snd-soc-dummy",
 		.no_pcm = 1,
@@ -303,7 +263,7 @@ static int bdw_rt5677_suspend_pre(struct snd_soc_card *card)
 	struct snd_soc_dapm_context *dapm;
 
 	if (bdw_rt5677->codec) {
-		dapm = &bdw_rt5677->codec->dapm;
+		dapm = snd_soc_codec_get_dapm(bdw_rt5677->codec);
 		snd_soc_dapm_disable_pin(dapm, "MICBIAS1");
 	}
 	return 0;
@@ -315,7 +275,7 @@ static int bdw_rt5677_resume_post(struct snd_soc_card *card)
 	struct snd_soc_dapm_context *dapm;
 
 	if (bdw_rt5677->codec) {
-		dapm = &bdw_rt5677->codec->dapm;
+		dapm = snd_soc_codec_get_dapm(bdw_rt5677->codec);
 		snd_soc_dapm_force_enable_pin(dapm, "MICBIAS1");
 	}
 	return 0;
@@ -351,6 +311,7 @@ static int bdw_rt5677_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Can't allocate bdw_rt5677\n");
 		return -ENOMEM;
 	}
+
 	snd_soc_card_set_drvdata(&bdw_rt5677_card, bdw_rt5677);
 
 	return snd_soc_register_card(&bdw_rt5677_card);

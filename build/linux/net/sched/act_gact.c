@@ -25,6 +25,8 @@
 
 #define GACT_TAB_MASK	15
 
+static int gact_net_id;
+
 #ifdef CONFIG_GACT_PROB
 static int gact_net_rand(struct tcf_gact *gact)
 {
@@ -57,6 +59,7 @@ static int tcf_gact_init(struct net *net, struct nlattr *nla,
 			 struct nlattr *est, struct tc_action *a,
 			 int ovr, int bind)
 {
+	struct tc_action_net *tn = net_generic(net, gact_net_id);
 	struct nlattr *tb[TCA_GACT_MAX + 1];
 	struct tc_gact *parm;
 	struct tcf_gact *gact;
@@ -88,9 +91,9 @@ static int tcf_gact_init(struct net *net, struct nlattr *nla,
 	}
 #endif
 
-	if (!tcf_hash_check(parm->index, a, bind)) {
-		ret = tcf_hash_create(parm->index, est, a, sizeof(*gact),
-				      bind, true);
+	if (!tcf_hash_check(tn, parm->index, a, bind)) {
+		ret = tcf_hash_create(tn, parm->index, est, a,
+				      sizeof(*gact), bind, true);
 		if (ret)
 			return ret;
 		ret = ACT_P_CREATED;
@@ -118,7 +121,7 @@ static int tcf_gact_init(struct net *net, struct nlattr *nla,
 	}
 #endif
 	if (ret == ACT_P_CREATED)
-		tcf_hash_insert(a);
+		tcf_hash_insert(tn, a);
 	return ret;
 }
 
@@ -143,6 +146,20 @@ static int tcf_gact(struct sk_buff *skb, const struct tc_action *a,
 	tcf_lastuse_update(&gact->tcf_tm);
 
 	return action;
+}
+
+static void tcf_gact_stats_update(struct tc_action *a, u64 bytes, u32 packets,
+				  u64 lastuse)
+{
+	struct tcf_gact *gact = a->priv;
+	int action = READ_ONCE(gact->tcf_action);
+	struct tcf_t *tm = &gact->tcf_tm;
+
+	_bstats_cpu_update(this_cpu_ptr(gact->common.cpu_bstats), bytes, packets);
+	if (action == TC_ACT_SHOT)
+		this_cpu_ptr(gact->common.cpu_qstats)->drops += packets;
+
+	tm->lastuse = lastuse;
 }
 
 static int tcf_gact_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
@@ -174,7 +191,7 @@ static int tcf_gact_dump(struct sk_buff *skb, struct tc_action *a, int bind, int
 	t.install = jiffies_to_clock_t(jiffies - gact->tcf_tm.install);
 	t.lastuse = jiffies_to_clock_t(jiffies - gact->tcf_tm.lastuse);
 	t.expires = jiffies_to_clock_t(gact->tcf_tm.expires);
-	if (nla_put(skb, TCA_GACT_TM, sizeof(t), &t))
+	if (nla_put_64bit(skb, TCA_GACT_TM, sizeof(t), &t, TCA_GACT_PAD))
 		goto nla_put_failure;
 	return skb->len;
 
@@ -183,13 +200,53 @@ nla_put_failure:
 	return -1;
 }
 
+static int tcf_gact_walker(struct net *net, struct sk_buff *skb,
+			   struct netlink_callback *cb, int type,
+			   struct tc_action *a)
+{
+	struct tc_action_net *tn = net_generic(net, gact_net_id);
+
+	return tcf_generic_walker(tn, skb, cb, type, a);
+}
+
+static int tcf_gact_search(struct net *net, struct tc_action *a, u32 index)
+{
+	struct tc_action_net *tn = net_generic(net, gact_net_id);
+
+	return tcf_hash_search(tn, a, index);
+}
+
 static struct tc_action_ops act_gact_ops = {
 	.kind		=	"gact",
 	.type		=	TCA_ACT_GACT,
 	.owner		=	THIS_MODULE,
 	.act		=	tcf_gact,
+	.stats_update	=	tcf_gact_stats_update,
 	.dump		=	tcf_gact_dump,
 	.init		=	tcf_gact_init,
+	.walk		=	tcf_gact_walker,
+	.lookup		=	tcf_gact_search,
+};
+
+static __net_init int gact_init_net(struct net *net)
+{
+	struct tc_action_net *tn = net_generic(net, gact_net_id);
+
+	return tc_action_net_init(tn, &act_gact_ops, GACT_TAB_MASK);
+}
+
+static void __net_exit gact_exit_net(struct net *net)
+{
+	struct tc_action_net *tn = net_generic(net, gact_net_id);
+
+	tc_action_net_exit(tn);
+}
+
+static struct pernet_operations gact_net_ops = {
+	.init = gact_init_net,
+	.exit = gact_exit_net,
+	.id   = &gact_net_id,
+	.size = sizeof(struct tc_action_net),
 };
 
 MODULE_AUTHOR("Jamal Hadi Salim(2002-4)");
@@ -203,12 +260,13 @@ static int __init gact_init_module(void)
 #else
 	pr_info("GACT probability NOT on\n");
 #endif
-	return tcf_register_action(&act_gact_ops, GACT_TAB_MASK);
+
+	return tcf_register_action(&act_gact_ops, &gact_net_ops);
 }
 
 static void __exit gact_cleanup_module(void)
 {
-	tcf_unregister_action(&act_gact_ops);
+	tcf_unregister_action(&act_gact_ops, &gact_net_ops);
 }
 
 module_init(gact_init_module);

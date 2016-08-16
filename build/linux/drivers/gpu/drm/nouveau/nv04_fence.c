@@ -22,9 +22,11 @@
  * Authors: Ben Skeggs
  */
 
-#include "nouveau_drm.h"
+#include "nouveau_drv.h"
 #include "nouveau_dma.h"
 #include "nouveau_fence.h"
+
+#include <nvif/if0004.h>
 
 struct nv04_fence_chan {
 	struct nouveau_fence_chan base;

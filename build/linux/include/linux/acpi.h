@@ -37,6 +37,8 @@
 #include <linux/list.h>
 #include <linux/mod_devicetable.h>
 #include <linux/dynamic_debug.h>
+#include <linux/module.h>
+#include <linux/mutex.h>
 
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
@@ -119,11 +121,72 @@ typedef int (*acpi_tbl_table_handler)(struct acpi_table_header *table);
 typedef int (*acpi_tbl_entry_handler)(struct acpi_subtable_header *header,
 				      const unsigned long end);
 
-#ifdef CONFIG_ACPI_INITRD_TABLE_OVERRIDE
-void acpi_initrd_override(void *data, size_t size);
+/* Debugger support */
+
+struct acpi_debugger_ops {
+	int (*create_thread)(acpi_osd_exec_callback function, void *context);
+	ssize_t (*write_log)(const char *msg);
+	ssize_t (*read_cmd)(char *buffer, size_t length);
+	int (*wait_command_ready)(bool single_step, char *buffer, size_t length);
+	int (*notify_command_complete)(void);
+};
+
+struct acpi_debugger {
+	const struct acpi_debugger_ops *ops;
+	struct module *owner;
+	struct mutex lock;
+};
+
+#ifdef CONFIG_ACPI_DEBUGGER
+int __init acpi_debugger_init(void);
+int acpi_register_debugger(struct module *owner,
+			   const struct acpi_debugger_ops *ops);
+void acpi_unregister_debugger(const struct acpi_debugger_ops *ops);
+int acpi_debugger_create_thread(acpi_osd_exec_callback function, void *context);
+ssize_t acpi_debugger_write_log(const char *msg);
+ssize_t acpi_debugger_read_cmd(char *buffer, size_t buffer_length);
+int acpi_debugger_wait_command_ready(void);
+int acpi_debugger_notify_command_complete(void);
 #else
-static inline void acpi_initrd_override(void *data, size_t size)
+static inline int acpi_debugger_init(void)
 {
+	return -ENODEV;
+}
+
+static inline int acpi_register_debugger(struct module *owner,
+					 const struct acpi_debugger_ops *ops)
+{
+	return -ENODEV;
+}
+
+static inline void acpi_unregister_debugger(const struct acpi_debugger_ops *ops)
+{
+}
+
+static inline int acpi_debugger_create_thread(acpi_osd_exec_callback function,
+					      void *context)
+{
+	return -ENODEV;
+}
+
+static inline int acpi_debugger_write_log(const char *msg)
+{
+	return -ENODEV;
+}
+
+static inline int acpi_debugger_read_cmd(char *buffer, u32 buffer_length)
+{
+	return -ENODEV;
+}
+
+static inline int acpi_debugger_wait_command_ready(void)
+{
+	return -ENODEV;
+}
+
+static inline int acpi_debugger_notify_command_complete(void)
+{
+	return -ENODEV;
 }
 #endif
 
@@ -145,6 +208,7 @@ void acpi_boot_table_init (void);
 int acpi_mps_check (void);
 int acpi_numa_init (void);
 
+void early_acpi_table_init(void *data, size_t size);
 int acpi_table_init (void);
 int acpi_table_parse(char *id, acpi_tbl_table_handler handler);
 int __init acpi_parse_entries(char *id, unsigned long table_size,
@@ -207,6 +271,7 @@ void acpi_irq_stats_init(void);
 extern u32 acpi_irq_handled;
 extern u32 acpi_irq_not_handled;
 extern unsigned int acpi_sci_irq;
+extern bool acpi_no_s5;
 #define INVALID_ACPI_IRQ	((unsigned)-1)
 static inline bool acpi_sci_irq_valid(void)
 {
@@ -240,7 +305,6 @@ struct pci_dev;
 int acpi_pci_irq_enable (struct pci_dev *dev);
 void acpi_penalize_isa_irq(int irq, int active);
 bool acpi_isa_irq_available(int irq);
-void acpi_penalize_sci_irq(int irq, int trigger, int polarity);
 void acpi_pci_irq_disable (struct pci_dev *dev);
 
 extern int ec_read(u8 addr, u8 *val);
@@ -288,7 +352,6 @@ extern bool wmi_has_guid(const char *guid);
 extern char acpi_video_backlight_string[];
 extern long acpi_is_video_device(acpi_handle handle);
 extern int acpi_blacklisted(void);
-extern void acpi_dmi_osi_linux(int enable, const struct dmi_system_id *d);
 extern void acpi_osi_setup(char *str);
 extern bool acpi_osi_is_win8(void);
 
@@ -318,6 +381,7 @@ bool acpi_dev_resource_address_space(struct acpi_resource *ares,
 bool acpi_dev_resource_ext_address_space(struct acpi_resource *ares,
 					 struct resource_win *win);
 unsigned long acpi_dev_irq_flags(u8 triggering, u8 polarity, u8 shareable);
+unsigned int acpi_dev_get_irq_type(int triggering, int polarity);
 bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
 				 struct resource *res);
 
@@ -524,6 +588,7 @@ static inline const char *acpi_dev_name(struct acpi_device *adev)
 	return NULL;
 }
 
+static inline void early_acpi_table_init(void *data, size_t size) { }
 static inline void acpi_early_init(void) { }
 static inline void acpi_subsystem_init(void) { }
 

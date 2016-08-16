@@ -176,7 +176,7 @@
 
 #define PORT_S3C6400	84
 
-/* NWPSERIAL */
+/* NWPSERIAL, now removed */
 #define PORT_NWPSERIAL	85
 
 /* MAX3100 */
@@ -260,5 +260,14 @@
 
 /* STM32 USART */
 #define PORT_STM32	113
+
+/* MVEBU UART */
+#define PORT_MVEBU	114
+
+/* Microchip PIC32 UART */
+#define PORT_PIC32	115
+
+/* MPS2 UART */
+#define PORT_MPS2UART	116
 
 #endif /* _UAPILINUX_SERIAL_CORE_H */

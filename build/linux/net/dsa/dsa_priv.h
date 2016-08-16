@@ -22,11 +22,6 @@ struct dsa_device_ops {
 };
 
 struct dsa_slave_priv {
-	/*
-	 * The linux network interface corresponding to this
-	 * switch port.
-	 */
-	struct net_device	*dev;
 	struct sk_buff *	(*xmit)(struct sk_buff *skb,
 					struct net_device *dev);
 
@@ -61,6 +56,7 @@ extern const struct dsa_device_ops notag_netdev_ops;
 void dsa_slave_mii_bus_init(struct dsa_switch *ds);
 int dsa_slave_create(struct dsa_switch *ds, struct device *parent,
 		     int port, char *name);
+void dsa_slave_destroy(struct net_device *slave_dev);
 int dsa_slave_suspend(struct net_device *slave_dev);
 int dsa_slave_resume(struct net_device *slave_dev);
 int dsa_slave_netdevice_event(struct notifier_block *unused,

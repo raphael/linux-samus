@@ -54,6 +54,7 @@ static int nd_region_probe(struct device *dev)
 
 	nd_region->btt_seed = nd_btt_create(nd_region);
 	nd_region->pfn_seed = nd_pfn_create(nd_region);
+	nd_region->dax_seed = nd_dax_create(nd_region);
 	if (err == 0)
 		return 0;
 
@@ -86,6 +87,7 @@ static int nd_region_remove(struct device *dev)
 	nd_region->ns_seed = NULL;
 	nd_region->btt_seed = NULL;
 	nd_region->pfn_seed = NULL;
+	nd_region->dax_seed = NULL;
 	dev_set_drvdata(dev, NULL);
 	nvdimm_bus_unlock(dev);
 
@@ -93,9 +95,21 @@ static int nd_region_remove(struct device *dev)
 	return 0;
 }
 
+static int child_notify(struct device *dev, void *data)
+{
+	nd_device_notify(dev, *(enum nvdimm_event *) data);
+	return 0;
+}
+
+static void nd_region_notify(struct device *dev, enum nvdimm_event event)
+{
+	device_for_each_child(dev, &event, child_notify);
+}
+
 static struct nd_device_driver nd_region_driver = {
 	.probe = nd_region_probe,
 	.remove = nd_region_remove,
+	.notify = nd_region_notify,
 	.drv = {
 		.name = "nd_region",
 	},

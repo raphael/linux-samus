@@ -31,10 +31,10 @@ static void *bpf_any_get(void *raw, enum bpf_type type)
 {
 	switch (type) {
 	case BPF_TYPE_PROG:
-		atomic_inc(&((struct bpf_prog *)raw)->aux->refcnt);
+		raw = bpf_prog_inc(raw);
 		break;
 	case BPF_TYPE_MAP:
-		bpf_map_inc(raw, true);
+		raw = bpf_map_inc(raw, true);
 		break;
 	default:
 		WARN_ON_ONCE(1);
@@ -119,17 +119,9 @@ static int bpf_inode_type(const struct inode *inode, enum bpf_type *type)
 	return 0;
 }
 
-static bool bpf_dname_reserved(const struct dentry *dentry)
-{
-	return strchr(dentry->d_name.name, '.');
-}
-
 static int bpf_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	struct inode *inode;
-
-	if (bpf_dname_reserved(dentry))
-		return -EPERM;
 
 	inode = bpf_get_inode(dir->i_sb, dir, mode | S_IFDIR);
 	if (IS_ERR(inode))
@@ -151,9 +143,6 @@ static int bpf_mkobj_ops(struct inode *dir, struct dentry *dentry,
 			 umode_t mode, const struct inode_operations *iops)
 {
 	struct inode *inode;
-
-	if (bpf_dname_reserved(dentry))
-		return -EPERM;
 
 	inode = bpf_get_inode(dir->i_sb, dir, mode | S_IFREG);
 	if (IS_ERR(inode))
@@ -187,11 +176,21 @@ static int bpf_mkobj(struct inode *dir, struct dentry *dentry, umode_t mode,
 	}
 }
 
+static struct dentry *
+bpf_lookup(struct inode *dir, struct dentry *dentry, unsigned flags)
+{
+	if (strchr(dentry->d_name.name, '.'))
+		return ERR_PTR(-EPERM);
+	return simple_lookup(dir, dentry, flags);
+}
+
 static const struct inode_operations bpf_dir_iops = {
-	.lookup		= simple_lookup,
+	.lookup		= bpf_lookup,
 	.mknod		= bpf_mkobj,
 	.mkdir		= bpf_mkdir,
 	.rmdir		= simple_rmdir,
+	.rename		= simple_rename,
+	.link		= simple_link,
 	.unlink		= simple_unlink,
 };
 
@@ -277,7 +276,8 @@ static void *bpf_obj_do_get(const struct filename *pathname,
 		goto out;
 
 	raw = bpf_any_get(inode->i_private, *type);
-	touch_atime(&path);
+	if (!IS_ERR(raw))
+		touch_atime(&path);
 
 	path_put(&path);
 	return raw;
@@ -357,7 +357,7 @@ static int bpf_fill_super(struct super_block *sb, void *data, int silent)
 static struct dentry *bpf_mount(struct file_system_type *type, int flags,
 				const char *dev_name, void *data)
 {
-	return mount_ns(type, flags, current->nsproxy->mnt_ns, bpf_fill_super);
+	return mount_nodev(type, flags, data, bpf_fill_super);
 }
 
 static struct file_system_type bpf_fs_type = {
@@ -365,7 +365,6 @@ static struct file_system_type bpf_fs_type = {
 	.name		= "bpf",
 	.mount		= bpf_mount,
 	.kill_sb	= kill_litter_super,
-	.fs_flags	= FS_USERNS_MOUNT,
 };
 
 MODULE_ALIAS_FS("bpf");

@@ -259,6 +259,7 @@ static void nb8800_receive(struct net_device *dev, unsigned int i,
 		if (err) {
 			netdev_err(dev, "rx buffer allocation failed\n");
 			dev->stats.rx_dropped++;
+			dev_kfree_skb(skb);
 			return;
 		}
 
@@ -302,7 +303,7 @@ static int nb8800_poll(struct napi_struct *napi, int budget)
 	nb8800_tx_done(dev);
 
 again:
-	while (work < budget) {
+	do {
 		struct nb8800_rx_buf *rxb;
 		unsigned int len;
 
@@ -330,7 +331,7 @@ again:
 		rxd->report = 0;
 		last = next;
 		work++;
-	}
+	} while (work < budget);
 
 	if (work) {
 		priv->rx_descs[last].desc.config |= DESC_EOC;
@@ -1460,7 +1461,19 @@ static int nb8800_probe(struct platform_device *pdev)
 		goto err_disable_clk;
 	}
 
-	priv->phy_node = of_parse_phandle(pdev->dev.of_node, "phy-handle", 0);
+	if (of_phy_is_fixed_link(pdev->dev.of_node)) {
+		ret = of_phy_register_fixed_link(pdev->dev.of_node);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "bad fixed-link spec\n");
+			goto err_free_bus;
+		}
+		priv->phy_node = of_node_get(pdev->dev.of_node);
+	}
+
+	if (!priv->phy_node)
+		priv->phy_node = of_parse_phandle(pdev->dev.of_node,
+						  "phy-handle", 0);
+
 	if (!priv->phy_node) {
 		dev_err(&pdev->dev, "no PHY specified\n");
 		ret = -ENODEV;

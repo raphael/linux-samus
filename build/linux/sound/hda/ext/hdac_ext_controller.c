@@ -77,6 +77,12 @@ int snd_hdac_ext_bus_parse_capabilities(struct hdac_ext_bus *ebus)
 			ebus->spbcap = bus->remap_addr + offset;
 			break;
 
+		case AZX_DRSM_CAP_ID:
+			/* DMA resume  capability found, handler function */
+			dev_dbg(bus->dev, "Found DRSM capability\n");
+			ebus->drsmcap = bus->remap_addr + offset;
+			break;
+
 		default:
 			dev_dbg(bus->dev, "Unknown capability %d\n", cur_cap);
 			break;
@@ -180,6 +186,9 @@ int snd_hdac_ext_bus_get_ml_capabilities(struct hdac_ext_bus *ebus)
 		hlink->lcaps  = readl(hlink->ml_addr + AZX_REG_ML_LCAP);
 		hlink->lsdiid = readw(hlink->ml_addr + AZX_REG_ML_LSDIID);
 
+		/* since link in On, update the ref */
+		hlink->ref_count = 1;
+
 		list_add_tail(&hlink->list, &ebus->hlink_list);
 	}
 
@@ -240,7 +249,7 @@ static int check_hdac_link_power_active(struct hdac_ext_link *link, bool enable)
 	int mask = (1 << AZX_MLCTL_CPA);
 
 	udelay(3);
-	timeout = 50;
+	timeout = 150;
 
 	do {
 		val = readl(link->ml_addr + AZX_REG_ML_LCTL);
@@ -282,6 +291,27 @@ int snd_hdac_ext_bus_link_power_down(struct hdac_ext_link *link)
 EXPORT_SYMBOL_GPL(snd_hdac_ext_bus_link_power_down);
 
 /**
+ * snd_hdac_ext_bus_link_power_up_all -power up all hda link
+ * @ebus: HD-audio extended bus
+ */
+int snd_hdac_ext_bus_link_power_up_all(struct hdac_ext_bus *ebus)
+{
+	struct hdac_ext_link *hlink = NULL;
+	int ret;
+
+	list_for_each_entry(hlink, &ebus->hlink_list, list) {
+		snd_hdac_updatel(hlink->ml_addr,
+				AZX_REG_ML_LCTL, 0, AZX_MLCTL_SPA);
+		ret = check_hdac_link_power_active(hlink, true);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(snd_hdac_ext_bus_link_power_up_all);
+
+/**
  * snd_hdac_ext_bus_link_power_down_all -power down all hda link
  * @ebus: HD-audio extended bus
  */
@@ -300,3 +330,66 @@ int snd_hdac_ext_bus_link_power_down_all(struct hdac_ext_bus *ebus)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_hdac_ext_bus_link_power_down_all);
+
+int snd_hdac_ext_bus_link_get(struct hdac_ext_bus *ebus,
+				struct hdac_ext_link *link)
+{
+	int ret = 0;
+
+	mutex_lock(&ebus->lock);
+
+	/*
+	 * if we move from 0 to 1, count will be 1 so power up this link
+	 * as well, also check the dma status and trigger that
+	 */
+	if (++link->ref_count == 1) {
+		if (!ebus->cmd_dma_state) {
+			snd_hdac_bus_init_cmd_io(&ebus->bus);
+			ebus->cmd_dma_state = true;
+		}
+
+		ret = snd_hdac_ext_bus_link_power_up(link);
+	}
+
+	mutex_unlock(&ebus->lock);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(snd_hdac_ext_bus_link_get);
+
+int snd_hdac_ext_bus_link_put(struct hdac_ext_bus *ebus,
+				struct hdac_ext_link *link)
+{
+	int ret = 0;
+	struct hdac_ext_link *hlink;
+	bool link_up = false;
+
+	mutex_lock(&ebus->lock);
+
+	/*
+	 * if we move from 1 to 0, count will be 0
+	 * so power down this link as well
+	 */
+	if (--link->ref_count == 0) {
+		ret = snd_hdac_ext_bus_link_power_down(link);
+
+		/*
+		 * now check if all links are off, if so turn off
+		 * cmd dma as well
+		 */
+		list_for_each_entry(hlink, &ebus->hlink_list, list) {
+			if (hlink->ref_count) {
+				link_up = true;
+				break;
+			}
+		}
+
+		if (!link_up) {
+			snd_hdac_bus_stop_cmd_io(&ebus->bus);
+			ebus->cmd_dma_state = false;
+		}
+	}
+
+	mutex_unlock(&ebus->lock);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(snd_hdac_ext_bus_link_put);

@@ -752,7 +752,8 @@ EXPORT_SYMBOL_GPL(cx231xx_set_mode);
 int cx231xx_ep5_bulkout(struct cx231xx *dev, u8 *firmware, u16 size)
 {
 	int errCode = 0;
-	int actlen, ret = -ENOMEM;
+	int actlen = -1;
+	int ret = -ENOMEM;
 	u32 *buffer;
 
 	buffer = kzalloc(4096, GFP_KERNEL);
@@ -914,6 +915,7 @@ EXPORT_SYMBOL_GPL(cx231xx_uninit_isoc);
  */
 void cx231xx_uninit_bulk(struct cx231xx *dev)
 {
+	struct cx231xx_dmaqueue *dma_q = &dev->video_mode.vidq;
 	struct urb *urb;
 	int i;
 
@@ -931,7 +933,7 @@ void cx231xx_uninit_bulk(struct cx231xx *dev)
 			if (dev->video_mode.bulk_ctl.transfer_buffer[i]) {
 				usb_free_coherent(dev->udev,
 						urb->transfer_buffer_length,
-						dev->video_mode.isoc_ctl.
+						dev->video_mode.bulk_ctl.
 						transfer_buffer[i],
 						urb->transfer_dma);
 			}
@@ -943,10 +945,12 @@ void cx231xx_uninit_bulk(struct cx231xx *dev)
 
 	kfree(dev->video_mode.bulk_ctl.urb);
 	kfree(dev->video_mode.bulk_ctl.transfer_buffer);
+	kfree(dma_q->p_left_data);
 
 	dev->video_mode.bulk_ctl.urb = NULL;
 	dev->video_mode.bulk_ctl.transfer_buffer = NULL;
 	dev->video_mode.bulk_ctl.num_bufs = 0;
+	dma_q->p_left_data = NULL;
 
 	if (dev->mode_tv == 0)
 		cx231xx_capture_start(dev, 0, Raw_Video);
@@ -1196,6 +1200,16 @@ int cx231xx_init_bulk(struct cx231xx *dev, int max_packets,
 				  sb_size, cx231xx_bulk_irq_callback, dma_q);
 	}
 
+	/* clear halt */
+	rc = usb_clear_halt(dev->udev, dev->video_mode.bulk_ctl.urb[0]->pipe);
+	if (rc < 0) {
+		dev_err(dev->dev,
+			"failed to clear USB bulk endpoint stall/halt condition (error=%i)\n",
+			rc);
+		cx231xx_uninit_bulk(dev);
+		return rc;
+	}
+
 	init_waitqueue_head(&dma_q->wq);
 
 	/* submit urbs and enables IRQ */
@@ -1291,6 +1305,9 @@ int cx231xx_dev_init(struct cx231xx *dev)
 	cx231xx_i2c_register(&dev->i2c_bus[1]);
 	cx231xx_i2c_register(&dev->i2c_bus[2]);
 
+	errCode = cx231xx_i2c_mux_create(dev);
+	if (errCode < 0)
+		return errCode;
 	cx231xx_i2c_mux_register(dev, 0);
 	cx231xx_i2c_mux_register(dev, 1);
 
@@ -1413,8 +1430,7 @@ EXPORT_SYMBOL_GPL(cx231xx_dev_init);
 void cx231xx_dev_uninit(struct cx231xx *dev)
 {
 	/* Un Initialize I2C bus */
-	cx231xx_i2c_mux_unregister(dev, 1);
-	cx231xx_i2c_mux_unregister(dev, 0);
+	cx231xx_i2c_mux_unregister(dev);
 	cx231xx_i2c_unregister(&dev->i2c_bus[2]);
 	cx231xx_i2c_unregister(&dev->i2c_bus[1]);
 	cx231xx_i2c_unregister(&dev->i2c_bus[0]);

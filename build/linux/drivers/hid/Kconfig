@@ -134,6 +134,16 @@ config HID_APPLEIR
 
 	Say Y here if you want support for Apple infrared remote control.
 
+config HID_ASUS
+	tristate "Asus"
+	depends on I2C_HID
+	---help---
+	Support for Asus notebook built-in keyboard via i2c.
+
+	Supported devices:
+	- EeeBook X205TA
+	- VivoBook E200HA
+
 config HID_AUREAL
 	tristate "Aureal"
 	depends on HID
@@ -195,6 +205,12 @@ config HID_PRODIKEYS
 	  Note: if you say N here, this device will still function as a basic
 	  multimedia keyboard, but will lack support for the musical keyboard
 	  and some additional multimedia keys.
+
+config HID_CMEDIA
+	tristate "CMedia CM6533 HID audio jack controls"
+	depends on HID
+	---help---
+	Support for CMedia CM6533 HID audio jack controls.
 
 config HID_CP2112
 	tristate "Silicon Labs CP2112 HID USB-to-SMBus Bridge support"

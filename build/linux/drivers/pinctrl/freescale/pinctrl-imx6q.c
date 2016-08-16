@@ -464,6 +464,7 @@ static const struct pinctrl_pin_desc imx6q_pinctrl_pads[] = {
 static struct imx_pinctrl_soc_info imx6q_pinctrl_info = {
 	.pins = imx6q_pinctrl_pads,
 	.npins = ARRAY_SIZE(imx6q_pinctrl_pads),
+	.gpr_compatible = "fsl,imx6q-iomuxc-gpr",
 };
 
 static const struct of_device_id imx6q_pinctrl_of_match[] = {
@@ -482,7 +483,6 @@ static struct platform_driver imx6q_pinctrl_driver = {
 		.of_match_table = imx6q_pinctrl_of_match,
 	},
 	.probe = imx6q_pinctrl_probe,
-	.remove = imx_pinctrl_remove,
 };
 
 static int __init imx6q_pinctrl_init(void)

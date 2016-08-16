@@ -25,6 +25,8 @@
 
 struct l3mdev_ops {
 	u32		(*l3mdev_fib_table)(const struct net_device *dev);
+	struct sk_buff * (*l3mdev_l3_rcv)(struct net_device *dev,
+					  struct sk_buff *skb, u16 proto);
 
 	/* IPv4 ops */
 	struct rtable *	(*l3mdev_get_rtable)(const struct net_device *dev,
@@ -39,7 +41,7 @@ struct l3mdev_ops {
 
 #ifdef CONFIG_NET_L3_MASTER_DEV
 
-int l3mdev_master_ifindex_rcu(struct net_device *dev);
+int l3mdev_master_ifindex_rcu(const struct net_device *dev);
 static inline int l3mdev_master_ifindex(struct net_device *dev)
 {
 	int ifindex;
@@ -49,6 +51,24 @@ static inline int l3mdev_master_ifindex(struct net_device *dev)
 	rcu_read_unlock();
 
 	return ifindex;
+}
+
+static inline int l3mdev_master_ifindex_by_index(struct net *net, int ifindex)
+{
+	struct net_device *dev;
+	int rc = 0;
+
+	if (likely(ifindex)) {
+		rcu_read_lock();
+
+		dev = dev_get_by_index_rcu(net, ifindex);
+		if (dev)
+			rc = l3mdev_master_ifindex_rcu(dev);
+
+		rcu_read_unlock();
+	}
+
+	return rc;
 }
 
 /* get index of an interface to use for FIB lookups. For devices
@@ -112,60 +132,50 @@ static inline bool netif_index_is_l3_master(struct net *net, int ifindex)
 	return rc;
 }
 
-static inline int l3mdev_get_saddr(struct net *net, int ifindex,
-				   struct flowi4 *fl4)
+int l3mdev_get_saddr(struct net *net, int ifindex, struct flowi4 *fl4);
+
+struct dst_entry *l3mdev_get_rt6_dst(struct net *net, const struct flowi6 *fl6);
+
+static inline
+struct sk_buff *l3mdev_l3_rcv(struct sk_buff *skb, u16 proto)
 {
-	struct net_device *dev;
-	int rc = 0;
+	struct net_device *master = NULL;
 
-	if (ifindex) {
+	if (netif_is_l3_slave(skb->dev))
+		master = netdev_master_upper_dev_get_rcu(skb->dev);
+	else if (netif_is_l3_master(skb->dev))
+		master = skb->dev;
 
-		rcu_read_lock();
+	if (master && master->l3mdev_ops->l3mdev_l3_rcv)
+		skb = master->l3mdev_ops->l3mdev_l3_rcv(master, skb, proto);
 
-		dev = dev_get_by_index_rcu(net, ifindex);
-		if (dev && netif_is_l3_master(dev) &&
-		    dev->l3mdev_ops->l3mdev_get_saddr) {
-			rc = dev->l3mdev_ops->l3mdev_get_saddr(dev, fl4);
-		}
-
-		rcu_read_unlock();
-	}
-
-	return rc;
-}
-
-static inline struct dst_entry *l3mdev_get_rt6_dst(const struct net_device *dev,
-						   const struct flowi6 *fl6)
-{
-	if (netif_is_l3_master(dev) && dev->l3mdev_ops->l3mdev_get_rt6_dst)
-		return dev->l3mdev_ops->l3mdev_get_rt6_dst(dev, fl6);
-
-	return NULL;
+	return skb;
 }
 
 static inline
-struct dst_entry *l3mdev_rt6_dst_by_oif(struct net *net,
-					const struct flowi6 *fl6)
+struct sk_buff *l3mdev_ip_rcv(struct sk_buff *skb)
 {
-	struct dst_entry *dst = NULL;
-	struct net_device *dev;
+	return l3mdev_l3_rcv(skb, AF_INET);
+}
 
-	dev = dev_get_by_index(net, fl6->flowi6_oif);
-	if (dev) {
-		dst = l3mdev_get_rt6_dst(dev, fl6);
-		dev_put(dev);
-	}
-
-	return dst;
+static inline
+struct sk_buff *l3mdev_ip6_rcv(struct sk_buff *skb)
+{
+	return l3mdev_l3_rcv(skb, AF_INET6);
 }
 
 #else
 
-static inline int l3mdev_master_ifindex_rcu(struct net_device *dev)
+static inline int l3mdev_master_ifindex_rcu(const struct net_device *dev)
 {
 	return 0;
 }
 static inline int l3mdev_master_ifindex(struct net_device *dev)
+{
+	return 0;
+}
+
+static inline int l3mdev_master_ifindex_by_index(struct net *net, int ifindex)
 {
 	return 0;
 }
@@ -210,16 +220,21 @@ static inline int l3mdev_get_saddr(struct net *net, int ifindex,
 }
 
 static inline
-struct dst_entry *l3mdev_get_rt6_dst(const struct net_device *dev,
-				     const struct flowi6 *fl6)
+struct dst_entry *l3mdev_get_rt6_dst(struct net *net, const struct flowi6 *fl6)
 {
 	return NULL;
 }
+
 static inline
-struct dst_entry *l3mdev_rt6_dst_by_oif(struct net *net,
-					const struct flowi6 *fl6)
+struct sk_buff *l3mdev_ip_rcv(struct sk_buff *skb)
 {
-	return NULL;
+	return skb;
+}
+
+static inline
+struct sk_buff *l3mdev_ip6_rcv(struct sk_buff *skb)
+{
+	return skb;
 }
 #endif
 

@@ -16,7 +16,7 @@
 #include "util/cache.h"
 #include "util/debug.h"
 #include "util/header.h"
-#include "util/parse-options.h"
+#include <subcmd/parse-options.h>
 #include "util/strlist.h"
 #include "util/build-id.h"
 #include "util/session.h"
@@ -38,19 +38,7 @@ static int build_id_cache__kcore_buildid(const char *proc_dir, char *sbuildid)
 
 static int build_id_cache__kcore_dir(char *dir, size_t sz)
 {
-	struct timeval tv;
-	struct tm tm;
-	char dt[32];
-
-	if (gettimeofday(&tv, NULL) || !localtime_r(&tv.tv_sec, &tm))
-		return -1;
-
-	if (!strftime(dt, sizeof(dt), "%Y%m%d%H%M%S", &tm))
-		return -1;
-
-	scnprintf(dir, sz, "%s%02u", dt, (unsigned)tv.tv_usec / 10000);
-
-	return 0;
+	return fetch_current_timestamp(dir, sz);
 }
 
 static bool same_kallsyms_reloc(const char *from_dir, char *to_dir)
@@ -131,8 +119,8 @@ static int build_id_cache__add_kcore(const char *filename, bool force)
 	if (build_id_cache__kcore_buildid(from_dir, sbuildid) < 0)
 		return -1;
 
-	scnprintf(to_dir, sizeof(to_dir), "%s/[kernel.kcore]/%s",
-		  buildid_dir, sbuildid);
+	scnprintf(to_dir, sizeof(to_dir), "%s/%s/%s",
+		  buildid_dir, DSO__NAME_KCORE, sbuildid);
 
 	if (!force &&
 	    !build_id_cache__kcore_existing(from_dir, to_dir, sizeof(to_dir))) {
@@ -143,8 +131,8 @@ static int build_id_cache__add_kcore(const char *filename, bool force)
 	if (build_id_cache__kcore_dir(dir, sizeof(dir)))
 		return -1;
 
-	scnprintf(to_dir, sizeof(to_dir), "%s/[kernel.kcore]/%s/%s",
-		  buildid_dir, sbuildid, dir);
+	scnprintf(to_dir, sizeof(to_dir), "%s/%s/%s/%s",
+		  buildid_dir, DSO__NAME_KCORE, sbuildid, dir);
 
 	if (mkdir_p(to_dir, 0755))
 		return -1;

@@ -51,9 +51,9 @@ static ssize_t efivarfs_file_write(struct file *file,
 		d_delete(file->f_path.dentry);
 		dput(file->f_path.dentry);
 	} else {
-		mutex_lock(&inode->i_mutex);
+		inode_lock(inode);
 		i_size_write(inode, datasize + sizeof(attributes));
-		mutex_unlock(&inode->i_mutex);
+		inode_unlock(inode);
 	}
 
 	bytes = count;
@@ -148,16 +148,16 @@ efivarfs_ioc_setxflags(struct file *file, void __user *arg)
 	if (error)
 		return error;
 
-	mutex_lock(&inode->i_mutex);
+	inode_lock(inode);
 	inode_set_flags(inode, i_flags, S_IMMUTABLE);
-	mutex_unlock(&inode->i_mutex);
+	inode_unlock(inode);
 
 	mnt_drop_write_file(file);
 
 	return 0;
 }
 
-long
+static long
 efivarfs_file_ioctl(struct file *file, unsigned int cmd, unsigned long p)
 {
 	void __user *arg = (void __user *)p;

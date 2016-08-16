@@ -311,11 +311,11 @@ static int formula_fprintf(struct hist_entry *he, struct hist_entry *pair,
 }
 
 static int hists__add_entry(struct hists *hists,
-			    struct addr_location *al, u64 period,
-			    u64 weight, u64 transaction)
+			    struct addr_location *al,
+			    struct perf_sample *sample)
 {
-	if (__hists__add_entry(hists, al, NULL, NULL, NULL, period, weight,
-			       transaction, true) != NULL)
+	if (__hists__add_entry(hists, al, NULL, NULL, NULL,
+			       sample, true) != NULL)
 		return 0;
 	return -ENOMEM;
 }
@@ -330,14 +330,13 @@ static int diff__process_sample_event(struct perf_tool *tool __maybe_unused,
 	struct hists *hists = evsel__hists(evsel);
 	int ret = -1;
 
-	if (perf_event__preprocess_sample(event, machine, &al, sample) < 0) {
+	if (machine__resolve(machine, &al, sample) < 0) {
 		pr_warning("problem processing %d event, skipping it.\n",
 			   event->header.type);
 		return -1;
 	}
 
-	if (hists__add_entry(hists, &al, sample->period,
-			     sample->weight, sample->transaction)) {
+	if (hists__add_entry(hists, &al, sample)) {
 		pr_warning("problem incrementing symbol period, skipping event\n");
 		goto out_put;
 	}
@@ -429,7 +428,7 @@ static void hists__baseline_only(struct hists *hists)
 	struct rb_root *root;
 	struct rb_node *next;
 
-	if (sort__need_collapse)
+	if (hists__has(hists, need_collapse))
 		root = &hists->entries_collapsed;
 	else
 		root = hists->entries_in;
@@ -451,7 +450,7 @@ static void hists__precompute(struct hists *hists)
 	struct rb_root *root;
 	struct rb_node *next;
 
-	if (sort__need_collapse)
+	if (hists__has(hists, need_collapse))
 		root = &hists->entries_collapsed;
 	else
 		root = hists->entries_in;
@@ -813,8 +812,9 @@ static const struct option options[] = {
 	OPT_STRING_NOEMPTY('t', "field-separator", &symbol_conf.field_sep, "separator",
 		   "separator for columns, no spaces will be added between "
 		   "columns '.' is reserved."),
-	OPT_STRING(0, "symfs", &symbol_conf.symfs, "directory",
-		    "Look for files with symbols relative to this directory"),
+	OPT_CALLBACK(0, "symfs", NULL, "directory",
+		     "Look for files with symbols relative to this directory",
+		     symbol__config_symfs),
 	OPT_UINTEGER('o', "order", &sort_compute, "Specify compute sorting."),
 	OPT_CALLBACK(0, "percentage", NULL, "relative|absolute",
 		     "How to display percentage of filtered entries", parse_filter_percentage),
@@ -1208,7 +1208,7 @@ static int ui_init(void)
 		BUG_ON(1);
 	}
 
-	list_add(&fmt->sort_list, &perf_hpp__sort_list);
+	perf_hpp__register_sort_field(fmt);
 	return 0;
 }
 
@@ -1265,8 +1265,6 @@ int cmd_diff(int argc, const char **argv, const char *prefix __maybe_unused)
 	if (ret < 0)
 		return ret;
 
-	perf_config(perf_default_config, NULL);
-
 	argc = parse_options(argc, argv, options, diff_usage, 0);
 
 	if (symbol__init(NULL) < 0)
@@ -1280,7 +1278,7 @@ int cmd_diff(int argc, const char **argv, const char *prefix __maybe_unused)
 
 	sort__mode = SORT_MODE__DIFF;
 
-	if (setup_sorting() < 0)
+	if (setup_sorting(NULL) < 0)
 		usage_with_options(diff_usage, options);
 
 	setup_pager();

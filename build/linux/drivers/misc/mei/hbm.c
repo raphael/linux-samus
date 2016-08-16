@@ -113,8 +113,6 @@ void mei_hbm_idle(struct mei_device *dev)
  */
 void mei_hbm_reset(struct mei_device *dev)
 {
-	dev->me_client_index = 0;
-
 	mei_me_cl_rm_all(dev);
 
 	mei_hbm_idle(dev);
@@ -301,7 +299,10 @@ static int mei_hbm_enum_clients_req(struct mei_device *dev)
 	enum_req = (struct hbm_host_enum_request *)dev->wr_msg.data;
 	memset(enum_req, 0, len);
 	enum_req->hbm_cmd = HOST_ENUM_REQ_CMD;
-	enum_req->allow_add = dev->hbm_f_dc_supported;
+	enum_req->flags |= dev->hbm_f_dc_supported ?
+			   MEI_HBM_ENUM_F_ALLOW_ADD : 0;
+	enum_req->flags |= dev->hbm_f_ie_supported ?
+			   MEI_HBM_ENUM_F_IMMEDIATE_ENUM : 0;
 
 	ret = mei_write_message(dev, mei_hdr, dev->wr_msg.data);
 	if (ret) {
@@ -400,6 +401,9 @@ static int mei_hbm_fw_add_cl_req(struct mei_device *dev,
 	ret = mei_hbm_me_cl_add(dev, (struct hbm_props_response *)req);
 	if (ret)
 		status = !MEI_HBMS_SUCCESS;
+
+	if (dev->dev_state == MEI_DEV_ENABLED)
+		schedule_work(&dev->bus_rescan_work);
 
 	return mei_hbm_add_cl_resp(dev, req->me_addr, status);
 }
@@ -524,26 +528,24 @@ static void mei_hbm_cl_notify(struct mei_device *dev,
  * mei_hbm_prop_req - request property for a single client
  *
  * @dev: the device structure
+ * @start_idx: client index to start search
  *
  * Return: 0 on success and < 0 on failure
  */
-
-static int mei_hbm_prop_req(struct mei_device *dev)
+static int mei_hbm_prop_req(struct mei_device *dev, unsigned long start_idx)
 {
-
 	struct mei_msg_hdr *mei_hdr = &dev->wr_msg.hdr;
 	struct hbm_props_request *prop_req;
 	const size_t len = sizeof(struct hbm_props_request);
-	unsigned long next_client_index;
+	unsigned long addr;
 	int ret;
 
-	next_client_index = find_next_bit(dev->me_clients_map, MEI_CLIENTS_MAX,
-					  dev->me_client_index);
+	addr = find_next_bit(dev->me_clients_map, MEI_CLIENTS_MAX, start_idx);
 
 	/* We got all client properties */
-	if (next_client_index == MEI_CLIENTS_MAX) {
+	if (addr == MEI_CLIENTS_MAX) {
 		dev->hbm_state = MEI_HBM_STARTED;
-		schedule_work(&dev->init_work);
+		mei_host_client_init(dev);
 
 		return 0;
 	}
@@ -554,7 +556,7 @@ static int mei_hbm_prop_req(struct mei_device *dev)
 	memset(prop_req, 0, sizeof(struct hbm_props_request));
 
 	prop_req->hbm_cmd = HOST_CLIENT_PROPERTIES_REQ_CMD;
-	prop_req->me_addr = next_client_index;
+	prop_req->me_addr = addr;
 
 	ret = mei_write_message(dev, mei_hdr, dev->wr_msg.data);
 	if (ret) {
@@ -564,7 +566,6 @@ static int mei_hbm_prop_req(struct mei_device *dev)
 	}
 
 	dev->init_clients_timer = MEI_CLIENTS_INIT_TIMEOUT;
-	dev->me_client_index = next_client_index;
 
 	return 0;
 }
@@ -789,8 +790,11 @@ static void mei_hbm_cl_connect_res(struct mei_device *dev, struct mei_cl *cl,
 		cl->state = MEI_FILE_CONNECTED;
 	else {
 		cl->state = MEI_FILE_DISCONNECT_REPLY;
-		if (rs->status == MEI_CL_CONN_NOT_FOUND)
+		if (rs->status == MEI_CL_CONN_NOT_FOUND) {
 			mei_me_cl_del(dev, cl->me_cl);
+			if (dev->dev_state == MEI_DEV_ENABLED)
+				schedule_work(&dev->bus_rescan_work);
+		}
 	}
 	cl->status = mei_cl_conn_status_to_errno(rs->status);
 }
@@ -866,15 +870,14 @@ static int mei_hbm_fw_disconnect_req(struct mei_device *dev,
 
 	cl = mei_hbm_cl_find_by_cmd(dev, disconnect_req);
 	if (cl) {
-		cl_dbg(dev, cl, "fw disconnect request received\n");
+		cl_warn(dev, cl, "fw disconnect request received\n");
 		cl->state = MEI_FILE_DISCONNECTING;
 		cl->timer_count = 0;
 
 		cb = mei_io_cb_init(cl, MEI_FOP_DISCONNECT_RSP, NULL);
 		if (!cb)
 			return -ENOMEM;
-		cl_dbg(dev, cl, "add disconnect response as first\n");
-		list_add(&cb->list, &dev->ctrl_wr_list.list);
+		list_add_tail(&cb->list, &dev->ctrl_wr_list.list);
 	}
 	return 0;
 }
@@ -972,6 +975,9 @@ static void mei_hbm_config_features(struct mei_device *dev)
 	if (dev->version.major_version >= HBM_MAJOR_VERSION_DC)
 		dev->hbm_f_dc_supported = 1;
 
+	if (dev->version.major_version >= HBM_MAJOR_VERSION_IE)
+		dev->hbm_f_ie_supported = 1;
+
 	/* disconnect on connect timeout instead of link reset */
 	if (dev->version.major_version >= HBM_MAJOR_VERSION_DOT)
 		dev->hbm_f_dot_supported = 1;
@@ -979,6 +985,10 @@ static void mei_hbm_config_features(struct mei_device *dev)
 	/* Notification Event Support */
 	if (dev->version.major_version >= HBM_MAJOR_VERSION_EV)
 		dev->hbm_f_ev_supported = 1;
+
+	/* Fixed Address Client Support */
+	if (dev->version.major_version >= HBM_MAJOR_VERSION_FA)
+		dev->hbm_f_fa_supported = 1;
 }
 
 /**
@@ -1136,10 +1146,8 @@ int mei_hbm_dispatch(struct mei_device *dev, struct mei_msg_hdr *hdr)
 
 		mei_hbm_me_cl_add(dev, props_res);
 
-		dev->me_client_index++;
-
 		/* request property for the next client */
-		if (mei_hbm_prop_req(dev))
+		if (mei_hbm_prop_req(dev, props_res->me_addr + 1))
 			return -EIO;
 
 		break;
@@ -1165,7 +1173,7 @@ int mei_hbm_dispatch(struct mei_device *dev, struct mei_msg_hdr *hdr)
 		dev->hbm_state = MEI_HBM_CLIENT_PROPERTIES;
 
 		/* first property request */
-		if (mei_hbm_prop_req(dev))
+		if (mei_hbm_prop_req(dev, 0))
 			return -EIO;
 
 		break;

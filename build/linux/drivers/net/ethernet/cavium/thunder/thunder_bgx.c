@@ -274,11 +274,13 @@ static void bgx_sgmii_change_link_state(struct lmac *lmac)
 static void bgx_lmac_handler(struct net_device *netdev)
 {
 	struct lmac *lmac = container_of(netdev, struct lmac, netdev);
-	struct phy_device *phydev = lmac->phydev;
+	struct phy_device *phydev;
 	int link_changed = 0;
 
 	if (!lmac)
 		return;
+
+	phydev = lmac->phydev;
 
 	if (!phydev->link && lmac->last_link)
 		link_changed = -1;
@@ -549,7 +551,9 @@ static int bgx_xaui_check_link(struct lmac *lmac)
 	}
 
 	/* Clear rcvflt bit (latching high) and read it back */
-	bgx_reg_modify(bgx, lmacid, BGX_SPUX_STATUS2, SPU_STATUS2_RCVFLT);
+	if (bgx_reg_read(bgx, lmacid, BGX_SPUX_STATUS2) & SPU_STATUS2_RCVFLT)
+		bgx_reg_modify(bgx, lmacid,
+			       BGX_SPUX_STATUS2, SPU_STATUS2_RCVFLT);
 	if (bgx_reg_read(bgx, lmacid, BGX_SPUX_STATUS2) & SPU_STATUS2_RCVFLT) {
 		dev_err(&bgx->pdev->dev, "Receive fault, retry training\n");
 		if (bgx->use_training) {
@@ -568,13 +572,6 @@ static int bgx_xaui_check_link(struct lmac *lmac)
 		return -1;
 	}
 
-	/* Wait for MAC RX to be ready */
-	if (bgx_poll_reg(bgx, lmacid, BGX_SMUX_RX_CTL,
-			 SMU_RX_CTL_STATUS, true)) {
-		dev_err(&bgx->pdev->dev, "SMU RX link not okay\n");
-		return -1;
-	}
-
 	/* Wait for BGX RX to be idle */
 	if (bgx_poll_reg(bgx, lmacid, BGX_SMUX_CTL, SMU_CTL_RX_IDLE, false)) {
 		dev_err(&bgx->pdev->dev, "SMU RX not idle\n");
@@ -587,29 +584,30 @@ static int bgx_xaui_check_link(struct lmac *lmac)
 		return -1;
 	}
 
-	if (bgx_reg_read(bgx, lmacid, BGX_SPUX_STATUS2) & SPU_STATUS2_RCVFLT) {
-		dev_err(&bgx->pdev->dev, "Receive fault\n");
-		return -1;
-	}
-
-	/* Receive link is latching low. Force it high and verify it */
-	bgx_reg_modify(bgx, lmacid, BGX_SPUX_STATUS1, SPU_STATUS1_RCV_LNK);
-	if (bgx_poll_reg(bgx, lmacid, BGX_SPUX_STATUS1,
-			 SPU_STATUS1_RCV_LNK, false)) {
-		dev_err(&bgx->pdev->dev, "SPU receive link down\n");
-		return -1;
-	}
-
+	/* Clear receive packet disable */
 	cfg = bgx_reg_read(bgx, lmacid, BGX_SPUX_MISC_CONTROL);
 	cfg &= ~SPU_MISC_CTL_RX_DIS;
 	bgx_reg_write(bgx, lmacid, BGX_SPUX_MISC_CONTROL, cfg);
-	return 0;
+
+	/* Check for MAC RX faults */
+	cfg = bgx_reg_read(bgx, lmacid, BGX_SMUX_RX_CTL);
+	/* 0 - Link is okay, 1 - Local fault, 2 - Remote fault */
+	cfg &= SMU_RX_CTL_STATUS;
+	if (!cfg)
+		return 0;
+
+	/* Rx local/remote fault seen.
+	 * Do lmac reinit to see if condition recovers
+	 */
+	bgx_lmac_xaui_init(bgx, lmacid, bgx->lmac_type);
+
+	return -1;
 }
 
 static void bgx_poll_for_link(struct work_struct *work)
 {
 	struct lmac *lmac;
-	u64 link;
+	u64 spu_link, smu_link;
 
 	lmac = container_of(work, struct lmac, dwork.work);
 
@@ -619,8 +617,11 @@ static void bgx_poll_for_link(struct work_struct *work)
 	bgx_poll_reg(lmac->bgx, lmac->lmacid, BGX_SPUX_STATUS1,
 		     SPU_STATUS1_RCV_LNK, false);
 
-	link = bgx_reg_read(lmac->bgx, lmac->lmacid, BGX_SPUX_STATUS1);
-	if (link & SPU_STATUS1_RCV_LNK) {
+	spu_link = bgx_reg_read(lmac->bgx, lmac->lmacid, BGX_SPUX_STATUS1);
+	smu_link = bgx_reg_read(lmac->bgx, lmac->lmacid, BGX_SMUX_RX_CTL);
+
+	if ((spu_link & SPU_STATUS1_RCV_LNK) &&
+	    !(smu_link & SMU_RX_CTL_STATUS)) {
 		lmac->link_up = 1;
 		if (lmac->bgx->lmac_type == BGX_MODE_XLAUI)
 			lmac->last_speed = 40000;
@@ -634,9 +635,15 @@ static void bgx_poll_for_link(struct work_struct *work)
 	}
 
 	if (lmac->last_link != lmac->link_up) {
+		if (lmac->link_up) {
+			if (bgx_xaui_check_link(lmac)) {
+				/* Errors, clear link_up state */
+				lmac->link_up = 0;
+				lmac->last_speed = SPEED_UNKNOWN;
+				lmac->last_duplex = DUPLEX_UNKNOWN;
+			}
+		}
 		lmac->last_link = lmac->link_up;
-		if (lmac->link_up)
-			bgx_xaui_check_link(lmac);
 	}
 
 	queue_delayed_work(lmac->check_link, &lmac->dwork, HZ * 2);
@@ -708,7 +715,7 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
 static void bgx_lmac_disable(struct bgx *bgx, u8 lmacid)
 {
 	struct lmac *lmac;
-	u64 cmrx_cfg;
+	u64 cfg;
 
 	lmac = &bgx->lmac[lmacid];
 	if (lmac->check_link) {
@@ -717,9 +724,33 @@ static void bgx_lmac_disable(struct bgx *bgx, u8 lmacid)
 		destroy_workqueue(lmac->check_link);
 	}
 
-	cmrx_cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
-	cmrx_cfg &= ~(1 << 15);
-	bgx_reg_write(bgx, lmacid, BGX_CMRX_CFG, cmrx_cfg);
+	/* Disable packet reception */
+	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
+	cfg &= ~CMR_PKT_RX_EN;
+	bgx_reg_write(bgx, lmacid, BGX_CMRX_CFG, cfg);
+
+	/* Give chance for Rx/Tx FIFO to get drained */
+	bgx_poll_reg(bgx, lmacid, BGX_CMRX_RX_FIFO_LEN, (u64)0x1FFF, true);
+	bgx_poll_reg(bgx, lmacid, BGX_CMRX_TX_FIFO_LEN, (u64)0x3FFF, true);
+
+	/* Disable packet transmission */
+	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
+	cfg &= ~CMR_PKT_TX_EN;
+	bgx_reg_write(bgx, lmacid, BGX_CMRX_CFG, cfg);
+
+	/* Disable serdes lanes */
+        if (!lmac->is_sgmii)
+                bgx_reg_modify(bgx, lmacid,
+                               BGX_SPUX_CONTROL1, SPU_CTL_LOW_POWER);
+        else
+                bgx_reg_modify(bgx, lmacid,
+                               BGX_GMP_PCS_MRX_CTL, PCS_MRX_CTL_PWR_DN);
+
+	/* Disable LMAC */
+	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
+	cfg &= ~CMR_EN;
+	bgx_reg_write(bgx, lmacid, BGX_CMRX_CFG, cfg);
+
 	bgx_flush_dmac_addrs(bgx, lmacid);
 
 	if ((bgx->lmac_type != BGX_MODE_XFI) &&
@@ -886,7 +917,8 @@ static void bgx_get_qlm_mode(struct bgx *bgx)
 
 #ifdef CONFIG_ACPI
 
-static int acpi_get_mac_address(struct acpi_device *adev, u8 *dst)
+static int acpi_get_mac_address(struct device *dev, struct acpi_device *adev,
+				u8 *dst)
 {
 	u8 mac[ETH_ALEN];
 	int ret;
@@ -897,9 +929,12 @@ static int acpi_get_mac_address(struct acpi_device *adev, u8 *dst)
 		goto out;
 
 	if (!is_valid_ether_addr(mac)) {
+		dev_err(dev, "MAC address invalid: %pM\n", mac);
 		ret = -EINVAL;
 		goto out;
 	}
+
+	dev_info(dev, "MAC address set to: %pM\n", mac);
 
 	memcpy(dst, mac, ETH_ALEN);
 out:
@@ -911,14 +946,15 @@ static acpi_status bgx_acpi_register_phy(acpi_handle handle,
 					 u32 lvl, void *context, void **rv)
 {
 	struct bgx *bgx = context;
+	struct device *dev = &bgx->pdev->dev;
 	struct acpi_device *adev;
 
 	if (acpi_bus_get_device(handle, &adev))
 		goto out;
 
-	acpi_get_mac_address(adev, bgx->lmac[bgx->lmac_count].mac);
+	acpi_get_mac_address(dev, adev, bgx->lmac[bgx->lmac_count].mac);
 
-	SET_NETDEV_DEV(&bgx->lmac[bgx->lmac_count].netdev, &bgx->pdev->dev);
+	SET_NETDEV_DEV(&bgx->lmac[bgx->lmac_count].netdev, dev);
 
 	bgx->lmac[bgx->lmac_count].lmacid = bgx->lmac_count;
 out:
@@ -968,38 +1004,64 @@ static int bgx_init_acpi_phy(struct bgx *bgx)
 
 static int bgx_init_of_phy(struct bgx *bgx)
 {
-	struct device_node *np;
-	struct device_node *np_child;
+	struct fwnode_handle *fwn;
+	struct device_node *node = NULL;
 	u8 lmac = 0;
-	char bgx_sel[5];
-	const char *mac;
 
-	/* Get BGX node from DT */
-	snprintf(bgx_sel, 5, "bgx%d", bgx->bgx_id);
-	np = of_find_node_by_name(NULL, bgx_sel);
-	if (!np)
-		return -ENODEV;
+	device_for_each_child_node(&bgx->pdev->dev, fwn) {
+		struct phy_device *pd;
+		struct device_node *phy_np;
+		const char *mac;
 
-	for_each_child_of_node(np, np_child) {
-		struct device_node *phy_np = of_parse_phandle(np_child,
-							      "phy-handle", 0);
-		if (!phy_np)
-			continue;
-		bgx->lmac[lmac].phydev = of_phy_find_device(phy_np);
+		/* Should always be an OF node.  But if it is not, we
+		 * cannot handle it, so exit the loop.
+		 */
+		node = to_of_node(fwn);
+		if (!node)
+			break;
 
-		mac = of_get_mac_address(np_child);
+		mac = of_get_mac_address(node);
 		if (mac)
 			ether_addr_copy(bgx->lmac[lmac].mac, mac);
 
 		SET_NETDEV_DEV(&bgx->lmac[lmac].netdev, &bgx->pdev->dev);
 		bgx->lmac[lmac].lmacid = lmac;
+
+		phy_np = of_parse_phandle(node, "phy-handle", 0);
+		/* If there is no phy or defective firmware presents
+		 * this cortina phy, for which there is no driver
+		 * support, ignore it.
+		 */
+		if (phy_np &&
+		    !of_device_is_compatible(phy_np, "cortina,cs4223-slice")) {
+			/* Wait until the phy drivers are available */
+			pd = of_phy_find_device(phy_np);
+			if (!pd)
+				goto defer;
+			bgx->lmac[lmac].phydev = pd;
+		}
+
 		lmac++;
 		if (lmac == MAX_LMAC_PER_BGX) {
-			of_node_put(np_child);
+			of_node_put(node);
 			break;
 		}
 	}
 	return 0;
+
+defer:
+	/* We are bailing out, try not to leak device reference counts
+	 * for phy devices we may have already found.
+	 */
+	while (lmac) {
+		if (bgx->lmac[lmac].phydev) {
+			put_device(&bgx->lmac[lmac].phydev->mdio.dev);
+			bgx->lmac[lmac].phydev = NULL;
+		}
+		lmac--;
+	}
+	of_node_put(node);
+	return -EPROBE_DEFER;
 }
 
 #else
@@ -1025,9 +1087,6 @@ static int bgx_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct device *dev = &pdev->dev;
 	struct bgx *bgx = NULL;
 	u8 lmac;
-
-	/* Load octeon mdio driver */
-	octeon_mdiobus_force_mod_depencency();
 
 	bgx = devm_kzalloc(dev, sizeof(*bgx), GFP_KERNEL);
 	if (!bgx)

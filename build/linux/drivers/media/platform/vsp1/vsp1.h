@@ -26,6 +26,8 @@
 struct clk;
 struct device;
 
+struct vsp1_drm;
+struct vsp1_entity;
 struct vsp1_platform_data;
 struct vsp1_bru;
 struct vsp1_hsit;
@@ -42,17 +44,22 @@ struct vsp1_uds;
 #define VSP1_HAS_LIF		(1 << 0)
 #define VSP1_HAS_LUT		(1 << 1)
 #define VSP1_HAS_SRU		(1 << 2)
+#define VSP1_HAS_BRU		(1 << 3)
 
-struct vsp1_platform_data {
+struct vsp1_device_info {
+	u32 version;
+	unsigned int gen;
 	unsigned int features;
 	unsigned int rpf_count;
 	unsigned int uds_count;
 	unsigned int wpf_count;
+	unsigned int num_bru_inputs;
+	bool uapi;
 };
 
 struct vsp1_device {
 	struct device *dev;
-	struct vsp1_platform_data pdata;
+	const struct vsp1_device_info *info;
 
 	void __iomem *mmio;
 	struct clk *clock;
@@ -71,13 +78,19 @@ struct vsp1_device {
 	struct vsp1_rwpf *wpf[VSP1_MAX_WPF];
 
 	struct list_head entities;
+	struct list_head videos;
 
 	struct v4l2_device v4l2_dev;
 	struct media_device media_dev;
+	struct media_entity_operations media_ops;
+
+	struct vsp1_drm *drm;
 };
 
 int vsp1_device_get(struct vsp1_device *vsp1);
 void vsp1_device_put(struct vsp1_device *vsp1);
+
+int vsp1_reset_wpf(struct vsp1_device *vsp1, unsigned int index);
 
 static inline u32 vsp1_read(struct vsp1_device *vsp1, u32 reg)
 {

@@ -37,7 +37,7 @@ void rcu_cpu_stall_reset(void);
 /*
  * Note a virtualization-based context switch.  This is simply a
  * wrapper around rcu_note_context_switch(), which allows TINY_RCU
- * to save a few bytes.
+ * to save a few bytes. The caller must have disabled interrupts.
  */
 static inline void rcu_virt_note_context_switch(int cpu)
 {
@@ -87,6 +87,8 @@ unsigned long rcu_batches_started_sched(void);
 unsigned long rcu_batches_completed(void);
 unsigned long rcu_batches_completed_bh(void);
 unsigned long rcu_batches_completed_sched(void);
+unsigned long rcu_exp_batches_completed(void);
+unsigned long rcu_exp_batches_completed_sched(void);
 void show_rcu_gp_kthreads(void);
 
 void rcu_force_quiescent_state(void);
@@ -97,6 +99,8 @@ void rcu_idle_enter(void);
 void rcu_idle_exit(void);
 void rcu_irq_enter(void);
 void rcu_irq_exit(void);
+void rcu_irq_enter_irqson(void);
+void rcu_irq_exit_irqson(void);
 
 void exit_rcu(void);
 

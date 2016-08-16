@@ -33,7 +33,7 @@ void rxrpc_remove_user_ID(struct rxrpc_sock *rx, struct rxrpc_call *call)
 
 	read_lock_bh(&call->state_lock);
 	if (!test_bit(RXRPC_CALL_RELEASED, &call->flags) &&
-	    !test_and_set_bit(RXRPC_CALL_RELEASE, &call->events))
+	    !test_and_set_bit(RXRPC_CALL_EV_RELEASE, &call->events))
 		rxrpc_queue_call(call);
 	read_unlock_bh(&call->state_lock);
 }
@@ -158,7 +158,7 @@ int rxrpc_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 			goto receive_non_data_message;
 
 		_debug("recvmsg DATA #%u { %d, %d }",
-		       ntohl(sp->hdr.seq), skb->len, sp->offset);
+		       sp->hdr.seq, skb->len, sp->offset);
 
 		if (!continue_call) {
 			/* only set the control data once per recvmsg() */
@@ -169,11 +169,11 @@ int rxrpc_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 			ASSERT(test_bit(RXRPC_CALL_HAS_USERID, &call->flags));
 		}
 
-		ASSERTCMP(ntohl(sp->hdr.seq), >=, call->rx_data_recv);
-		ASSERTCMP(ntohl(sp->hdr.seq), <=, call->rx_data_recv + 1);
-		call->rx_data_recv = ntohl(sp->hdr.seq);
+		ASSERTCMP(sp->hdr.seq, >=, call->rx_data_recv);
+		ASSERTCMP(sp->hdr.seq, <=, call->rx_data_recv + 1);
+		call->rx_data_recv = sp->hdr.seq;
 
-		ASSERTCMP(ntohl(sp->hdr.seq), >, call->rx_data_eaten);
+		ASSERTCMP(sp->hdr.seq, >, call->rx_data_eaten);
 
 		offset = sp->offset;
 		copy = skb->len - offset;
@@ -288,7 +288,11 @@ receive_non_data_message:
 		ret = put_cmsg(msg, SOL_RXRPC, RXRPC_BUSY, 0, &abort_code);
 		break;
 	case RXRPC_SKB_MARK_REMOTE_ABORT:
-		abort_code = call->abort_code;
+		abort_code = call->remote_abort;
+		ret = put_cmsg(msg, SOL_RXRPC, RXRPC_ABORT, 4, &abort_code);
+		break;
+	case RXRPC_SKB_MARK_LOCAL_ABORT:
+		abort_code = call->local_abort;
 		ret = put_cmsg(msg, SOL_RXRPC, RXRPC_ABORT, 4, &abort_code);
 		break;
 	case RXRPC_SKB_MARK_NET_ERROR:
@@ -303,6 +307,7 @@ receive_non_data_message:
 			       &abort_code);
 		break;
 	default:
+		pr_err("RxRPC: Unknown packet mark %u\n", skb->mark);
 		BUG();
 		break;
 	}
@@ -364,11 +369,11 @@ void rxrpc_kernel_data_delivered(struct sk_buff *skb)
 	struct rxrpc_skb_priv *sp = rxrpc_skb(skb);
 	struct rxrpc_call *call = sp->call;
 
-	ASSERTCMP(ntohl(sp->hdr.seq), >=, call->rx_data_recv);
-	ASSERTCMP(ntohl(sp->hdr.seq), <=, call->rx_data_recv + 1);
-	call->rx_data_recv = ntohl(sp->hdr.seq);
+	ASSERTCMP(sp->hdr.seq, >=, call->rx_data_recv);
+	ASSERTCMP(sp->hdr.seq, <=, call->rx_data_recv + 1);
+	call->rx_data_recv = sp->hdr.seq;
 
-	ASSERTCMP(ntohl(sp->hdr.seq), >, call->rx_data_eaten);
+	ASSERTCMP(sp->hdr.seq, >, call->rx_data_eaten);
 	rxrpc_free_skb(skb);
 }
 
@@ -401,9 +406,14 @@ u32 rxrpc_kernel_get_abort_code(struct sk_buff *skb)
 {
 	struct rxrpc_skb_priv *sp = rxrpc_skb(skb);
 
-	ASSERTCMP(skb->mark, ==, RXRPC_SKB_MARK_REMOTE_ABORT);
-
-	return sp->call->abort_code;
+	switch (skb->mark) {
+	case RXRPC_SKB_MARK_REMOTE_ABORT:
+		return sp->call->remote_abort;
+	case RXRPC_SKB_MARK_LOCAL_ABORT:
+		return sp->call->local_abort;
+	default:
+		BUG();
+	}
 }
 
 EXPORT_SYMBOL(rxrpc_kernel_get_abort_code);

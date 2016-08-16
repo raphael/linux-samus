@@ -22,12 +22,14 @@ extern void disable_TSC(void);
 static inline cycles_t get_cycles(void)
 {
 #ifndef CONFIG_X86_TSC
-	if (!cpu_has_tsc)
+	if (!boot_cpu_has(X86_FEATURE_TSC))
 		return 0;
 #endif
 
 	return rdtsc();
 }
+
+extern struct system_counterval_t convert_art_to_tsc(cycle_t art);
 
 extern void tsc_init(void);
 extern void mark_tsc_unstable(char *reason);

@@ -62,6 +62,7 @@ static inline struct thread_info *current_thread_info(void)
 }
 
 void arch_release_task_struct(struct task_struct *tsk);
+int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src);
 
 #define THREAD_SIZE_ORDER THREAD_ORDER
 
@@ -95,7 +96,5 @@ void arch_release_task_struct(struct task_struct *tsk);
 #define _TIF_UPROBE		_BITUL(TIF_UPROBE)
 #define _TIF_31BIT		_BITUL(TIF_31BIT)
 #define _TIF_SINGLE_STEP	_BITUL(TIF_SINGLE_STEP)
-
-#define is_32bit_task()		(test_thread_flag(TIF_31BIT))
 
 #endif /* _ASM_THREAD_INFO_H */

@@ -16,6 +16,7 @@
 #include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/io.h>
+#include <linux/io-mapping.h>
 #include <linux/gpio/consumer.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -196,21 +197,68 @@ static struct gpio_desc *of_parse_own_gpio(struct device_node *np,
 }
 
 /**
+ * of_gpiochip_set_names() - set up the names of the lines
+ * @chip: GPIO chip whose lines should be named, if possible
+ */
+static void of_gpiochip_set_names(struct gpio_chip *gc)
+{
+	struct gpio_device *gdev = gc->gpiodev;
+	struct device_node *np = gc->of_node;
+	int i;
+	int nstrings;
+
+	nstrings = of_property_count_strings(np, "gpio-line-names");
+	if (nstrings <= 0)
+		/* Lines names not present */
+		return;
+
+	/* This is normally not what you want */
+	if (gdev->ngpio != nstrings)
+		dev_info(&gdev->dev, "gpio-line-names specifies %d line "
+			 "names but there are %d lines on the chip\n",
+			 nstrings, gdev->ngpio);
+
+	/*
+	 * Make sure to not index beyond the end of the number of descriptors
+	 * of the GPIO device.
+	 */
+	for (i = 0; i < gdev->ngpio; i++) {
+		const char *name;
+		int ret;
+
+		ret = of_property_read_string_index(np,
+						    "gpio-line-names",
+						    i,
+						    &name);
+		if (ret) {
+			if (ret != -ENODATA)
+                                dev_err(&gdev->dev,
+                                        "unable to name line %d: %d\n",
+                                        i, ret);
+			break;
+		}
+		gdev->descs[i].name = name;
+	}
+}
+
+/**
  * of_gpiochip_scan_gpios - Scan gpio-controller for gpio definitions
  * @chip:	gpio chip to act on
  *
  * This is only used by of_gpiochip_add to request/set GPIO initial
  * configuration.
+ * It retures error if it fails otherwise 0 on success.
  */
-static void of_gpiochip_scan_gpios(struct gpio_chip *chip)
+static int of_gpiochip_scan_gpios(struct gpio_chip *chip)
 {
 	struct gpio_desc *desc = NULL;
 	struct device_node *np;
 	const char *name;
 	enum gpio_lookup_flags lflags;
 	enum gpiod_flags dflags;
+	int ret;
 
-	for_each_child_of_node(chip->of_node, np) {
+	for_each_available_child_of_node(chip->of_node, np) {
 		if (!of_property_read_bool(np, "gpio-hog"))
 			continue;
 
@@ -218,9 +266,12 @@ static void of_gpiochip_scan_gpios(struct gpio_chip *chip)
 		if (IS_ERR(desc))
 			continue;
 
-		if (gpiod_hog(desc, name, lflags, dflags))
-			continue;
+		ret = gpiod_hog(desc, name, lflags, dflags);
+		if (ret < 0)
+			return ret;
 	}
+
+	return 0;
 }
 
 /**
@@ -262,9 +313,10 @@ int of_gpio_simple_xlate(struct gpio_chip *gc,
 EXPORT_SYMBOL(of_gpio_simple_xlate);
 
 /**
- * of_mm_gpiochip_add - Add memory mapped GPIO chip (bank)
+ * of_mm_gpiochip_add_data - Add memory mapped GPIO chip (bank)
  * @np:		device node of the GPIO chip
  * @mm_gc:	pointer to the of_mm_gpio_chip allocated structure
+ * @data:	driver data to store in the struct gpio_chip
  *
  * To use this function you should allocate and fill mm_gc with:
  *
@@ -280,8 +332,9 @@ EXPORT_SYMBOL(of_gpio_simple_xlate);
  * do all necessary work for you. Then you'll able to use .regs
  * to manage GPIOs from the callbacks.
  */
-int of_mm_gpiochip_add(struct device_node *np,
-		       struct of_mm_gpio_chip *mm_gc)
+int of_mm_gpiochip_add_data(struct device_node *np,
+			    struct of_mm_gpio_chip *mm_gc,
+			    void *data)
 {
 	int ret = -ENOMEM;
 	struct gpio_chip *gc = &mm_gc->gc;
@@ -301,7 +354,7 @@ int of_mm_gpiochip_add(struct device_node *np,
 
 	mm_gc->gc.of_node = np;
 
-	ret = gpiochip_add(gc);
+	ret = gpiochip_add_data(gc, data);
 	if (ret)
 		goto err2;
 
@@ -315,7 +368,7 @@ err0:
 	       np->full_name, ret);
 	return ret;
 }
-EXPORT_SYMBOL(of_mm_gpiochip_add);
+EXPORT_SYMBOL(of_mm_gpiochip_add_data);
 
 /**
  * of_mm_gpiochip_remove - Remove memory mapped GPIO chip (bank)
@@ -423,8 +476,8 @@ int of_gpiochip_add(struct gpio_chip *chip)
 {
 	int status;
 
-	if ((!chip->of_node) && (chip->dev))
-		chip->of_node = chip->dev->of_node;
+	if ((!chip->of_node) && (chip->parent))
+		chip->of_node = chip->parent->of_node;
 
 	if (!chip->of_node)
 		return 0;
@@ -438,11 +491,13 @@ int of_gpiochip_add(struct gpio_chip *chip)
 	if (status)
 		return status;
 
+	/* If the chip defines names itself, these take precedence */
+	if (!chip->names)
+		of_gpiochip_set_names(chip);
+
 	of_node_get(chip->of_node);
 
-	of_gpiochip_scan_gpios(chip);
-
-	return 0;
+	return of_gpiochip_scan_gpios(chip);
 }
 
 void of_gpiochip_remove(struct gpio_chip *chip)

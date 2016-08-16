@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2015, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -66,11 +66,6 @@ static char *acpi_ut_format_number(char *string,
 				   u8 base, s32 width, s32 precision, u8 type);
 
 static char *acpi_ut_put_number(char *string, u64 number, u8 base, u8 upper);
-
-/* Module globals */
-
-static const char acpi_gbl_lower_hex_digits[] = "0123456789abcdef";
-static const char acpi_gbl_upper_hex_digits[] = "0123456789ABCDEF";
 
 /*******************************************************************************
  *
@@ -269,9 +264,9 @@ static char *acpi_ut_format_number(char *string,
 
 	sign = '\0';
 	if (type & ACPI_FORMAT_SIGN) {
-		if ((s64) number < 0) {
+		if ((s64)number < 0) {
 			sign = '-';
-			number = -(s64) number;
+			number = -(s64)number;
 			width--;
 		} else if (type & ACPI_FORMAT_SIGN_PLUS) {
 			sign = '+';
@@ -314,8 +309,9 @@ static char *acpi_ut_format_number(char *string,
 	if (need_prefix) {
 		string = acpi_ut_bound_string_output(string, end, '0');
 		if (base == 16) {
-			string = acpi_ut_bound_string_output(string, end,
-							     upper ? 'X' : 'x');
+			string =
+			    acpi_ut_bound_string_output(string, end,
+							upper ? 'X' : 'x');
 		}
 	}
 	if (!(type & ACPI_FORMAT_LEFT)) {
@@ -400,6 +396,7 @@ acpi_ut_vsnprintf(char *string,
 			} else {
 				break;
 			}
+
 		} while (1);
 
 		/* Process width */
@@ -407,7 +404,7 @@ acpi_ut_vsnprintf(char *string,
 		width = -1;
 		if (isdigit((int)*format)) {
 			format = acpi_ut_scan_number(format, &number);
-			width = (s32) number;
+			width = (s32)number;
 		} else if (*format == '*') {
 			++format;
 			width = va_arg(args, int);
@@ -424,11 +421,12 @@ acpi_ut_vsnprintf(char *string,
 			++format;
 			if (isdigit((int)*format)) {
 				format = acpi_ut_scan_number(format, &number);
-				precision = (s32) number;
+				precision = (s32)number;
 			} else if (*format == '*') {
 				++format;
 				precision = va_arg(args, int);
 			}
+
 			if (precision < 0) {
 				precision = 0;
 			}
@@ -488,10 +486,12 @@ acpi_ut_vsnprintf(char *string,
 									' ');
 				}
 			}
+
 			for (i = 0; i < length; ++i) {
 				pos = acpi_ut_bound_string_output(pos, end, *s);
 				++s;
 			}
+
 			while (length < width--) {
 				pos =
 				    acpi_ut_bound_string_output(pos, end, ' ');
@@ -529,9 +529,9 @@ acpi_ut_vsnprintf(char *string,
 			}
 
 			p = va_arg(args, void *);
-			pos = acpi_ut_format_number(pos, end,
-						    ACPI_TO_INTEGER(p), 16,
-						    width, precision, type);
+			pos =
+			    acpi_ut_format_number(pos, end, ACPI_TO_INTEGER(p),
+						  16, width, precision, type);
 			continue;
 
 		default:
@@ -550,17 +550,17 @@ acpi_ut_vsnprintf(char *string,
 		if (qualifier == 'L') {
 			number = va_arg(args, u64);
 			if (type & ACPI_FORMAT_SIGN) {
-				number = (s64) number;
+				number = (s64)number;
 			}
 		} else if (qualifier == 'l') {
 			number = va_arg(args, unsigned long);
 			if (type & ACPI_FORMAT_SIGN) {
-				number = (s32) number;
+				number = (s32)number;
 			}
 		} else if (qualifier == 'h') {
 			number = (u16)va_arg(args, int);
 			if (type & ACPI_FORMAT_SIGN) {
-				number = (s16) number;
+				number = (s16)number;
 			}
 		} else {
 			number = va_arg(args, unsigned int);

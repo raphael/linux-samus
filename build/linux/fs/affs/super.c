@@ -32,7 +32,7 @@ affs_commit_super(struct super_block *sb, int wait)
 	struct affs_root_tail *tail = AFFS_ROOT_TAIL(sb, bh);
 
 	lock_buffer(bh);
-	secs_to_datestamp(get_seconds(), &tail->disk_change);
+	secs_to_datestamp(ktime_get_real_seconds(), &tail->disk_change);
 	affs_fix_checksum(sb, bh);
 	unlock_buffer(bh);
 
@@ -132,7 +132,7 @@ static int __init init_inodecache(void)
 	affs_inode_cachep = kmem_cache_create("affs_inode_cache",
 					     sizeof(struct affs_inode_info),
 					     0, (SLAB_RECLAIM_ACCOUNT|
-						SLAB_MEM_SPREAD),
+						SLAB_MEM_SPREAD|SLAB_ACCOUNT),
 					     init_once);
 	if (affs_inode_cachep == NULL)
 		return -ENOMEM;
@@ -528,7 +528,7 @@ affs_remount(struct super_block *sb, int *flags, char *data)
 	char			*prefix = NULL;
 
 	new_opts = kstrdup(data, GFP_KERNEL);
-	if (!new_opts)
+	if (data && !new_opts)
 		return -ENOMEM;
 
 	pr_debug("%s(flags=0x%x,opts=\"%s\")\n", __func__, *flags, data);
@@ -546,7 +546,8 @@ affs_remount(struct super_block *sb, int *flags, char *data)
 	}
 
 	flush_delayed_work(&sbi->sb_work);
-	replace_mount_options(sb, new_opts);
+	if (new_opts)
+		replace_mount_options(sb, new_opts);
 
 	sbi->s_flags = mount_flags;
 	sbi->s_mode  = mode;

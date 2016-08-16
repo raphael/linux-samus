@@ -1,4 +1,7 @@
 /*
+ * Broadcom Kona GPIO Driver
+ *
+ * Author: Broadcom Corporation <bcm-kernel-feedback-list@broadcom.com>
  * Copyright (C) 2012-2014 Broadcom Corporation
  *
  * This program is free software; you can redistribute it and/or
@@ -17,7 +20,7 @@
 #include <linux/gpio.h>
 #include <linux/of_device.h>
 #include <linux/of_irq.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/irqdomain.h>
 #include <linux/irqchip/chained_irq.h>
 
@@ -78,11 +81,6 @@ struct bcm_kona_gpio_bank {
 	struct bcm_kona_gpio *kona_gpio;
 };
 
-static inline struct bcm_kona_gpio *to_kona_gpio(struct gpio_chip *chip)
-{
-	return container_of(chip, struct bcm_kona_gpio, gpio_chip);
-}
-
 static inline void bcm_kona_gpio_write_lock_regs(void __iomem *reg_base,
 						int bank_id, u32 lockcode)
 {
@@ -124,7 +122,7 @@ static void bcm_kona_gpio_unlock_gpio(struct bcm_kona_gpio *kona_gpio,
 
 static int bcm_kona_gpio_get_dir(struct gpio_chip *chip, unsigned gpio)
 {
-	struct bcm_kona_gpio *kona_gpio = to_kona_gpio(chip);
+	struct bcm_kona_gpio *kona_gpio = gpiochip_get_data(chip);
 	void __iomem *reg_base = kona_gpio->reg_base;
 	u32 val;
 
@@ -141,7 +139,7 @@ static void bcm_kona_gpio_set(struct gpio_chip *chip, unsigned gpio, int value)
 	u32 val, reg_offset;
 	unsigned long flags;
 
-	kona_gpio = to_kona_gpio(chip);
+	kona_gpio = gpiochip_get_data(chip);
 	reg_base = kona_gpio->reg_base;
 	spin_lock_irqsave(&kona_gpio->lock, flags);
 
@@ -168,7 +166,7 @@ static int bcm_kona_gpio_get(struct gpio_chip *chip, unsigned gpio)
 	u32 val, reg_offset;
 	unsigned long flags;
 
-	kona_gpio = to_kona_gpio(chip);
+	kona_gpio = gpiochip_get_data(chip);
 	reg_base = kona_gpio->reg_base;
 	spin_lock_irqsave(&kona_gpio->lock, flags);
 
@@ -188,7 +186,7 @@ static int bcm_kona_gpio_get(struct gpio_chip *chip, unsigned gpio)
 
 static int bcm_kona_gpio_request(struct gpio_chip *chip, unsigned gpio)
 {
-	struct bcm_kona_gpio *kona_gpio = to_kona_gpio(chip);
+	struct bcm_kona_gpio *kona_gpio = gpiochip_get_data(chip);
 
 	bcm_kona_gpio_unlock_gpio(kona_gpio, gpio);
 	return 0;
@@ -196,7 +194,7 @@ static int bcm_kona_gpio_request(struct gpio_chip *chip, unsigned gpio)
 
 static void bcm_kona_gpio_free(struct gpio_chip *chip, unsigned gpio)
 {
-	struct bcm_kona_gpio *kona_gpio = to_kona_gpio(chip);
+	struct bcm_kona_gpio *kona_gpio = gpiochip_get_data(chip);
 
 	bcm_kona_gpio_lock_gpio(kona_gpio, gpio);
 }
@@ -208,7 +206,7 @@ static int bcm_kona_gpio_direction_input(struct gpio_chip *chip, unsigned gpio)
 	u32 val;
 	unsigned long flags;
 
-	kona_gpio = to_kona_gpio(chip);
+	kona_gpio = gpiochip_get_data(chip);
 	reg_base = kona_gpio->reg_base;
 	spin_lock_irqsave(&kona_gpio->lock, flags);
 
@@ -232,7 +230,7 @@ static int bcm_kona_gpio_direction_output(struct gpio_chip *chip,
 	u32 val, reg_offset;
 	unsigned long flags;
 
-	kona_gpio = to_kona_gpio(chip);
+	kona_gpio = gpiochip_get_data(chip);
 	reg_base = kona_gpio->reg_base;
 	spin_lock_irqsave(&kona_gpio->lock, flags);
 
@@ -255,7 +253,7 @@ static int bcm_kona_gpio_to_irq(struct gpio_chip *chip, unsigned gpio)
 {
 	struct bcm_kona_gpio *kona_gpio;
 
-	kona_gpio = to_kona_gpio(chip);
+	kona_gpio = gpiochip_get_data(chip);
 	if (gpio >= kona_gpio->gpio_chip.ngpio)
 		return -ENXIO;
 	return irq_create_mapping(kona_gpio->irq_domain, gpio);
@@ -269,11 +267,11 @@ static int bcm_kona_gpio_set_debounce(struct gpio_chip *chip, unsigned gpio,
 	u32 val, res;
 	unsigned long flags;
 
-	kona_gpio = to_kona_gpio(chip);
+	kona_gpio = gpiochip_get_data(chip);
 	reg_base = kona_gpio->reg_base;
 	/* debounce must be 1-128ms (or 0) */
 	if ((debounce > 0 && debounce < 1000) || debounce > 128000) {
-		dev_err(chip->dev, "Debounce value %u not in range\n",
+		dev_err(chip->parent, "Debounce value %u not in range\n",
 			debounce);
 		return -EINVAL;
 	}
@@ -416,7 +414,7 @@ static int bcm_kona_gpio_irq_set_type(struct irq_data *d, unsigned int type)
 	case IRQ_TYPE_LEVEL_LOW:
 		/* BCM GPIO doesn't support level triggering */
 	default:
-		dev_err(kona_gpio->gpio_chip.dev,
+		dev_err(kona_gpio->gpio_chip.parent,
 			"Invalid BCM GPIO irq type 0x%x\n", type);
 		return -EINVAL;
 	}
@@ -477,7 +475,7 @@ static int bcm_kona_gpio_irq_reqres(struct irq_data *d)
 	struct bcm_kona_gpio *kona_gpio = irq_data_get_irq_chip_data(d);
 
 	if (gpiochip_lock_as_irq(&kona_gpio->gpio_chip, d->hwirq)) {
-		dev_err(kona_gpio->gpio_chip.dev,
+		dev_err(kona_gpio->gpio_chip.parent,
 			"unable to lock HW IRQ %lu for IRQ\n",
 			d->hwirq);
 		return -EINVAL;
@@ -506,8 +504,6 @@ static struct of_device_id const bcm_kona_gpio_of_match[] = {
 	{ .compatible = "brcm,kona-gpio" },
 	{}
 };
-
-MODULE_DEVICE_TABLE(of, bcm_kona_gpio_of_match);
 
 /*
  * This lock class tells lockdep that GPIO irqs are in a different
@@ -551,11 +547,11 @@ static void bcm_kona_gpio_reset(struct bcm_kona_gpio *kona_gpio)
 	/* disable interrupts and clear status */
 	for (i = 0; i < kona_gpio->num_bank; i++) {
 		/* Unlock the entire bank first */
-		bcm_kona_gpio_write_lock_regs(kona_gpio, i, UNLOCK_CODE);
+		bcm_kona_gpio_write_lock_regs(reg_base, i, UNLOCK_CODE);
 		writel(0xffffffff, reg_base + GPIO_INT_MASK(i));
 		writel(0xffffffff, reg_base + GPIO_INT_STATUS(i));
 		/* Now re-lock the bank */
-		bcm_kona_gpio_write_lock_regs(kona_gpio, i, LOCK_CODE);
+		bcm_kona_gpio_write_lock_regs(reg_base, i, LOCK_CODE);
 	}
 }
 
@@ -635,7 +631,7 @@ static int bcm_kona_gpio_probe(struct platform_device *pdev)
 
 	bcm_kona_gpio_reset(kona_gpio);
 
-	ret = gpiochip_add(chip);
+	ret = devm_gpiochip_add_data(dev, chip, kona_gpio);
 	if (ret < 0) {
 		dev_err(dev, "Couldn't add GPIO chip -- %d\n", ret);
 		goto err_irq_domain;
@@ -664,9 +660,4 @@ static struct platform_driver bcm_kona_gpio_driver = {
 	},
 	.probe = bcm_kona_gpio_probe,
 };
-
-module_platform_driver(bcm_kona_gpio_driver);
-
-MODULE_AUTHOR("Broadcom Corporation <bcm-kernel-feedback-list@broadcom.com>");
-MODULE_DESCRIPTION("Broadcom Kona GPIO Driver");
-MODULE_LICENSE("GPL v2");
+builtin_platform_driver(bcm_kona_gpio_driver);

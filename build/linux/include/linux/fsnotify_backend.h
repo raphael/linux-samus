@@ -290,14 +290,9 @@ static inline void __fsnotify_update_dcache_flags(struct dentry *dentry)
 /*
  * fsnotify_d_instantiate - instantiate a dentry for inode
  */
-static inline void __fsnotify_d_instantiate(struct dentry *dentry, struct inode *inode)
+static inline void __fsnotify_d_instantiate(struct dentry *dentry)
 {
-	if (!inode)
-		return;
-
-	spin_lock(&dentry->d_lock);
 	__fsnotify_update_dcache_flags(dentry);
-	spin_unlock(&dentry->d_lock);
 }
 
 /* called from fsnotify listeners, such as fanotify or dnotify */
@@ -364,8 +359,6 @@ extern void fsnotify_clear_vfsmount_marks_by_group(struct fsnotify_group *group)
 extern void fsnotify_clear_inode_marks_by_group(struct fsnotify_group *group);
 /* run all the marks in a group, and clear all of the marks where mark->flags & flags is true*/
 extern void fsnotify_clear_marks_by_group_flags(struct fsnotify_group *group, unsigned int flags);
-/* run all the marks in a group, and flag them to be freed */
-extern void fsnotify_clear_marks_by_group(struct fsnotify_group *group);
 extern void fsnotify_get_mark(struct fsnotify_mark *mark);
 extern void fsnotify_put_mark(struct fsnotify_mark *mark);
 extern void fsnotify_unmount_inodes(struct super_block *sb);
@@ -396,7 +389,7 @@ static inline void __fsnotify_vfsmount_delete(struct vfsmount *mnt)
 static inline void __fsnotify_update_dcache_flags(struct dentry *dentry)
 {}
 
-static inline void __fsnotify_d_instantiate(struct dentry *dentry, struct inode *inode)
+static inline void __fsnotify_d_instantiate(struct dentry *dentry)
 {}
 
 static inline u32 fsnotify_get_cookie(void)

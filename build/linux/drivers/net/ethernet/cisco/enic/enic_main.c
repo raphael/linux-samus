@@ -2458,13 +2458,11 @@ static int enic_dev_init(struct enic *enic)
 	switch (vnic_dev_get_intr_mode(enic->vdev)) {
 	default:
 		netif_napi_add(netdev, &enic->napi[0], enic_poll, 64);
-		napi_hash_add(&enic->napi[0]);
 		break;
 	case VNIC_DEV_INTR_MODE_MSIX:
 		for (i = 0; i < enic->rq_count; i++) {
 			netif_napi_add(netdev, &enic->napi[i],
 				enic_poll_msix_rq, NAPI_POLL_WEIGHT);
-			napi_hash_add(&enic->napi[i]);
 		}
 		for (i = 0; i < enic->wq_count; i++)
 			netif_napi_add(netdev, &enic->napi[enic_cq_wq(enic, i)],
@@ -2742,6 +2740,7 @@ static int enic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		netdev->hw_features |= NETIF_F_RXCSUM;
 
 	netdev->features |= netdev->hw_features;
+	netdev->vlan_features |= netdev->features;
 
 #ifdef CONFIG_RFS_ACCEL
 	netdev->hw_features |= NETIF_F_NTUPLE;

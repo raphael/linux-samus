@@ -11,8 +11,8 @@
 
 #include <linux/types.h>
 #include <linux/delay.h>
-#include <linux/mutex.h>
 #include <linux/slab.h>
+#include <linux/spinlock.h>
 #include "qed_hsi.h"
 
 struct qed_mcp_link_speed_params {
@@ -40,7 +40,15 @@ struct qed_mcp_link_capabilities {
 struct qed_mcp_link_state {
 	bool    link_up;
 
-	u32     speed; /* In Mb/s */
+	u32	min_pf_rate;
+
+	/* Actual link speed in Mb/s */
+	u32	line_speed;
+
+	/* PF max speed in Mb/s, deduced from line_speed
+	 * according to PF max bandwidth configuration.
+	 */
+	u32     speed;
 	bool    full_duplex;
 
 	bool    an;
@@ -141,13 +149,16 @@ int qed_mcp_set_link(struct qed_hwfn   *p_hwfn,
 /**
  * @brief Get the management firmware version value
  *
- * @param cdev       - qed dev pointer
- * @param mfw_ver    - mfw version value
+ * @param p_hwfn
+ * @param p_ptt
+ * @param p_mfw_ver    - mfw version value
+ * @param p_running_bundle_id	- image id in nvram; Optional.
  *
- * @return int - 0 - operation was successul.
+ * @return int - 0 - operation was successful.
  */
-int qed_mcp_get_mfw_ver(struct qed_dev *cdev,
-			u32 *mfw_ver);
+int qed_mcp_get_mfw_ver(struct qed_hwfn *p_hwfn,
+			struct qed_ptt *p_ptt,
+			u32 *p_mfw_ver, u32 *p_running_bundle_id);
 
 /**
  * @brief Get media type value of the port.
@@ -224,6 +235,41 @@ qed_mcp_send_drv_version(struct qed_hwfn *p_hwfn,
 			 struct qed_ptt *p_ptt,
 			 struct qed_mcp_drv_version *p_ver);
 
+/**
+ * @brief Set LED status
+ *
+ *  @param p_hwfn
+ *  @param p_ptt
+ *  @param mode - LED mode
+ *
+ * @return int - 0 - operation was successful.
+ */
+int qed_mcp_set_led(struct qed_hwfn *p_hwfn,
+		    struct qed_ptt *p_ptt,
+		    enum qed_led_mode mode);
+
+/**
+ * @brief Bist register test
+ *
+ *  @param p_hwfn    - hw function
+ *  @param p_ptt     - PTT required for register access
+ *
+ * @return int - 0 - operation was successful.
+ */
+int qed_mcp_bist_register_test(struct qed_hwfn *p_hwfn,
+			       struct qed_ptt *p_ptt);
+
+/**
+ * @brief Bist clock test
+ *
+ *  @param p_hwfn    - hw function
+ *  @param p_ptt     - PTT required for register access
+ *
+ * @return int - 0 - operation was successful.
+ */
+int qed_mcp_bist_clock_test(struct qed_hwfn *p_hwfn,
+			    struct qed_ptt *p_ptt);
+
 /* Using hwfn number (and not pf_num) is required since in CMT mode,
  * same pf_num may be used by two different hwfn
  * TODO - this shouldn't really be in .h file, but until all fields
@@ -242,7 +288,8 @@ qed_mcp_send_drv_version(struct qed_hwfn *p_hwfn,
 #define MFW_PORT(_p_hwfn)       ((_p_hwfn)->abs_pf_id %	\
 				 ((_p_hwfn)->cdev->num_ports_in_engines * 2))
 struct qed_mcp_info {
-	struct mutex				mutex; /* MCP access lock */
+	spinlock_t				lock;
+	bool					block_mb_sending;
 	u32					public_base;
 	u32					drv_mb_addr;
 	u32					mfw_mb_addr;
@@ -257,6 +304,15 @@ struct qed_mcp_info {
 	u8					*mfw_mb_shadow;
 	u16					mfw_mb_length;
 	u16					mcp_hist;
+};
+
+struct qed_mcp_mb_params {
+	u32			cmd;
+	u32			param;
+	union drv_union_data	*p_data_src;
+	union drv_union_data	*p_data_dst;
+	u32			mcp_resp;
+	u32			mcp_param;
 };
 
 /**
@@ -337,6 +393,18 @@ void qed_mcp_read_mb(struct qed_hwfn *p_hwfn,
 		     struct qed_ptt *p_ptt);
 
 /**
+ * @brief Ack to mfw that driver finished FLR process for VFs
+ *
+ * @param p_hwfn
+ * @param p_ptt
+ * @param vfs_to_ack - bit mask of all engine VFs for which the PF acks.
+ *
+ * @param return int - 0 upon success.
+ */
+int qed_mcp_ack_vf_flr(struct qed_hwfn *p_hwfn,
+		       struct qed_ptt *p_ptt, u32 *vfs_to_ack);
+
+/**
  * @brief - calls during init to read shmem of all function-related info.
  *
  * @param p_hwfn
@@ -366,4 +434,27 @@ int qed_mcp_reset(struct qed_hwfn *p_hwfn,
  */
 bool qed_mcp_is_init(struct qed_hwfn *p_hwfn);
 
+/**
+ * @brief request MFW to configure MSI-X for a VF
+ *
+ * @param p_hwfn
+ * @param p_ptt
+ * @param vf_id - absolute inside engine
+ * @param num_sbs - number of entries to request
+ *
+ * @return int
+ */
+int qed_mcp_config_vf_msix(struct qed_hwfn *p_hwfn,
+			   struct qed_ptt *p_ptt, u8 vf_id, u8 num);
+
+int qed_configure_pf_min_bandwidth(struct qed_dev *cdev, u8 min_bw);
+int qed_configure_pf_max_bandwidth(struct qed_dev *cdev, u8 max_bw);
+int __qed_configure_pf_max_bandwidth(struct qed_hwfn *p_hwfn,
+				     struct qed_ptt *p_ptt,
+				     struct qed_mcp_link_state *p_link,
+				     u8 max_bw);
+int __qed_configure_pf_min_bandwidth(struct qed_hwfn *p_hwfn,
+				     struct qed_ptt *p_ptt,
+				     struct qed_mcp_link_state *p_link,
+				     u8 min_bw);
 #endif

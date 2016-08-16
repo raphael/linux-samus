@@ -139,6 +139,7 @@ struct pci_dn *pci_get_pdn(struct pci_dev *pdev)
 #ifdef CONFIG_PCI_IOV
 static struct pci_dn *add_one_dev_pci_data(struct pci_dn *parent,
 					   struct pci_dev *pdev,
+					   int vf_index,
 					   int busno, int devfn)
 {
 	struct pci_dn *pdn;
@@ -158,6 +159,7 @@ static struct pci_dn *add_one_dev_pci_data(struct pci_dn *parent,
 	pdn->busno = busno;
 	pdn->devfn = devfn;
 #ifdef CONFIG_PPC_POWERNV
+	pdn->vf_index = vf_index;
 	pdn->pe_number = IODA_INVALID_PE;
 #endif
 	INIT_LIST_HEAD(&pdn->child_list);
@@ -179,6 +181,7 @@ struct pci_dn *add_dev_pci_data(struct pci_dev *pdev)
 {
 #ifdef CONFIG_PCI_IOV
 	struct pci_dn *parent, *pdn;
+	struct eeh_dev *edev;
 	int i;
 
 	/* Only support IOV for now */
@@ -196,7 +199,7 @@ struct pci_dn *add_dev_pci_data(struct pci_dev *pdev)
 		return NULL;
 
 	for (i = 0; i < pci_sriov_get_totalvfs(pdev); i++) {
-		pdn = add_one_dev_pci_data(parent, NULL,
+		pdn = add_one_dev_pci_data(parent, NULL, i,
 					   pci_iov_virtfn_bus(pdev, i),
 					   pci_iov_virtfn_devfn(pdev, i));
 		if (!pdn) {
@@ -204,6 +207,12 @@ struct pci_dn *add_dev_pci_data(struct pci_dev *pdev)
 				 __func__, i);
 			return NULL;
 		}
+
+		/* Create the EEH device for the VF */
+		eeh_dev_init(pdn, pci_bus_to_host(pdev->bus));
+		edev = pdn_to_eeh_dev(pdn);
+		BUG_ON(!edev);
+		edev->physfn = pdev;
 	}
 #endif /* CONFIG_PCI_IOV */
 
@@ -215,6 +224,7 @@ void remove_dev_pci_data(struct pci_dev *pdev)
 #ifdef CONFIG_PCI_IOV
 	struct pci_dn *parent;
 	struct pci_dn *pdn, *tmp;
+	struct eeh_dev *edev;
 	int i;
 
 	/*
@@ -256,6 +266,13 @@ void remove_dev_pci_data(struct pci_dev *pdev)
 			    pdn->devfn != pci_iov_virtfn_devfn(pdev, i))
 				continue;
 
+			/* Release EEH device for the VF */
+			edev = pdn_to_eeh_dev(pdn);
+			if (edev) {
+				pdn->edev = NULL;
+				kfree(edev);
+			}
+
 			if (!list_empty(&pdn->list))
 				list_del(&pdn->list);
 
@@ -265,13 +282,9 @@ void remove_dev_pci_data(struct pci_dev *pdev)
 #endif /* CONFIG_PCI_IOV */
 }
 
-/*
- * Traverse_func that inits the PCI fields of the device node.
- * NOTE: this *must* be done before read/write config to the device.
- */
-void *update_dn_pci_info(struct device_node *dn, void *data)
+struct pci_dn *pci_add_device_node_info(struct pci_controller *hose,
+					struct device_node *dn)
 {
-	struct pci_controller *phb = data;
 	const __be32 *type = of_get_property(dn, "ibm,pci-config-space-type", NULL);
 	const __be32 *regs;
 	struct device_node *parent;
@@ -282,7 +295,7 @@ void *update_dn_pci_info(struct device_node *dn, void *data)
 		return NULL;
 	dn->data = pdn;
 	pdn->node = dn;
-	pdn->phb = phb;
+	pdn->phb = hose;
 #ifdef CONFIG_PPC_POWERNV
 	pdn->pe_number = IODA_INVALID_PE;
 #endif
@@ -314,8 +327,32 @@ void *update_dn_pci_info(struct device_node *dn, void *data)
 	if (pdn->parent)
 		list_add_tail(&pdn->list, &pdn->parent->child_list);
 
-	return NULL;
+	return pdn;
 }
+EXPORT_SYMBOL_GPL(pci_add_device_node_info);
+
+void pci_remove_device_node_info(struct device_node *dn)
+{
+	struct pci_dn *pdn = dn ? PCI_DN(dn) : NULL;
+#ifdef CONFIG_EEH
+	struct eeh_dev *edev = pdn_to_eeh_dev(pdn);
+
+	if (edev)
+		edev->pdn = NULL;
+#endif
+
+	if (!pdn)
+		return;
+
+	WARN_ON(!list_empty(&pdn->child_list));
+	list_del(&pdn->list);
+	if (pdn->parent)
+		of_node_put(pdn->parent->node);
+
+	dn->data = NULL;
+	kfree(pdn);
+}
+EXPORT_SYMBOL_GPL(pci_remove_device_node_info);
 
 /*
  * Traverse a device tree stopping each PCI device in the tree.
@@ -335,8 +372,9 @@ void *update_dn_pci_info(struct device_node *dn, void *data)
  * one of these nodes we also assume its siblings are non-pci for
  * performance.
  */
-void *traverse_pci_devices(struct device_node *start, traverse_func pre,
-		void *data)
+void *pci_traverse_device_nodes(struct device_node *start,
+				void *(*fn)(struct device_node *, void *),
+				void *data)
 {
 	struct device_node *dn, *nextdn;
 	void *ret;
@@ -351,8 +389,11 @@ void *traverse_pci_devices(struct device_node *start, traverse_func pre,
 		if (classp)
 			class = of_read_number(classp, 1);
 
-		if (pre && ((ret = pre(dn, data)) != NULL))
-			return ret;
+		if (fn) {
+			ret = fn(dn, data);
+			if (ret)
+				return ret;
+		}
 
 		/* If we are a PCI bridge, go down */
 		if (dn->child && ((class >> 8) == PCI_CLASS_BRIDGE_PCI ||
@@ -374,6 +415,7 @@ void *traverse_pci_devices(struct device_node *start, traverse_func pre,
 	}
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(pci_traverse_device_nodes);
 
 static struct pci_dn *pci_dn_next_one(struct pci_dn *root,
 				      struct pci_dn *pdn)
@@ -415,6 +457,18 @@ void *traverse_pci_dn(struct pci_dn *root,
 	return NULL;
 }
 
+static void *add_pdn(struct device_node *dn, void *data)
+{
+	struct pci_controller *hose = data;
+	struct pci_dn *pdn;
+
+	pdn = pci_add_device_node_info(hose, dn);
+	if (!pdn)
+		return ERR_PTR(-ENOMEM);
+
+	return NULL;
+}
+
 /** 
  * pci_devs_phb_init_dynamic - setup pci devices under this PHB
  * phb: pci-to-host bridge (top-level bridge connecting to cpu)
@@ -429,8 +483,7 @@ void pci_devs_phb_init_dynamic(struct pci_controller *phb)
 	struct pci_dn *pdn;
 
 	/* PHB nodes themselves must not match */
-	update_dn_pci_info(dn, phb);
-	pdn = dn->data;
+	pdn = pci_add_device_node_info(phb, dn);
 	if (pdn) {
 		pdn->devfn = pdn->busno = -1;
 		pdn->vendor_id = pdn->device_id = pdn->class_code = 0;
@@ -439,7 +492,7 @@ void pci_devs_phb_init_dynamic(struct pci_controller *phb)
 	}
 
 	/* Update dn->phb ptrs for new phb and children devices */
-	traverse_pci_devices(dn, update_dn_pci_info, phb);
+	pci_traverse_device_nodes(dn, add_pdn, phb);
 }
 
 /** 

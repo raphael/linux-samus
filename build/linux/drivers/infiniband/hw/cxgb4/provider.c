@@ -339,7 +339,8 @@ static int c4iw_query_device(struct ib_device *ibdev, struct ib_device_attr *pro
 	props->max_mr = c4iw_num_stags(&dev->rdev);
 	props->max_pd = T4_MAX_NUM_PD;
 	props->local_ca_ack_delay = 0;
-	props->max_fast_reg_page_list_len = t4_max_fr_depth(use_dsgl);
+	props->max_fast_reg_page_list_len =
+		t4_max_fr_depth(dev->rdev.lldi.ulptx_memwrite_dsgl && use_dsgl);
 
 	return 0;
 }
@@ -445,20 +446,59 @@ static ssize_t show_board(struct device *dev, struct device_attribute *attr,
 		       c4iw_dev->rdev.lldi.pdev->device);
 }
 
+enum counters {
+	IP4INSEGS,
+	IP4OUTSEGS,
+	IP4RETRANSSEGS,
+	IP4OUTRSTS,
+	IP6INSEGS,
+	IP6OUTSEGS,
+	IP6RETRANSSEGS,
+	IP6OUTRSTS,
+	NR_COUNTERS
+};
+
+static const char * const names[] = {
+	[IP4INSEGS] = "ip4InSegs",
+	[IP4OUTSEGS] = "ip4OutSegs",
+	[IP4RETRANSSEGS] = "ip4RetransSegs",
+	[IP4OUTRSTS] = "ip4OutRsts",
+	[IP6INSEGS] = "ip6InSegs",
+	[IP6OUTSEGS] = "ip6OutSegs",
+	[IP6RETRANSSEGS] = "ip6RetransSegs",
+	[IP6OUTRSTS] = "ip6OutRsts"
+};
+
+static struct rdma_hw_stats *c4iw_alloc_stats(struct ib_device *ibdev,
+					      u8 port_num)
+{
+	BUILD_BUG_ON(ARRAY_SIZE(names) != NR_COUNTERS);
+
+	if (port_num != 0)
+		return NULL;
+
+	return rdma_alloc_hw_stats_struct(names, NR_COUNTERS,
+					  RDMA_HW_STATS_DEFAULT_LIFESPAN);
+}
+
 static int c4iw_get_mib(struct ib_device *ibdev,
-			union rdma_protocol_stats *stats)
+			struct rdma_hw_stats *stats,
+			u8 port, int index)
 {
 	struct tp_tcp_stats v4, v6;
 	struct c4iw_dev *c4iw_dev = to_c4iw_dev(ibdev);
 
 	cxgb4_get_tcp_stats(c4iw_dev->rdev.lldi.pdev, &v4, &v6);
-	memset(stats, 0, sizeof *stats);
-	stats->iw.tcpInSegs = v4.tcp_in_segs + v6.tcp_in_segs;
-	stats->iw.tcpOutSegs = v4.tcp_out_segs + v6.tcp_out_segs;
-	stats->iw.tcpRetransSegs = v4.tcp_retrans_segs + v6.tcp_retrans_segs;
-	stats->iw.tcpOutRsts = v4.tcp_out_rsts + v6.tcp_out_rsts;
+	stats->value[IP4INSEGS] = v4.tcp_in_segs;
+	stats->value[IP4OUTSEGS] = v4.tcp_out_segs;
+	stats->value[IP4RETRANSSEGS] = v4.tcp_retrans_segs;
+	stats->value[IP4OUTRSTS] = v4.tcp_out_rsts;
+	stats->value[IP6INSEGS] = v6.tcp_in_segs;
+	stats->value[IP6OUTSEGS] = v6.tcp_out_segs;
+	stats->value[IP6RETRANSSEGS] = v6.tcp_retrans_segs;
+	stats->value[IP6OUTRSTS] = v6.tcp_out_rsts;
 
-	return 0;
+	return stats->num_counters;
 }
 
 static DEVICE_ATTR(hw_rev, S_IRUGO, show_rev, NULL);
@@ -549,12 +589,9 @@ int c4iw_register_device(struct c4iw_dev *dev)
 	dev->ibdev.resize_cq = c4iw_resize_cq;
 	dev->ibdev.poll_cq = c4iw_poll_cq;
 	dev->ibdev.get_dma_mr = c4iw_get_dma_mr;
-	dev->ibdev.reg_phys_mr = c4iw_register_phys_mem;
-	dev->ibdev.rereg_phys_mr = c4iw_reregister_phys_mem;
 	dev->ibdev.reg_user_mr = c4iw_reg_user_mr;
 	dev->ibdev.dereg_mr = c4iw_dereg_mr;
 	dev->ibdev.alloc_mw = c4iw_alloc_mw;
-	dev->ibdev.bind_mw = c4iw_bind_mw;
 	dev->ibdev.dealloc_mw = c4iw_dealloc_mw;
 	dev->ibdev.alloc_mr = c4iw_alloc_mr;
 	dev->ibdev.map_mr_sg = c4iw_map_mr_sg;
@@ -564,9 +601,12 @@ int c4iw_register_device(struct c4iw_dev *dev)
 	dev->ibdev.req_notify_cq = c4iw_arm_cq;
 	dev->ibdev.post_send = c4iw_post_send;
 	dev->ibdev.post_recv = c4iw_post_receive;
-	dev->ibdev.get_protocol_stats = c4iw_get_mib;
+	dev->ibdev.alloc_hw_stats = c4iw_alloc_stats;
+	dev->ibdev.get_hw_stats = c4iw_get_mib;
 	dev->ibdev.uverbs_abi_ver = C4IW_UVERBS_ABI_VERSION;
 	dev->ibdev.get_port_immutable = c4iw_port_immutable;
+	dev->ibdev.drain_sq = c4iw_drain_sq;
+	dev->ibdev.drain_rq = c4iw_drain_rq;
 
 	dev->ibdev.iwcm = kmalloc(sizeof(struct iw_cm_verbs), GFP_KERNEL);
 	if (!dev->ibdev.iwcm)
@@ -580,6 +620,8 @@ int c4iw_register_device(struct c4iw_dev *dev)
 	dev->ibdev.iwcm->add_ref = c4iw_qp_add_ref;
 	dev->ibdev.iwcm->rem_ref = c4iw_qp_rem_ref;
 	dev->ibdev.iwcm->get_qp = c4iw_get_qp;
+	memcpy(dev->ibdev.iwcm->ifname, dev->rdev.lldi.ports[0]->name,
+	       sizeof(dev->ibdev.iwcm->ifname));
 
 	ret = ib_register_device(&dev->ibdev, NULL);
 	if (ret)

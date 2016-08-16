@@ -897,7 +897,6 @@ static void cursor_update(void *data)
 static int armada_drm_crtc_cursor_set(struct drm_crtc *crtc,
 	struct drm_file *file, uint32_t handle, uint32_t w, uint32_t h)
 {
-	struct drm_device *dev = crtc->dev;
 	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
 	struct armada_gem_object *obj = NULL;
 	int ret;
@@ -911,7 +910,7 @@ static int armada_drm_crtc_cursor_set(struct drm_crtc *crtc,
 		if (w > 64 || h > 64 || (w > 32 && h > 32))
 			return -ENOMEM;
 
-		obj = armada_gem_object_lookup(dev, file, handle);
+		obj = armada_gem_object_lookup(file, handle);
 		if (!obj)
 			return -ENOENT;
 
@@ -928,11 +927,10 @@ static int armada_drm_crtc_cursor_set(struct drm_crtc *crtc,
 		}
 	}
 
-	mutex_lock(&dev->struct_mutex);
 	if (dcrtc->cursor_obj) {
 		dcrtc->cursor_obj->update = NULL;
 		dcrtc->cursor_obj->update_data = NULL;
-		drm_gem_object_unreference(&dcrtc->cursor_obj->obj);
+		drm_gem_object_unreference_unlocked(&dcrtc->cursor_obj->obj);
 	}
 	dcrtc->cursor_obj = obj;
 	dcrtc->cursor_w = w;
@@ -942,14 +940,12 @@ static int armada_drm_crtc_cursor_set(struct drm_crtc *crtc,
 		obj->update_data = dcrtc;
 		obj->update = cursor_update;
 	}
-	mutex_unlock(&dev->struct_mutex);
 
 	return ret;
 }
 
 static int armada_drm_crtc_cursor_move(struct drm_crtc *crtc, int x, int y)
 {
-	struct drm_device *dev = crtc->dev;
 	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
 	int ret;
 
@@ -957,11 +953,9 @@ static int armada_drm_crtc_cursor_move(struct drm_crtc *crtc, int x, int y)
 	if (!dcrtc->variant->has_spu_adv_reg)
 		return -EFAULT;
 
-	mutex_lock(&dev->struct_mutex);
 	dcrtc->cursor_x = x;
 	dcrtc->cursor_y = y;
 	ret = armada_drm_crtc_cursor_update(dcrtc, false);
-	mutex_unlock(&dev->struct_mutex);
 
 	return ret;
 }
@@ -972,7 +966,7 @@ static void armada_drm_crtc_destroy(struct drm_crtc *crtc)
 	struct armada_private *priv = crtc->dev->dev_private;
 
 	if (dcrtc->cursor_obj)
-		drm_gem_object_unreference(&dcrtc->cursor_obj->obj);
+		drm_gem_object_unreference_unlocked(&dcrtc->cursor_obj->obj);
 
 	priv->dcrtc[dcrtc->num] = NULL;
 	drm_crtc_cleanup(&dcrtc->crtc);
@@ -1074,7 +1068,7 @@ armada_drm_crtc_set_property(struct drm_crtc *crtc,
 	return 0;
 }
 
-static struct drm_crtc_funcs armada_crtc_funcs = {
+static const struct drm_crtc_funcs armada_crtc_funcs = {
 	.cursor_set	= armada_drm_crtc_cursor_set,
 	.cursor_move	= armada_drm_crtc_cursor_move,
 	.destroy	= armada_drm_crtc_destroy,
@@ -1216,14 +1210,14 @@ static int armada_drm_crtc_create(struct drm_device *drm, struct device *dev,
 				       &armada_primary_plane_funcs,
 				       armada_primary_formats,
 				       ARRAY_SIZE(armada_primary_formats),
-				       DRM_PLANE_TYPE_PRIMARY);
+				       DRM_PLANE_TYPE_PRIMARY, NULL);
 	if (ret) {
 		kfree(primary);
 		return ret;
 	}
 
 	ret = drm_crtc_init_with_planes(drm, &dcrtc->crtc, &primary->base, NULL,
-					&armada_crtc_funcs);
+					&armada_crtc_funcs, NULL);
 	if (ret)
 		goto err_crtc_init;
 

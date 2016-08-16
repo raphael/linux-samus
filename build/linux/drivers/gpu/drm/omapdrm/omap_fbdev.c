@@ -153,7 +153,7 @@ static int omap_fbdev_create(struct drm_fb_helper *helper,
 		/* note: if fb creation failed, we can't rely on fb destroy
 		 * to unref the bo:
 		 */
-		drm_gem_object_unreference(fbdev->bo);
+		drm_gem_object_unreference_unlocked(fbdev->bo);
 		ret = PTR_ERR(fb);
 		goto fail;
 	}
@@ -295,6 +295,10 @@ fini:
 	drm_fb_helper_fini(helper);
 fail:
 	kfree(fbdev);
+
+	dev_warn(dev->dev, "omap_fbdev_init failed\n");
+	/* well, limp along without an fbdev.. maybe X11 will work? */
+
 	return NULL;
 }
 

@@ -15,6 +15,7 @@ struct sock_diag_handler {
 	__u8 family;
 	int (*dump)(struct sk_buff *skb, struct nlmsghdr *nlh);
 	int (*get_info)(struct sk_buff *skb, struct sock *sk);
+	int (*destroy)(struct sk_buff *skb, struct nlmsghdr *nlh);
 };
 
 int sock_diag_register(const struct sock_diag_handler *h);
@@ -35,6 +36,9 @@ enum sknetlink_groups sock_diag_destroy_group(const struct sock *sk)
 {
 	switch (sk->sk_family) {
 	case AF_INET:
+		if (sk->sk_type == SOCK_RAW)
+			return SKNLGRP_NONE;
+
 		switch (sk->sk_protocol) {
 		case IPPROTO_TCP:
 			return SKNLGRP_INET_TCP_DESTROY;
@@ -44,6 +48,9 @@ enum sknetlink_groups sock_diag_destroy_group(const struct sock *sk)
 			return SKNLGRP_NONE;
 		}
 	case AF_INET6:
+		if (sk->sk_type == SOCK_RAW)
+			return SKNLGRP_NONE;
+
 		switch (sk->sk_protocol) {
 		case IPPROTO_TCP:
 			return SKNLGRP_INET6_TCP_DESTROY;
@@ -68,4 +75,5 @@ bool sock_diag_has_destroy_listeners(const struct sock *sk)
 }
 void sock_diag_broadcast_destroy(struct sock *sk);
 
+int sock_diag_destroy(struct sock *sk, int err);
 #endif

@@ -10,6 +10,8 @@
 #include "comm.h"
 #include "unwind.h"
 
+#include <api/fs/fs.h>
+
 int thread__init_map_groups(struct thread *thread, struct machine *machine)
 {
 	struct thread *leader;
@@ -19,8 +21,10 @@ int thread__init_map_groups(struct thread *thread, struct machine *machine)
 		thread->mg = map_groups__new(machine);
 	} else {
 		leader = __machine__findnew_thread(machine, pid, pid);
-		if (leader)
+		if (leader) {
 			thread->mg = map_groups__get(leader->mg);
+			thread__put(leader);
+		}
 	}
 
 	return thread->mg ? 0 : -1;
@@ -53,7 +57,7 @@ struct thread *thread__new(pid_t pid, pid_t tid)
 			goto err_thread;
 
 		list_add(&comm->list, &thread->comm_list);
-		atomic_set(&thread->refcnt, 0);
+		atomic_set(&thread->refcnt, 1);
 		RB_CLEAR_NODE(&thread->rb_node);
 	}
 
@@ -95,6 +99,10 @@ struct thread *thread__get(struct thread *thread)
 void thread__put(struct thread *thread)
 {
 	if (thread && atomic_dec_and_test(&thread->refcnt)) {
+		/*
+		 * Remove it from the dead_threads list, as last reference
+		 * is gone.
+		 */
 		list_del_init(&thread->node);
 		thread__delete(thread);
 	}
@@ -145,6 +153,23 @@ int __thread__set_comm(struct thread *thread, const char *str, u64 timestamp,
 	thread->comm_set = true;
 
 	return 0;
+}
+
+int thread__set_comm_from_proc(struct thread *thread)
+{
+	char path[64];
+	char *comm = NULL;
+	size_t sz;
+	int err = -1;
+
+	if (!(snprintf(path, sizeof(path), "%d/task/%d/comm",
+		       thread->pid_, thread->tid) >= (int)sizeof(path)) &&
+	    procfs__read_str(path, &comm, &sz) == 0) {
+		comm[sz - 1] = '\0';
+		err = thread__set_comm(thread, comm, 0);
+	}
+
+	return err;
 }
 
 const char *thread__comm_str(const struct thread *thread)
@@ -227,7 +252,7 @@ void thread__find_cpumode_addr_location(struct thread *thread,
 					struct addr_location *al)
 {
 	size_t i;
-	const u8 const cpumodes[] = {
+	const u8 cpumodes[] = {
 		PERF_RECORD_MISC_USER,
 		PERF_RECORD_MISC_KERNEL,
 		PERF_RECORD_MISC_GUEST_USER,

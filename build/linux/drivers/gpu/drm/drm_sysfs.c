@@ -167,47 +167,35 @@ static ssize_t status_store(struct device *device,
 {
 	struct drm_connector *connector = to_drm_connector(device);
 	struct drm_device *dev = connector->dev;
-	enum drm_connector_status old_status;
+	enum drm_connector_force old_force;
 	int ret;
 
 	ret = mutex_lock_interruptible(&dev->mode_config.mutex);
 	if (ret)
 		return ret;
 
-	old_status = connector->status;
+	old_force = connector->force;
 
-	if (sysfs_streq(buf, "detect")) {
+	if (sysfs_streq(buf, "detect"))
 		connector->force = 0;
-		connector->status = connector->funcs->detect(connector, true);
-	} else if (sysfs_streq(buf, "on")) {
+	else if (sysfs_streq(buf, "on"))
 		connector->force = DRM_FORCE_ON;
-	} else if (sysfs_streq(buf, "on-digital")) {
+	else if (sysfs_streq(buf, "on-digital"))
 		connector->force = DRM_FORCE_ON_DIGITAL;
-	} else if (sysfs_streq(buf, "off")) {
+	else if (sysfs_streq(buf, "off"))
 		connector->force = DRM_FORCE_OFF;
-	} else
+	else
 		ret = -EINVAL;
 
-	if (ret == 0 && connector->force) {
-		if (connector->force == DRM_FORCE_ON ||
-		    connector->force == DRM_FORCE_ON_DIGITAL)
-			connector->status = connector_status_connected;
-		else
-			connector->status = connector_status_disconnected;
-		if (connector->funcs->force)
-			connector->funcs->force(connector);
-	}
-
-	if (old_status != connector->status) {
-		DRM_DEBUG_KMS("[CONNECTOR:%d:%s] status updated from %d to %d\n",
+	if (old_force != connector->force || !connector->force) {
+		DRM_DEBUG_KMS("[CONNECTOR:%d:%s] force updated from %d to %d or reprobing\n",
 			      connector->base.id,
 			      connector->name,
-			      old_status, connector->status);
+			      old_force, connector->force);
 
-		dev->mode_config.delayed_event = true;
-		if (dev->mode_config.poll_enabled)
-			schedule_delayed_work(&dev->mode_config.output_poll_work,
-					      0);
+		connector->funcs->fill_modes(connector,
+					     dev->mode_config.max_width,
+					     dev->mode_config.max_height);
 	}
 
 	mutex_unlock(&dev->mode_config.mutex);
@@ -220,9 +208,12 @@ static ssize_t status_show(struct device *device,
 			   char *buf)
 {
 	struct drm_connector *connector = to_drm_connector(device);
+	enum drm_connector_status status;
+
+	status = READ_ONCE(connector->status);
 
 	return snprintf(buf, PAGE_SIZE, "%s\n",
-			drm_get_connector_status_name(connector->status));
+			drm_get_connector_status_name(status));
 }
 
 static ssize_t dpms_show(struct device *device,
@@ -243,36 +234,44 @@ static ssize_t enabled_show(struct device *device,
 			   char *buf)
 {
 	struct drm_connector *connector = to_drm_connector(device);
+	bool enabled;
 
-	return snprintf(buf, PAGE_SIZE, "%s\n", connector->encoder ? "enabled" :
-			"disabled");
+	enabled = READ_ONCE(connector->encoder);
+
+	return snprintf(buf, PAGE_SIZE, enabled ? "enabled\n" : "disabled\n");
 }
 
 static ssize_t edid_show(struct file *filp, struct kobject *kobj,
 			 struct bin_attribute *attr, char *buf, loff_t off,
 			 size_t count)
 {
-	struct device *connector_dev = container_of(kobj, struct device, kobj);
+	struct device *connector_dev = kobj_to_dev(kobj);
 	struct drm_connector *connector = to_drm_connector(connector_dev);
 	unsigned char *edid;
 	size_t size;
+	ssize_t ret = 0;
 
+	mutex_lock(&connector->dev->mode_config.mutex);
 	if (!connector->edid_blob_ptr)
-		return 0;
+		goto unlock;
 
 	edid = connector->edid_blob_ptr->data;
 	size = connector->edid_blob_ptr->length;
 	if (!edid)
-		return 0;
+		goto unlock;
 
 	if (off >= size)
-		return 0;
+		goto unlock;
 
 	if (off + count > size)
 		count = size - off;
 	memcpy(buf, edid + off, count);
 
-	return count;
+	ret = count;
+unlock:
+	mutex_unlock(&connector->dev->mode_config.mutex);
+
+	return ret;
 }
 
 static ssize_t modes_show(struct device *device,
@@ -283,108 +282,14 @@ static ssize_t modes_show(struct device *device,
 	struct drm_display_mode *mode;
 	int written = 0;
 
+	mutex_lock(&connector->dev->mode_config.mutex);
 	list_for_each_entry(mode, &connector->modes, head) {
 		written += snprintf(buf + written, PAGE_SIZE - written, "%s\n",
 				    mode->name);
 	}
+	mutex_unlock(&connector->dev->mode_config.mutex);
 
 	return written;
-}
-
-static ssize_t tv_subconnector_show(struct device *device,
-				    struct device_attribute *attr,
-				    char *buf)
-{
-	struct drm_connector *connector = to_drm_connector(device);
-	struct drm_device *dev = connector->dev;
-	struct drm_property *prop;
-	uint64_t subconnector;
-	int ret;
-
-	prop = dev->mode_config.tv_subconnector_property;
-	if (!prop) {
-		DRM_ERROR("Unable to find subconnector property\n");
-		return 0;
-	}
-
-	ret = drm_object_property_get_value(&connector->base, prop, &subconnector);
-	if (ret)
-		return 0;
-
-	return snprintf(buf, PAGE_SIZE, "%s",
-			drm_get_tv_subconnector_name((int)subconnector));
-}
-
-static ssize_t tv_select_subconnector_show(struct device *device,
-					   struct device_attribute *attr,
-					   char *buf)
-{
-	struct drm_connector *connector = to_drm_connector(device);
-	struct drm_device *dev = connector->dev;
-	struct drm_property *prop;
-	uint64_t subconnector;
-	int ret;
-
-	prop = dev->mode_config.tv_select_subconnector_property;
-	if (!prop) {
-		DRM_ERROR("Unable to find select subconnector property\n");
-		return 0;
-	}
-
-	ret = drm_object_property_get_value(&connector->base, prop, &subconnector);
-	if (ret)
-		return 0;
-
-	return snprintf(buf, PAGE_SIZE, "%s",
-			drm_get_tv_select_name((int)subconnector));
-}
-
-static ssize_t dvii_subconnector_show(struct device *device,
-				      struct device_attribute *attr,
-				      char *buf)
-{
-	struct drm_connector *connector = to_drm_connector(device);
-	struct drm_device *dev = connector->dev;
-	struct drm_property *prop;
-	uint64_t subconnector;
-	int ret;
-
-	prop = dev->mode_config.dvi_i_subconnector_property;
-	if (!prop) {
-		DRM_ERROR("Unable to find subconnector property\n");
-		return 0;
-	}
-
-	ret = drm_object_property_get_value(&connector->base, prop, &subconnector);
-	if (ret)
-		return 0;
-
-	return snprintf(buf, PAGE_SIZE, "%s",
-			drm_get_dvi_i_subconnector_name((int)subconnector));
-}
-
-static ssize_t dvii_select_subconnector_show(struct device *device,
-					     struct device_attribute *attr,
-					     char *buf)
-{
-	struct drm_connector *connector = to_drm_connector(device);
-	struct drm_device *dev = connector->dev;
-	struct drm_property *prop;
-	uint64_t subconnector;
-	int ret;
-
-	prop = dev->mode_config.dvi_i_select_subconnector_property;
-	if (!prop) {
-		DRM_ERROR("Unable to find select subconnector property\n");
-		return 0;
-	}
-
-	ret = drm_object_property_get_value(&connector->base, prop, &subconnector);
-	if (ret)
-		return 0;
-
-	return snprintf(buf, PAGE_SIZE, "%s",
-			drm_get_dvi_i_select_name((int)subconnector));
 }
 
 static DEVICE_ATTR_RW(status);
@@ -399,54 +304,6 @@ static struct attribute *connector_dev_attrs[] = {
 	&dev_attr_modes.attr,
 	NULL
 };
-
-static DEVICE_ATTR_RO(tv_subconnector);
-static DEVICE_ATTR_RO(tv_select_subconnector);
-
-static struct attribute *connector_tv_dev_attrs[] = {
-	&dev_attr_tv_subconnector.attr,
-	&dev_attr_tv_select_subconnector.attr,
-	NULL
-};
-
-static DEVICE_ATTR_RO(dvii_subconnector);
-static DEVICE_ATTR_RO(dvii_select_subconnector);
-
-static struct attribute *connector_dvii_dev_attrs[] = {
-	&dev_attr_dvii_subconnector.attr,
-	&dev_attr_dvii_select_subconnector.attr,
-	NULL
-};
-
-/* Connector type related helpers */
-static int kobj_connector_type(struct kobject *kobj)
-{
-	struct device *dev = kobj_to_dev(kobj);
-	struct drm_connector *connector = to_drm_connector(dev);
-
-	return connector->connector_type;
-}
-
-static umode_t connector_is_dvii(struct kobject *kobj,
-				 struct attribute *attr, int idx)
-{
-	return kobj_connector_type(kobj) == DRM_MODE_CONNECTOR_DVII ?
-		attr->mode : 0;
-}
-
-static umode_t connector_is_tv(struct kobject *kobj,
-			       struct attribute *attr, int idx)
-{
-	switch (kobj_connector_type(kobj)) {
-	case DRM_MODE_CONNECTOR_Composite:
-	case DRM_MODE_CONNECTOR_SVIDEO:
-	case DRM_MODE_CONNECTOR_Component:
-	case DRM_MODE_CONNECTOR_TV:
-		return attr->mode;
-	}
-
-	return 0;
-}
 
 static struct bin_attribute edid_attr = {
 	.attr.name = "edid",
@@ -465,20 +322,8 @@ static const struct attribute_group connector_dev_group = {
 	.bin_attrs = connector_bin_attrs,
 };
 
-static const struct attribute_group connector_tv_dev_group = {
-	.attrs = connector_tv_dev_attrs,
-	.is_visible = connector_is_tv,
-};
-
-static const struct attribute_group connector_dvii_dev_group = {
-	.attrs = connector_dvii_dev_attrs,
-	.is_visible = connector_is_dvii,
-};
-
 static const struct attribute_group *connector_dev_groups[] = {
 	&connector_dev_group,
-	&connector_tv_dev_group,
-	&connector_dvii_dev_group,
 	NULL
 };
 

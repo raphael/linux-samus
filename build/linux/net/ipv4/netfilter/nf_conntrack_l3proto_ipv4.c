@@ -360,7 +360,7 @@ static int ipv4_init_net(struct net *net)
 
 	in->ctl_table[0].data = &nf_conntrack_max;
 	in->ctl_table[1].data = &net->ct.count;
-	in->ctl_table[2].data = &net->ct.htable_size;
+	in->ctl_table[2].data = &nf_conntrack_htable_size;
 	in->ctl_table[3].data = &net->ct.sysctl_checksum;
 	in->ctl_table[4].data = &net->ct.sysctl_log_invalid;
 #endif
@@ -451,7 +451,7 @@ static int __init nf_conntrack_l3proto_ipv4_init(void)
 
 	ret = nf_register_sockopt(&so_getorigdst);
 	if (ret < 0) {
-		printk(KERN_ERR "Unable to register netfilter socket option\n");
+		pr_err("Unable to register netfilter socket option\n");
 		return ret;
 	}
 

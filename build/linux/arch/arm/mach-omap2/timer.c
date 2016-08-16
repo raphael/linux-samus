@@ -194,8 +194,8 @@ static struct device_node * __init omap_get_timer_dt(const struct of_device_id *
 /**
  * omap_dmtimer_init - initialisation function when device tree is used
  *
- * For secure OMAP3 devices, timers with device type "timer-secure" cannot
- * be used by the kernel as they are reserved. Therefore, to prevent the
+ * For secure OMAP3/DRA7xx devices, timers with device type "timer-secure"
+ * cannot be used by the kernel as they are reserved. Therefore, to prevent the
  * kernel registering these devices remove them dynamically from the device
  * tree on boot.
  */
@@ -203,7 +203,7 @@ static void __init omap_dmtimer_init(void)
 {
 	struct device_node *np;
 
-	if (!cpu_is_omap34xx())
+	if (!cpu_is_omap34xx() && !soc_is_dra7xx())
 		return;
 
 	/* If we are a secure device, remove any secure timer nodes */
@@ -496,8 +496,7 @@ void __init omap_init_time(void)
 	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
 			2, "timer_sys_ck", NULL, false);
 
-	if (of_have_populated_dt())
-		clocksource_probe();
+	clocksource_probe();
 }
 
 #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM43XX)
@@ -505,6 +504,8 @@ void __init omap3_secure_sync32k_timer_init(void)
 {
 	__omap_sync32k_timer_init(12, "secure_32k_fck", "ti,timer-secure",
 			2, "timer_sys_ck", NULL, false);
+
+	clocksource_probe();
 }
 #endif /* CONFIG_ARCH_OMAP3 */
 
@@ -513,6 +514,8 @@ void __init omap3_gptimer_timer_init(void)
 {
 	__omap_sync32k_timer_init(2, "timer_sys_ck", NULL,
 			1, "timer_sys_ck", "ti,timer-alwon", true);
+
+	clocksource_probe();
 }
 #endif
 

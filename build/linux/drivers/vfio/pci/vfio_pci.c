@@ -111,6 +111,36 @@ static inline bool vfio_pci_is_vga(struct pci_dev *pdev)
 }
 
 static void vfio_pci_try_bus_reset(struct vfio_pci_device *vdev);
+static void vfio_pci_disable(struct vfio_pci_device *vdev);
+
+/*
+ * INTx masking requires the ability to disable INTx signaling via PCI_COMMAND
+ * _and_ the ability detect when the device is asserting INTx via PCI_STATUS.
+ * If a device implements the former but not the latter we would typically
+ * expect broken_intx_masking be set and require an exclusive interrupt.
+ * However since we do have control of the device's ability to assert INTx,
+ * we can instead pretend that the device does not implement INTx, virtualizing
+ * the pin register to report zero and maintaining DisINTx set on the host.
+ */
+static bool vfio_pci_nointx(struct pci_dev *pdev)
+{
+	switch (pdev->vendor) {
+	case PCI_VENDOR_ID_INTEL:
+		switch (pdev->device) {
+		/* All i40e (XL710/X710) 10/20/40GbE NICs */
+		case 0x1572:
+		case 0x1574:
+		case 0x1580 ... 0x1581:
+		case 0x1583 ... 0x1589:
+		case 0x37d0 ... 0x37d2:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	return false;
+}
 
 static int vfio_pci_enable(struct vfio_pci_device *vdev)
 {
@@ -135,21 +165,27 @@ static int vfio_pci_enable(struct vfio_pci_device *vdev)
 		pr_debug("%s: Couldn't store %s saved state\n",
 			 __func__, dev_name(&pdev->dev));
 
+	if (likely(!nointxmask)) {
+		if (vfio_pci_nointx(pdev)) {
+			dev_info(&pdev->dev, "Masking broken INTx support\n");
+			vdev->nointx = true;
+			pci_intx(pdev, 0);
+		} else
+			vdev->pci_2_3 = pci_intx_mask_supported(pdev);
+	}
+
+	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
+	if (vdev->pci_2_3 && (cmd & PCI_COMMAND_INTX_DISABLE)) {
+		cmd &= ~PCI_COMMAND_INTX_DISABLE;
+		pci_write_config_word(pdev, PCI_COMMAND, cmd);
+	}
+
 	ret = vfio_config_init(vdev);
 	if (ret) {
 		kfree(vdev->pci_saved_state);
 		vdev->pci_saved_state = NULL;
 		pci_disable_device(pdev);
 		return ret;
-	}
-
-	if (likely(!nointxmask))
-		vdev->pci_2_3 = pci_intx_mask_supported(pdev);
-
-	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-	if (vdev->pci_2_3 && (cmd & PCI_COMMAND_INTX_DISABLE)) {
-		cmd &= ~PCI_COMMAND_INTX_DISABLE;
-		pci_write_config_word(pdev, PCI_COMMAND, cmd);
 	}
 
 	msix_pos = pdev->msix_cap;
@@ -169,13 +205,26 @@ static int vfio_pci_enable(struct vfio_pci_device *vdev)
 	if (!vfio_vga_disabled() && vfio_pci_is_vga(pdev))
 		vdev->has_vga = true;
 
+
+	if (vfio_pci_is_vga(pdev) &&
+	    pdev->vendor == PCI_VENDOR_ID_INTEL &&
+	    IS_ENABLED(CONFIG_VFIO_PCI_IGD)) {
+		ret = vfio_pci_igd_init(vdev);
+		if (ret) {
+			dev_warn(&vdev->pdev->dev,
+				 "Failed to setup Intel IGD regions\n");
+			vfio_pci_disable(vdev);
+			return ret;
+		}
+	}
+
 	return 0;
 }
 
 static void vfio_pci_disable(struct vfio_pci_device *vdev)
 {
 	struct pci_dev *pdev = vdev->pdev;
-	int bar;
+	int i, bar;
 
 	/* Stop the device from further DMA */
 	pci_clear_master(pdev);
@@ -185,6 +234,13 @@ static void vfio_pci_disable(struct vfio_pci_device *vdev)
 				vdev->irq_type, 0, 0, NULL);
 
 	vdev->virq_disabled = false;
+
+	for (i = 0; i < vdev->num_regions; i++)
+		vdev->region[i].ops->release(vdev, &vdev->region[i]);
+
+	vdev->num_regions = 0;
+	kfree(vdev->region);
+	vdev->region = NULL; /* don't krealloc a freed pointer */
 
 	vfio_config_free(vdev);
 
@@ -283,7 +339,7 @@ static int vfio_pci_get_irq_count(struct vfio_pci_device *vdev, int irq_type)
 	if (irq_type == VFIO_PCI_INTX_IRQ_INDEX) {
 		u8 pin;
 		pci_read_config_byte(vdev->pdev, PCI_INTERRUPT_PIN, &pin);
-		if (IS_ENABLED(CONFIG_VFIO_PCI_INTX) && pin)
+		if (IS_ENABLED(CONFIG_VFIO_PCI_INTX) && !vdev->nointx && pin)
 			return 1;
 
 	} else if (irq_type == VFIO_PCI_MSI_IRQ_INDEX) {
@@ -421,6 +477,93 @@ static int vfio_pci_for_each_slot_or_bus(struct pci_dev *pdev,
 	return walk.ret;
 }
 
+static int msix_sparse_mmap_cap(struct vfio_pci_device *vdev,
+				struct vfio_info_cap *caps)
+{
+	struct vfio_info_cap_header *header;
+	struct vfio_region_info_cap_sparse_mmap *sparse;
+	size_t end, size;
+	int nr_areas = 2, i = 0;
+
+	end = pci_resource_len(vdev->pdev, vdev->msix_bar);
+
+	/* If MSI-X table is aligned to the start or end, only one area */
+	if (((vdev->msix_offset & PAGE_MASK) == 0) ||
+	    (PAGE_ALIGN(vdev->msix_offset + vdev->msix_size) >= end))
+		nr_areas = 1;
+
+	size = sizeof(*sparse) + (nr_areas * sizeof(*sparse->areas));
+
+	header = vfio_info_cap_add(caps, size,
+				   VFIO_REGION_INFO_CAP_SPARSE_MMAP, 1);
+	if (IS_ERR(header))
+		return PTR_ERR(header);
+
+	sparse = container_of(header,
+			      struct vfio_region_info_cap_sparse_mmap, header);
+	sparse->nr_areas = nr_areas;
+
+	if (vdev->msix_offset & PAGE_MASK) {
+		sparse->areas[i].offset = 0;
+		sparse->areas[i].size = vdev->msix_offset & PAGE_MASK;
+		i++;
+	}
+
+	if (PAGE_ALIGN(vdev->msix_offset + vdev->msix_size) < end) {
+		sparse->areas[i].offset = PAGE_ALIGN(vdev->msix_offset +
+						     vdev->msix_size);
+		sparse->areas[i].size = end - sparse->areas[i].offset;
+		i++;
+	}
+
+	return 0;
+}
+
+static int region_type_cap(struct vfio_pci_device *vdev,
+			   struct vfio_info_cap *caps,
+			   unsigned int type, unsigned int subtype)
+{
+	struct vfio_info_cap_header *header;
+	struct vfio_region_info_cap_type *cap;
+
+	header = vfio_info_cap_add(caps, sizeof(*cap),
+				   VFIO_REGION_INFO_CAP_TYPE, 1);
+	if (IS_ERR(header))
+		return PTR_ERR(header);
+
+	cap = container_of(header, struct vfio_region_info_cap_type, header);
+	cap->type = type;
+	cap->subtype = subtype;
+
+	return 0;
+}
+
+int vfio_pci_register_dev_region(struct vfio_pci_device *vdev,
+				 unsigned int type, unsigned int subtype,
+				 const struct vfio_pci_regops *ops,
+				 size_t size, u32 flags, void *data)
+{
+	struct vfio_pci_region *region;
+
+	region = krealloc(vdev->region,
+			  (vdev->num_regions + 1) * sizeof(*region),
+			  GFP_KERNEL);
+	if (!region)
+		return -ENOMEM;
+
+	vdev->region = region;
+	vdev->region[vdev->num_regions].type = type;
+	vdev->region[vdev->num_regions].subtype = subtype;
+	vdev->region[vdev->num_regions].ops = ops;
+	vdev->region[vdev->num_regions].size = size;
+	vdev->region[vdev->num_regions].flags = flags;
+	vdev->region[vdev->num_regions].data = data;
+
+	vdev->num_regions++;
+
+	return 0;
+}
+
 static long vfio_pci_ioctl(void *device_data,
 			   unsigned int cmd, unsigned long arg)
 {
@@ -443,7 +586,7 @@ static long vfio_pci_ioctl(void *device_data,
 		if (vdev->reset_works)
 			info.flags |= VFIO_DEVICE_FLAGS_RESET;
 
-		info.num_regions = VFIO_PCI_NUM_REGIONS;
+		info.num_regions = VFIO_PCI_NUM_REGIONS + vdev->num_regions;
 		info.num_irqs = VFIO_PCI_NUM_IRQS;
 
 		return copy_to_user((void __user *)arg, &info, minsz) ?
@@ -452,6 +595,8 @@ static long vfio_pci_ioctl(void *device_data,
 	} else if (cmd == VFIO_DEVICE_GET_REGION_INFO) {
 		struct pci_dev *pdev = vdev->pdev;
 		struct vfio_region_info info;
+		struct vfio_info_cap caps = { .buf = NULL, .size = 0 };
+		int i, ret;
 
 		minsz = offsetofend(struct vfio_region_info, offset);
 
@@ -480,8 +625,15 @@ static long vfio_pci_ioctl(void *device_data,
 				     VFIO_REGION_INFO_FLAG_WRITE;
 			if (IS_ENABLED(CONFIG_VFIO_PCI_MMAP) &&
 			    pci_resource_flags(pdev, info.index) &
-			    IORESOURCE_MEM && info.size >= PAGE_SIZE)
+			    IORESOURCE_MEM && info.size >= PAGE_SIZE) {
 				info.flags |= VFIO_REGION_INFO_FLAG_MMAP;
+				if (info.index == vdev->msix_bar) {
+					ret = msix_sparse_mmap_cap(vdev, &caps);
+					if (ret)
+						return ret;
+				}
+			}
+
 			break;
 		case VFIO_PCI_ROM_REGION_INDEX:
 		{
@@ -493,8 +645,14 @@ static long vfio_pci_ioctl(void *device_data,
 
 			/* Report the BAR size, not the ROM size */
 			info.size = pci_resource_len(pdev, info.index);
-			if (!info.size)
-				break;
+			if (!info.size) {
+				/* Shadow ROMs appear as PCI option ROMs */
+				if (pdev->resource[PCI_ROM_RESOURCE].flags &
+							IORESOURCE_ROM_SHADOW)
+					info.size = 0x20000;
+				else
+					break;
+			}
 
 			/* Is it really there? */
 			io = pci_map_rom(pdev, &size);
@@ -518,7 +676,40 @@ static long vfio_pci_ioctl(void *device_data,
 
 			break;
 		default:
-			return -EINVAL;
+			if (info.index >=
+			    VFIO_PCI_NUM_REGIONS + vdev->num_regions)
+				return -EINVAL;
+
+			i = info.index - VFIO_PCI_NUM_REGIONS;
+
+			info.offset = VFIO_PCI_INDEX_TO_OFFSET(info.index);
+			info.size = vdev->region[i].size;
+			info.flags = vdev->region[i].flags;
+
+			ret = region_type_cap(vdev, &caps,
+					      vdev->region[i].type,
+					      vdev->region[i].subtype);
+			if (ret)
+				return ret;
+		}
+
+		if (caps.size) {
+			info.flags |= VFIO_REGION_INFO_FLAG_CAPS;
+			if (info.argsz < sizeof(info) + caps.size) {
+				info.argsz = sizeof(info) + caps.size;
+				info.cap_offset = 0;
+			} else {
+				vfio_info_cap_shift(&caps, sizeof(info));
+				if (copy_to_user((void __user *)arg +
+						  sizeof(info), caps.buf,
+						  caps.size)) {
+					kfree(caps.buf);
+					return -EFAULT;
+				}
+				info.cap_offset = sizeof(info);
+			}
+
+			kfree(caps.buf);
 		}
 
 		return copy_to_user((void __user *)arg, &info, minsz) ?
@@ -798,7 +989,7 @@ static ssize_t vfio_pci_rw(void *device_data, char __user *buf,
 	unsigned int index = VFIO_PCI_OFFSET_TO_INDEX(*ppos);
 	struct vfio_pci_device *vdev = device_data;
 
-	if (index >= VFIO_PCI_NUM_REGIONS)
+	if (index >= VFIO_PCI_NUM_REGIONS + vdev->num_regions)
 		return -EINVAL;
 
 	switch (index) {
@@ -815,6 +1006,10 @@ static ssize_t vfio_pci_rw(void *device_data, char __user *buf,
 
 	case VFIO_PCI_VGA_REGION_INDEX:
 		return vfio_pci_vga_rw(vdev, buf, count, ppos, iswrite);
+	default:
+		index -= VFIO_PCI_NUM_REGIONS;
+		return vdev->region[index].ops->rw(vdev, buf,
+						   count, ppos, iswrite);
 	}
 
 	return -EINVAL;
@@ -943,13 +1138,13 @@ static int vfio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (pdev->hdr_type != PCI_HEADER_TYPE_NORMAL)
 		return -EINVAL;
 
-	group = iommu_group_get(&pdev->dev);
+	group = vfio_iommu_group_get(&pdev->dev);
 	if (!group)
 		return -EINVAL;
 
 	vdev = kzalloc(sizeof(*vdev), GFP_KERNEL);
 	if (!vdev) {
-		iommu_group_put(group);
+		vfio_iommu_group_put(group, &pdev->dev);
 		return -ENOMEM;
 	}
 
@@ -960,7 +1155,7 @@ static int vfio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	ret = vfio_add_group_dev(&pdev->dev, &vfio_pci_ops, vdev);
 	if (ret) {
-		iommu_group_put(group);
+		vfio_iommu_group_put(group, &pdev->dev);
 		kfree(vdev);
 		return ret;
 	}
@@ -996,7 +1191,8 @@ static void vfio_pci_remove(struct pci_dev *pdev)
 	if (!vdev)
 		return;
 
-	iommu_group_put(pdev->dev.iommu_group);
+	vfio_iommu_group_put(pdev->dev.iommu_group, &pdev->dev);
+	kfree(vdev->region);
 	kfree(vdev);
 
 	if (vfio_pci_is_vga(pdev)) {

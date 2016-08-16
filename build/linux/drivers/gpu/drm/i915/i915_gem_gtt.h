@@ -42,8 +42,7 @@ typedef uint64_t gen8_pde_t;
 typedef uint64_t gen8_ppgtt_pdpe_t;
 typedef uint64_t gen8_ppgtt_pml4e_t;
 
-#define gtt_total_entries(gtt) ((gtt).base.total >> PAGE_SHIFT)
-
+#define ggtt_total_entries(ggtt) ((ggtt)->base.total >> PAGE_SHIFT)
 
 /* gen6-hsw has bit 11-4 for physical addr bit 39-32 */
 #define GEN6_GTT_ADDR_ENCODE(addr)	((addr) | (((addr) >> 28) & 0xff0))
@@ -136,16 +135,13 @@ enum i915_ggtt_view_type {
 };
 
 struct intel_rotation_info {
-	unsigned int height;
-	unsigned int pitch;
 	unsigned int uv_offset;
 	uint32_t pixel_format;
-	uint64_t fb_modifier;
-	unsigned int width_pages, height_pages;
-	uint64_t size;
-	unsigned int width_pages_uv, height_pages_uv;
-	uint64_t size_uv;
 	unsigned int uv_start_page;
+	struct {
+		/* tiles */
+		unsigned int width, height;
+	} plane[2];
 };
 
 struct i915_ggtt_view {
@@ -156,13 +152,10 @@ struct i915_ggtt_view {
 			u64 offset;
 			unsigned int size;
 		} partial;
+		struct intel_rotation_info rotated;
 	} params;
 
 	struct sg_table *pages;
-
-	union {
-		struct intel_rotation_info rotation_info;
-	};
 };
 
 extern const struct i915_ggtt_view i915_ggtt_view_normal;
@@ -187,6 +180,7 @@ struct i915_vma {
 #define GLOBAL_BIND	(1<<0)
 #define LOCAL_BIND	(1<<1)
 	unsigned int bound : 4;
+	bool is_ggtt : 1;
 
 	/**
 	 * Support different GGTT views into the same object.
@@ -198,9 +192,9 @@ struct i915_vma {
 	struct i915_ggtt_view ggtt_view;
 
 	/** This object's place on the active/inactive lists */
-	struct list_head mm_list;
+	struct list_head vm_link;
 
-	struct list_head vma_link; /* Link in the object's VMA list */
+	struct list_head obj_link; /* Link in the object's VMA list */
 
 	/** This vma's place in the batchbuffer or on the eviction list */
 	struct list_head exec_list;
@@ -279,6 +273,8 @@ struct i915_address_space {
 	u64 start;		/* Start offset always 0 for dri2 */
 	u64 total;		/* size addr space maps (ex. 2GB for ggtt) */
 
+	bool is_ggtt;
+
 	struct i915_page_scratch *scratch_page;
 	struct i915_page_table *scratch_pt;
 	struct i915_page_directory *scratch_pd;
@@ -334,6 +330,8 @@ struct i915_address_space {
 			u32 flags);
 };
 
+#define i915_is_ggtt(V) ((V)->is_ggtt)
+
 /* The Graphics Translation Table is the way in which GEN hardware translates a
  * Graphics Virtual Address into a Physical Address. In addition to the normal
  * collateral associated with any va->pa translations GEN hardware also has a
@@ -341,11 +339,14 @@ struct i915_address_space {
  * and correct (in cases like swizzling). That region is referred to as GMADR in
  * the spec.
  */
-struct i915_gtt {
+struct i915_ggtt {
 	struct i915_address_space base;
 
 	size_t stolen_size;		/* Total size of stolen memory */
 	size_t stolen_usable_size;	/* Total size minus BIOS reserved */
+	size_t stolen_reserved_base;
+	size_t stolen_reserved_size;
+	size_t size;			/* Total size of Global GTT */
 	u64 mappable_end;		/* End offset that we can CPU map */
 	struct io_mapping *mappable;	/* Mapping to our CPU mappable region */
 	phys_addr_t mappable_base;	/* PA of our GMADR */
@@ -357,10 +358,7 @@ struct i915_gtt {
 
 	int mtrr;
 
-	/* global gtt ops */
-	int (*gtt_probe)(struct drm_device *dev, u64 *gtt_total,
-			  size_t *stolen, phys_addr_t *mappable_base,
-			  u64 *mappable_end);
+	int (*probe)(struct i915_ggtt *ggtt);
 };
 
 struct i915_hw_ppgtt {
@@ -420,7 +418,7 @@ static inline uint32_t i915_pte_index(uint64_t address, uint32_t pde_shift)
 static inline uint32_t i915_pte_count(uint64_t addr, size_t length,
 				      uint32_t pde_shift)
 {
-	const uint64_t mask = ~((1 << pde_shift) - 1);
+	const uint64_t mask = ~((1ULL << pde_shift) - 1);
 	uint64_t end;
 
 	WARN_ON(length == 0);
@@ -458,32 +456,29 @@ static inline uint32_t gen6_pde_index(uint32_t addr)
  * between from start until start + length. On gen8+ it simply iterates
  * over every page directory entry in a page directory.
  */
-#define gen8_for_each_pde(pt, pd, start, length, temp, iter)		\
-	for (iter = gen8_pde_index(start); \
-	     length > 0 && iter < I915_PDES ? \
-			(pt = (pd)->page_table[iter]), 1 : 0; \
-	     iter++,				\
-	     temp = ALIGN(start+1, 1 << GEN8_PDE_SHIFT) - start,	\
-	     temp = min(temp, length),					\
-	     start += temp, length -= temp)
+#define gen8_for_each_pde(pt, pd, start, length, iter)			\
+	for (iter = gen8_pde_index(start);				\
+	     length > 0 && iter < I915_PDES &&				\
+		(pt = (pd)->page_table[iter], true);			\
+	     ({ u64 temp = ALIGN(start+1, 1 << GEN8_PDE_SHIFT);		\
+		    temp = min(temp - start, length);			\
+		    start += temp, length -= temp; }), ++iter)
 
-#define gen8_for_each_pdpe(pd, pdp, start, length, temp, iter)	\
-	for (iter = gen8_pdpe_index(start); \
-	     length > 0 && (iter < I915_PDPES_PER_PDP(dev)) ? \
-			(pd = (pdp)->page_directory[iter]), 1 : 0; \
-	     iter++,				\
-	     temp = ALIGN(start+1, 1 << GEN8_PDPE_SHIFT) - start,	\
-	     temp = min(temp, length),					\
-	     start += temp, length -= temp)
+#define gen8_for_each_pdpe(pd, pdp, start, length, iter)		\
+	for (iter = gen8_pdpe_index(start);				\
+	     length > 0 && iter < I915_PDPES_PER_PDP(dev) &&		\
+		(pd = (pdp)->page_directory[iter], true);		\
+	     ({ u64 temp = ALIGN(start+1, 1 << GEN8_PDPE_SHIFT);	\
+		    temp = min(temp - start, length);			\
+		    start += temp, length -= temp; }), ++iter)
 
-#define gen8_for_each_pml4e(pdp, pml4, start, length, temp, iter)	\
-	for (iter = gen8_pml4e_index(start);	\
-	     length > 0 && iter < GEN8_PML4ES_PER_PML4 ? \
-			(pdp = (pml4)->pdps[iter]), 1 : 0; \
-	     iter++,				\
-	     temp = ALIGN(start+1, 1ULL << GEN8_PML4E_SHIFT) - start,	\
-	     temp = min(temp, length),					\
-	     start += temp, length -= temp)
+#define gen8_for_each_pml4e(pdp, pml4, start, length, iter)		\
+	for (iter = gen8_pml4e_index(start);				\
+	     length > 0 && iter < GEN8_PML4ES_PER_PML4 &&		\
+		(pdp = (pml4)->pdps[iter], true);			\
+	     ({ u64 temp = ALIGN(start+1, 1ULL << GEN8_PML4E_SHIFT);	\
+		    temp = min(temp - start, length);			\
+		    start += temp, length -= temp; }), ++iter)
 
 static inline uint32_t gen8_pte_index(uint64_t address)
 {
@@ -518,10 +513,10 @@ i915_page_dir_dma_addr(const struct i915_hw_ppgtt *ppgtt, const unsigned n)
 		px_dma(ppgtt->base.scratch_pd);
 }
 
-int i915_gem_gtt_init(struct drm_device *dev);
-void i915_gem_init_global_gtt(struct drm_device *dev);
-void i915_global_gtt_cleanup(struct drm_device *dev);
-
+int i915_ggtt_init_hw(struct drm_device *dev);
+int i915_ggtt_enable_hw(struct drm_device *dev);
+void i915_gem_init_ggtt(struct drm_device *dev);
+void i915_ggtt_cleanup_hw(struct drm_device *dev);
 
 int i915_ppgtt_init(struct drm_device *dev, struct i915_hw_ppgtt *ppgtt);
 int i915_ppgtt_init_hw(struct drm_device *dev);
@@ -556,7 +551,7 @@ i915_ggtt_view_equal(const struct i915_ggtt_view *a,
 
 	if (a->type != b->type)
 		return false;
-	if (a->type == I915_GGTT_VIEW_PARTIAL)
+	if (a->type != I915_GGTT_VIEW_NORMAL)
 		return !memcmp(&a->params, &b->params, sizeof(a->params));
 	return true;
 }

@@ -27,21 +27,16 @@
 
 #include "../../codecs/rt286.h"
 
-static struct snd_soc_jack broadwell_hp;
-static struct snd_soc_jack broadwell_mic;
-
+static struct snd_soc_jack broadwell_headset;
 /* Headset jack detection DAPM pins */
-static struct snd_soc_jack_pin broadwell_hp_pins[] = {
-	{
-		.pin = "Headphone Jack",
-		.mask = SND_JACK_HEADPHONE,
-	},
-};
-
-static struct snd_soc_jack_pin broadwell_mic_pins[] = {
+static struct snd_soc_jack_pin broadwell_headset_pins[] = {
 	{
 		.pin = "Mic Jack",
 		.mask = SND_JACK_MICROPHONE,
+	},
+	{
+		.pin = "Headphone Jack",
+		.mask = SND_JACK_HEADPHONE,
 	},
 };
 
@@ -85,26 +80,13 @@ static int broadwell_rt286_codec_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_codec *codec = rtd->codec;
 	int ret = 0;
-
-	ret = snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE,
-				&broadwell_hp);
+	ret = snd_soc_card_jack_new(rtd->card, "Headset",
+		SND_JACK_HEADSET | SND_JACK_BTN_0, &broadwell_headset,
+		broadwell_headset_pins, ARRAY_SIZE(broadwell_headset_pins));
 	if (ret)
 		return ret;
 
-	ret = snd_soc_jack_add_pins(&broadwell_hp, 1, broadwell_hp_pins);
-	if (ret)
-		return ret;
-
-	ret = snd_soc_jack_new(codec, "Mic Jack", SND_JACK_MICROPHONE,
-				&broadwell_mic);
-	if (ret)
-		return ret;
-
-	ret = snd_soc_jack_add_pins(&broadwell_mic, 1, broadwell_mic_pins);
-	if (ret)
-		return ret;
-
-	rt286_mic_detect(codec, &broadwell_hp, &broadwell_mic);
+	rt286_mic_detect(codec, &broadwell_headset);
 	return 0;
 }
 
@@ -122,9 +104,7 @@ static int broadwell_ssp0_fixup(struct snd_soc_pcm_runtime *rtd,
 	channels->min = channels->max = 2;
 
 	/* set SSP0 to 16 bit */
-	snd_mask_set(&params->masks[SNDRV_PCM_HW_PARAM_FORMAT -
-				    SNDRV_PCM_HW_PARAM_FIRST_MASK],
-				    SNDRV_PCM_FORMAT_S16_LE);
+	params_set_format(params, SNDRV_PCM_FORMAT_S16_LE);
 	return 0;
 }
 
@@ -152,8 +132,6 @@ static struct snd_soc_ops broadwell_rt286_ops = {
 
 static int broadwell_rtd_init(struct snd_soc_pcm_runtime *rtd)
 {
-	struct snd_soc_codec *codec = rtd->codec;
-	struct snd_soc_dapm_context *dapm = &codec->dapm;
 	struct sst_pdata *pdata = dev_get_platdata(rtd->platform->dev);
 	struct sst_hsw *broadwell = pdata->dsp;
 	int ret;
@@ -167,14 +145,6 @@ static int broadwell_rtd_init(struct snd_soc_pcm_runtime *rtd)
 		return ret;
 	}
 
-	/* always connected - check HP for jack detect */
-	snd_soc_dapm_enable_pin(dapm, "Headphone Jack");
-	snd_soc_dapm_enable_pin(dapm, "Speaker");
-	snd_soc_dapm_enable_pin(dapm, "Mic Jack");
-	snd_soc_dapm_enable_pin(dapm, "Line Jack");
-	snd_soc_dapm_enable_pin(dapm, "DMIC1");
-	snd_soc_dapm_enable_pin(dapm, "DMIC2");
-
 	return 0;
 }
 
@@ -183,7 +153,7 @@ static struct snd_soc_dai_link broadwell_rt286_dais[] = {
 	/* Front End DAI links */
 	{
 		.name = "System PCM",
-		.stream_name = "System Playback",
+		.stream_name = "System Playback/Capture",
 		.cpu_dai_name = "System Pin",
 		.platform_name = "haswell-pcm-audio",
 		.dynamic = 1,
@@ -192,6 +162,7 @@ static struct snd_soc_dai_link broadwell_rt286_dais[] = {
 		.init = broadwell_rtd_init,
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
 		.dpcm_playback = 1,
+		.dpcm_capture = 1,
 	},
 	{
 		.name = "Offload0",
@@ -226,23 +197,11 @@ static struct snd_soc_dai_link broadwell_rt286_dais[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
 		.dpcm_capture = 1,
 	},
-	{
-		.name = "Capture PCM",
-		.stream_name = "Capture",
-		.cpu_dai_name = "Capture Pin",
-		.platform_name = "haswell-pcm-audio",
-		.dynamic = 1,
-		.codec_name = "snd-soc-dummy",
-		.codec_dai_name = "snd-soc-dummy-dai",
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
-		.dpcm_capture = 1,
-	},
-
 	/* Back End DAI links */
 	{
 		/* SSP0 - Codec */
 		.name = "Codec",
-		.be_id = 0,
+		.id = 0,
 		.cpu_dai_name = "snd-soc-dummy-dai",
 		.platform_name = "snd-soc-dummy",
 		.no_pcm = 1,
@@ -260,6 +219,32 @@ static struct snd_soc_dai_link broadwell_rt286_dais[] = {
 	},
 };
 
+static int broadwell_suspend(struct snd_soc_card *card){
+	struct snd_soc_codec *codec;
+
+	list_for_each_entry(codec, &card->codec_dev_list, card_list) {
+		if (!strcmp(codec->component.name, "i2c-INT343A:00")) {
+			dev_dbg(codec->dev, "disabling jack detect before going to suspend.\n");
+			rt286_mic_detect(codec, NULL);
+			break;
+		}
+	}
+	return 0;
+}
+
+static int broadwell_resume(struct snd_soc_card *card){
+	struct snd_soc_codec *codec;
+
+	list_for_each_entry(codec, &card->codec_dev_list, card_list) {
+		if (!strcmp(codec->component.name, "i2c-INT343A:00")) {
+			dev_dbg(codec->dev, "enabling jack detect for resume.\n");
+			rt286_mic_detect(codec, &broadwell_headset);
+			break;
+		}
+	}
+	return 0;
+}
+
 /* broadwell audio machine driver for WPT + RT286S */
 static struct snd_soc_card broadwell_rt286 = {
 	.name = "broadwell-rt286",
@@ -273,27 +258,21 @@ static struct snd_soc_card broadwell_rt286 = {
 	.dapm_routes = broadwell_rt286_map,
 	.num_dapm_routes = ARRAY_SIZE(broadwell_rt286_map),
 	.fully_routed = true,
+	.suspend_pre = broadwell_suspend,
+	.resume_post = broadwell_resume,
 };
 
 static int broadwell_audio_probe(struct platform_device *pdev)
 {
 	broadwell_rt286.dev = &pdev->dev;
 
-	return snd_soc_register_card(&broadwell_rt286);
-}
-
-static int broadwell_audio_remove(struct platform_device *pdev)
-{
-	snd_soc_unregister_card(&broadwell_rt286);
-	return 0;
+	return devm_snd_soc_register_card(&pdev->dev, &broadwell_rt286);
 }
 
 static struct platform_driver broadwell_audio = {
 	.probe = broadwell_audio_probe,
-	.remove = broadwell_audio_remove,
 	.driver = {
 		.name = "broadwell-audio",
-		.owner = THIS_MODULE,
 	},
 };
 

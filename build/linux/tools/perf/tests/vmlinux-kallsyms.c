@@ -18,7 +18,7 @@ static int vmlinux_matches_kallsyms_filter(struct map *map __maybe_unused,
 
 #define UM(x) kallsyms_map->unmap_ip(kallsyms_map, (x))
 
-int test__vmlinux_matches_kallsyms(void)
+int test__vmlinux_matches_kallsyms(int subtest __maybe_unused)
 {
 	int err = -1;
 	struct rb_node *nd;
@@ -54,8 +54,14 @@ int test__vmlinux_matches_kallsyms(void)
 	 * Step 3:
 	 *
 	 * Load and split /proc/kallsyms into multiple maps, one per module.
+	 * Do not use kcore, as this test was designed before kcore support
+	 * and has parts that only make sense if using the non-kcore code.
+	 * XXX: extend it to stress the kcorre code as well, hint: the list
+	 * of modules extracted from /proc/kcore, in its current form, can't
+	 * be compacted against the list of modules found in the "vmlinux"
+	 * code and with the one got from /proc/modules from the "kallsyms" code.
 	 */
-	if (machine__load_kallsyms(&kallsyms, "/proc/kallsyms", type, NULL) <= 0) {
+	if (__machine__load_kallsyms(&kallsyms, "/proc/kallsyms", type, true, NULL) <= 0) {
 		pr_debug("dso__load_kallsyms ");
 		goto out;
 	}
@@ -110,7 +116,6 @@ int test__vmlinux_matches_kallsyms(void)
 	 */
 	for (nd = rb_first(&vmlinux_map->dso->symbols[type]); nd; nd = rb_next(nd)) {
 		struct symbol *pair, *first_pair;
-		bool backwards = true;
 
 		sym  = rb_entry(nd, struct symbol, rb_node);
 
@@ -151,27 +156,17 @@ next_pair:
 				continue;
 
 			} else {
-				struct rb_node *nnd;
-detour:
-				nnd = backwards ? rb_prev(&pair->rb_node) :
-						  rb_next(&pair->rb_node);
-				if (nnd) {
-					struct symbol *next = rb_entry(nnd, struct symbol, rb_node);
-
-					if (UM(next->start) == mem_start) {
-						pair = next;
+				pair = machine__find_kernel_symbol_by_name(&kallsyms, type, sym->name, NULL, NULL);
+				if (pair) {
+					if (UM(pair->start) == mem_start)
 						goto next_pair;
-					}
-				}
 
-				if (backwards) {
-					backwards = false;
-					pair = first_pair;
-					goto detour;
+					pr_debug("%#" PRIx64 ": diff name v: %s k: %s\n",
+						 mem_start, sym->name, pair->name);
+				} else {
+					pr_debug("%#" PRIx64 ": diff name v: %s k: %s\n",
+						 mem_start, sym->name, first_pair->name);
 				}
-
-				pr_debug("%#" PRIx64 ": diff name v: %s k: %s\n",
-					 mem_start, sym->name, pair->name);
 			}
 		} else
 			pr_debug("%#" PRIx64 ": %s not on kallsyms\n",

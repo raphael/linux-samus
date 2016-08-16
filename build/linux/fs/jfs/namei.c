@@ -983,6 +983,7 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 		jfs_info("jfs_symlink: allocate extent ip:0x%p", ip);
 
 		ip->i_op = &jfs_symlink_inode_operations;
+		inode_nohighmem(ip);
 		ip->i_mapping->a_ops = &jfs_aops;
 
 		/*
@@ -1224,8 +1225,8 @@ static int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		rc = dtSearch(new_dir, &new_dname, &ino, &btstack,
 			      JFS_CREATE);
 		if (rc) {
-			jfs_err("jfs_rename didn't expect dtSearch to fail "
-				"w/rc = %d", rc);
+			jfs_err("jfs_rename didn't expect dtSearch to fail w/rc = %d",
+				rc);
 			goto out_tx;
 		}
 
@@ -1523,7 +1524,7 @@ struct dentry *jfs_get_parent(struct dentry *dentry)
 	parent_ino =
 		le32_to_cpu(JFS_IP(d_inode(dentry))->i_dtroot.header.idotdot);
 
-	return d_obtain_alias(jfs_iget(d_inode(dentry)->i_sb, parent_ino));
+	return d_obtain_alias(jfs_iget(dentry->d_sb, parent_ino));
 }
 
 const struct inode_operations jfs_dir_inode_operations = {
@@ -1536,10 +1537,10 @@ const struct inode_operations jfs_dir_inode_operations = {
 	.rmdir		= jfs_rmdir,
 	.mknod		= jfs_mknod,
 	.rename		= jfs_rename,
-	.setxattr	= jfs_setxattr,
-	.getxattr	= jfs_getxattr,
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
 	.listxattr	= jfs_listxattr,
-	.removexattr	= jfs_removexattr,
+	.removexattr	= generic_removexattr,
 	.setattr	= jfs_setattr,
 #ifdef CONFIG_JFS_POSIX_ACL
 	.get_acl	= jfs_get_acl,

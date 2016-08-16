@@ -288,7 +288,7 @@ config SENSORS_K10TEMP
 
 config SENSORS_FAM15H_POWER
 	tristate "AMD Family 15h processor power"
-	depends on X86 && PCI
+	depends on X86 && PCI && CPU_SUP_AMD
 	help
 	  If you say yes here you get support for processor power
 	  information of your AMD family 15h CPU.
@@ -621,7 +621,8 @@ config SENSORS_IT87
 	  If you say yes here you get support for ITE IT8705F, IT8712F, IT8716F,
 	  IT8718F, IT8720F, IT8721F, IT8726F, IT8728F, IT8732F, IT8758E,
 	  IT8771E, IT8772E, IT8781F, IT8782F, IT8783E/F, IT8786E, IT8790E,
-	  IT8603E, IT8620E, and IT8623E sensor chips, and the SiS950 clone.
+	  IT8603E, IT8620E, IT8623E, and IT8628E sensor chips, and the SiS950
+	  clone.
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called it87.
@@ -684,6 +685,20 @@ config SENSORS_LTC2945
 
 	  This driver can also be built as a module. If so, the module will
 	  be called ltc2945.
+
+config SENSORS_LTC2990
+	tristate "Linear Technology LTC2990 (current monitoring mode only)"
+	depends on I2C
+	help
+	  If you say yes here you get support for Linear Technology LTC2990
+	  I2C System Monitor. The LTC2990 supports a combination of voltage,
+	  current and temperature monitoring, but in addition to the Vcc supply
+	  voltage and chip temperature, this driver currently only supports
+	  reading two currents by measuring two differential voltages across
+	  series resistors.
+
+	  This driver can also be built as a module. If so, the module will
+	  be called ltc2990.
 
 config SENSORS_LTC4151
 	tristate "Linear Technology LTC4151"
@@ -807,6 +822,16 @@ config SENSORS_MAX197
 	  This driver can also be built as a module. If so, the module
 	  will be called max197.
 
+config SENSORS_MAX31722
+tristate "MAX31722 temperature sensor"
+	depends on SPI
+	help
+	  Support for the Maxim Integrated MAX31722/MAX31723 digital
+	  thermometers/thermostats operating over an SPI interface.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called max31722.
+
 config SENSORS_MAX6639
 	tristate "Maxim MAX6639 sensor chip"
 	depends on I2C
@@ -858,16 +883,6 @@ config SENSORS_MAX31790
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called max31790.
-
-config SENSORS_HTU21
-	tristate "Measurement Specialties HTU21D humidity/temperature sensors"
-	depends on I2C
-	help
-	  If you say yes here you get support for the Measurement Specialties
-	  HTU21D humidity and temperature sensors.
-
-	  This driver can also be built as a module.  If so, the module
-	  will be called htu21.
 
 config SENSORS_MCP3021
 	tristate "Microchip MCP3021 and compatibles"
@@ -1137,7 +1152,7 @@ config SENSORS_NTC_THERMISTOR
 
 	  Currently, this driver supports
 	  NCP15WB473, NCP18WB473, NCP21WB473, NCP03WB473, NCP15WL333,
-	  and NCP03WF104 from Murata and B57330V2103 from EPCOS.
+	  NCP03WF104 and NCP15XH103 from Murata and B57330V2103 from EPCOS.
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called ntc-thermistor.
@@ -1185,6 +1200,21 @@ config SENSORS_NCT7904
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called nct7904.
+
+config SENSORS_NSA320
+	tristate "ZyXEL NSA320 and compatible fan speed and temperature sensors"
+	depends on GPIOLIB && OF
+	depends on MACH_KIRKWOOD || COMPILE_TEST
+	help
+	  If you say yes here you get support for hardware monitoring
+	  for the ZyXEL NSA320 Media Server and other compatible devices
+	  (probably the NSA325 and some NSA310 variants).
+
+	  The sensor data is taken from a Holtek HT46R065 microcontroller
+	  connected to GPIO lines.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called nsa320-hwmon.
 
 config SENSORS_PCF8591
 	tristate "Philips PCF8591 ADC/DAC"

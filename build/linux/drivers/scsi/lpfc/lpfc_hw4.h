@@ -1,7 +1,7 @@
 /*******************************************************************
  * This file is part of the Emulex Linux Device Driver for         *
  * Fibre Channel Host Bus Adapters.                                *
- * Copyright (C) 2009-2015 Emulex.  All rights reserved.                *
+ * Copyright (C) 2009-2016 Emulex.  All rights reserved.                *
  * EMULEX and SLI are trademarks of Emulex.                        *
  * www.emulex.com                                                  *
  *                                                                 *
@@ -2557,7 +2557,26 @@ struct lpfc_mbx_memory_dump_type3 {
 
 /* SFF-8472 Table 3.1a Diagnostics: Data Fields Address/Page A2 */
 
-#define SSF_AW_THRESHOLDS		0
+#define SSF_TEMP_HIGH_ALARM		0
+#define SSF_TEMP_LOW_ALARM		2
+#define SSF_TEMP_HIGH_WARNING		4
+#define SSF_TEMP_LOW_WARNING		6
+#define SSF_VOLTAGE_HIGH_ALARM		8
+#define SSF_VOLTAGE_LOW_ALARM		10
+#define SSF_VOLTAGE_HIGH_WARNING	12
+#define SSF_VOLTAGE_LOW_WARNING		14
+#define SSF_BIAS_HIGH_ALARM		16
+#define SSF_BIAS_LOW_ALARM		18
+#define SSF_BIAS_HIGH_WARNING		20
+#define SSF_BIAS_LOW_WARNING		22
+#define SSF_TXPOWER_HIGH_ALARM		24
+#define SSF_TXPOWER_LOW_ALARM		26
+#define SSF_TXPOWER_HIGH_WARNING	28
+#define SSF_TXPOWER_LOW_WARNING		30
+#define SSF_RXPOWER_HIGH_ALARM		32
+#define SSF_RXPOWER_LOW_ALARM		34
+#define SSF_RXPOWER_HIGH_WARNING	36
+#define SSF_RXPOWER_LOW_WARNING		38
 #define SSF_EXT_CAL_CONSTANTS		56
 #define SSF_CC_DMI			95
 #define SFF_TEMPERATURE_B1		96
@@ -2865,6 +2884,9 @@ struct lpfc_sli4_parameters {
 	uint32_t word17;
 	uint32_t word18;
 	uint32_t word19;
+#define cfg_ext_embed_cb_SHIFT			0
+#define cfg_ext_embed_cb_MASK			0x00000001
+#define cfg_ext_embed_cb_WORD			word19
 };
 
 struct lpfc_mbx_get_sli4_parameters {
@@ -3317,6 +3339,7 @@ struct lpfc_acqe_link {
 #define LPFC_ASYNC_LINK_SPEED_20GBPS		0x5
 #define LPFC_ASYNC_LINK_SPEED_25GBPS		0x6
 #define LPFC_ASYNC_LINK_SPEED_40GBPS		0x7
+#define LPFC_ASYNC_LINK_SPEED_100GBPS		0x8
 #define lpfc_acqe_link_duplex_SHIFT		16
 #define lpfc_acqe_link_duplex_MASK		0x000000FF
 #define lpfc_acqe_link_duplex_WORD		word0
@@ -3447,23 +3470,50 @@ struct lpfc_acqe_fc_la {
 struct lpfc_acqe_misconfigured_event {
 	struct {
 	uint32_t word0;
-#define lpfc_sli_misconfigured_port0_SHIFT	0
-#define lpfc_sli_misconfigured_port0_MASK	0x000000FF
-#define lpfc_sli_misconfigured_port0_WORD	word0
-#define lpfc_sli_misconfigured_port1_SHIFT	8
-#define lpfc_sli_misconfigured_port1_MASK	0x000000FF
-#define lpfc_sli_misconfigured_port1_WORD	word0
-#define lpfc_sli_misconfigured_port2_SHIFT	16
-#define lpfc_sli_misconfigured_port2_MASK	0x000000FF
-#define lpfc_sli_misconfigured_port2_WORD	word0
-#define lpfc_sli_misconfigured_port3_SHIFT	24
-#define lpfc_sli_misconfigured_port3_MASK	0x000000FF
-#define lpfc_sli_misconfigured_port3_WORD	word0
+#define lpfc_sli_misconfigured_port0_state_SHIFT	0
+#define lpfc_sli_misconfigured_port0_state_MASK		0x000000FF
+#define lpfc_sli_misconfigured_port0_state_WORD		word0
+#define lpfc_sli_misconfigured_port1_state_SHIFT	8
+#define lpfc_sli_misconfigured_port1_state_MASK		0x000000FF
+#define lpfc_sli_misconfigured_port1_state_WORD		word0
+#define lpfc_sli_misconfigured_port2_state_SHIFT	16
+#define lpfc_sli_misconfigured_port2_state_MASK		0x000000FF
+#define lpfc_sli_misconfigured_port2_state_WORD		word0
+#define lpfc_sli_misconfigured_port3_state_SHIFT	24
+#define lpfc_sli_misconfigured_port3_state_MASK		0x000000FF
+#define lpfc_sli_misconfigured_port3_state_WORD		word0
+	uint32_t word1;
+#define lpfc_sli_misconfigured_port0_op_SHIFT		0
+#define lpfc_sli_misconfigured_port0_op_MASK		0x00000001
+#define lpfc_sli_misconfigured_port0_op_WORD		word1
+#define lpfc_sli_misconfigured_port0_severity_SHIFT	1
+#define lpfc_sli_misconfigured_port0_severity_MASK	0x00000003
+#define lpfc_sli_misconfigured_port0_severity_WORD	word1
+#define lpfc_sli_misconfigured_port1_op_SHIFT		8
+#define lpfc_sli_misconfigured_port1_op_MASK		0x00000001
+#define lpfc_sli_misconfigured_port1_op_WORD		word1
+#define lpfc_sli_misconfigured_port1_severity_SHIFT	9
+#define lpfc_sli_misconfigured_port1_severity_MASK	0x00000003
+#define lpfc_sli_misconfigured_port1_severity_WORD	word1
+#define lpfc_sli_misconfigured_port2_op_SHIFT		16
+#define lpfc_sli_misconfigured_port2_op_MASK		0x00000001
+#define lpfc_sli_misconfigured_port2_op_WORD		word1
+#define lpfc_sli_misconfigured_port2_severity_SHIFT	17
+#define lpfc_sli_misconfigured_port2_severity_MASK	0x00000003
+#define lpfc_sli_misconfigured_port2_severity_WORD	word1
+#define lpfc_sli_misconfigured_port3_op_SHIFT		24
+#define lpfc_sli_misconfigured_port3_op_MASK		0x00000001
+#define lpfc_sli_misconfigured_port3_op_WORD		word1
+#define lpfc_sli_misconfigured_port3_severity_SHIFT	25
+#define lpfc_sli_misconfigured_port3_severity_MASK	0x00000003
+#define lpfc_sli_misconfigured_port3_severity_WORD	word1
 	} theEvent;
 #define LPFC_SLI_EVENT_STATUS_VALID			0x00
 #define LPFC_SLI_EVENT_STATUS_NOT_PRESENT	0x01
 #define LPFC_SLI_EVENT_STATUS_WRONG_TYPE	0x02
 #define LPFC_SLI_EVENT_STATUS_UNSUPPORTED	0x03
+#define LPFC_SLI_EVENT_STATUS_UNQUALIFIED	0x04
+#define LPFC_SLI_EVENT_STATUS_UNCERTIFIED	0x05
 };
 
 struct lpfc_acqe_sli {
@@ -3891,6 +3941,9 @@ union lpfc_wqe {
 union lpfc_wqe128 {
 	uint32_t words[32];
 	struct lpfc_wqe_generic generic;
+	struct fcp_icmnd64_wqe fcp_icmd;
+	struct fcp_iread64_wqe fcp_iread;
+	struct fcp_iwrite64_wqe fcp_iwrite;
 	struct xmit_seq64_wqe xmit_sequence;
 	struct gen_req64_wqe gen_req;
 };

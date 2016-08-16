@@ -590,7 +590,7 @@ static const char * const usb1_groups[] = {"usb1_0_grp"};
 static const char * const mdio0_groups[] = {"mdio0_0_grp"};
 static const char * const mdio1_groups[] = {"mdio1_0_grp"};
 static const char * const qspi0_groups[] = {"qspi0_0_grp"};
-static const char * const qspi1_groups[] = {"qspi0_1_grp"};
+static const char * const qspi1_groups[] = {"qspi1_0_grp"};
 static const char * const qspi_fbclk_groups[] = {"qspi_fbclk_grp"};
 static const char * const qspi_cs1_groups[] = {"qspi_cs1_grp"};
 static const char * const spi0_groups[] = {"spi0_0_grp", "spi0_1_grp",
@@ -862,7 +862,7 @@ static const struct pinctrl_ops zynq_pctrl_ops = {
 	.get_group_name = zynq_pctrl_get_group_name,
 	.get_group_pins = zynq_pctrl_get_group_pins,
 	.dt_node_to_map = pinconf_generic_dt_node_to_map_all,
-	.dt_free_map = pinctrl_utils_dt_free_map,
+	.dt_free_map = pinctrl_utils_free_map,
 };
 
 /* pinmux */
@@ -1195,22 +1195,13 @@ static int zynq_pinctrl_probe(struct platform_device *pdev)
 	pctrl->funcs = zynq_pmux_functions;
 	pctrl->nfuncs = ARRAY_SIZE(zynq_pmux_functions);
 
-	pctrl->pctrl = pinctrl_register(&zynq_desc, &pdev->dev, pctrl);
+	pctrl->pctrl = devm_pinctrl_register(&pdev->dev, &zynq_desc, pctrl);
 	if (IS_ERR(pctrl->pctrl))
 		return PTR_ERR(pctrl->pctrl);
 
 	platform_set_drvdata(pdev, pctrl);
 
 	dev_info(&pdev->dev, "zynq pinctrl initialized\n");
-
-	return 0;
-}
-
-static int zynq_pinctrl_remove(struct platform_device *pdev)
-{
-	struct zynq_pinctrl *pctrl = platform_get_drvdata(pdev);
-
-	pinctrl_unregister(pctrl->pctrl);
 
 	return 0;
 }
@@ -1227,7 +1218,6 @@ static struct platform_driver zynq_pinctrl_driver = {
 		.of_match_table = zynq_pinctrl_of_match,
 	},
 	.probe = zynq_pinctrl_probe,
-	.remove = zynq_pinctrl_remove,
 };
 
 static int __init zynq_pinctrl_init(void)

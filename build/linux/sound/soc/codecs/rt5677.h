@@ -14,6 +14,7 @@
 
 #include <sound/rt5677.h>
 #include <linux/gpio/driver.h>
+#include <linux/gpio/consumer.h>
 
 /* Info */
 #define RT5677_RESET				0x00
@@ -1636,12 +1637,6 @@
 #define RT5677_GPIO6_P_NOR			(0x0 << 0)
 #define RT5677_GPIO6_P_INV			(0x1 << 0)
 
-/* General Control (0xfa) */
-#define RT5677_IRQ_DEBOUNCE_SEL_MASK		(0x3 << 3)
-#define RT5677_IRQ_DEBOUNCE_SEL_MCLK		(0x0 << 3)
-#define RT5677_IRQ_DEBOUNCE_SEL_RC		(0x1 << 3)
-#define RT5677_IRQ_DEBOUNCE_SEL_SLIM		(0x2 << 3)
-
 /* Virtual DSP Mixer Control (0xf7 0xf8 0xf9) */
 #define RT5677_DSP_IB_01_H			(0x1 << 15)
 #define RT5677_DSP_IB_01_H_SFT			15
@@ -1703,7 +1698,6 @@ enum {
 	RT5677_AIF4,
 	RT5677_AIF5,
 	RT5677_AIFS,
-	RT5677_DSPBUFF,
 };
 
 enum {
@@ -1720,7 +1714,11 @@ enum {
 	RT5677_IRQ_JD1,
 	RT5677_IRQ_JD2,
 	RT5677_IRQ_JD3,
-	RT5677_IRQ_NUM,
+};
+
+enum rt5677_type {
+	RT5677,
+	RT5676,
 };
 
 /* ASRC clock source selection */
@@ -1778,24 +1776,16 @@ struct rt5677_priv {
 	int pll_src;
 	int pll_in;
 	int pll_out;
-	int pow_ldo2; /* POW_LDO2 pin */
+	struct gpio_desc *pow_ldo2; /* POW_LDO2 pin */
+	struct gpio_desc *reset_pin; /* RESET pin */
+	enum rt5677_type type;
 #ifdef CONFIG_GPIOLIB
 	struct gpio_chip gpio_chip;
 #endif
-	bool dsp_vad_en_request; /* DSP VAD enable/disable request */
-	bool dsp_vad_en; /* dsp_work parameter */
+	bool dsp_vad_en;
+	struct regmap_irq_chip_data *irq_data;
 	bool is_dsp_mode;
 	bool is_vref_slow;
-	struct delayed_work dsp_work;
-
-	/* Interrupt handling */
-	struct irq_domain *domain;
-	struct mutex irq_lock;
-	unsigned int irq_en;
-	struct delayed_work resume_irq_check;
-	int irq;
-
-	int (*set_dsp_vad)(struct snd_soc_codec *codec, bool on);
 };
 
 int rt5677_sel_asrc_clk_src(struct snd_soc_codec *codec,

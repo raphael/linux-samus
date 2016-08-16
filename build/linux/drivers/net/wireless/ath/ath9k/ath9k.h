@@ -23,6 +23,7 @@
 #include <linux/leds.h>
 #include <linux/completion.h>
 #include <linux/time.h>
+#include <linux/hw_random.h>
 
 #include "common.h"
 #include "debug.h"
@@ -812,16 +813,12 @@ static inline int ath9k_dump_btcoex(struct ath_softc *sc, u8 *buf, u32 size)
 #ifdef CONFIG_MAC80211_LEDS
 void ath_init_leds(struct ath_softc *sc);
 void ath_deinit_leds(struct ath_softc *sc);
-void ath_fill_led_pin(struct ath_softc *sc);
 #else
 static inline void ath_init_leds(struct ath_softc *sc)
 {
 }
 
 static inline void ath_deinit_leds(struct ath_softc *sc)
-{
-}
-static inline void ath_fill_led_pin(struct ath_softc *sc)
 {
 }
 #endif
@@ -981,6 +978,7 @@ struct ath_softc {
 	struct ath_offchannel offchannel;
 	struct ath_chanctx *next_chan;
 	struct completion go_beacon;
+	struct timespec last_event_time;
 #endif
 
 	unsigned long driver_data;
@@ -1040,6 +1038,11 @@ struct ath_softc {
 	u32 wow_intr_before_sleep;
 	bool force_wow;
 #endif
+
+#ifdef CONFIG_ATH9K_HWRNG
+	u32 rng_last;
+	struct task_struct *rng_task;
+#endif
 };
 
 /********/
@@ -1061,6 +1064,22 @@ static inline int ath9k_tx99_send(struct ath_softc *sc,
 	return 0;
 }
 #endif /* CONFIG_ATH9K_TX99 */
+
+/***************************/
+/* Random Number Generator */
+/***************************/
+#ifdef CONFIG_ATH9K_HWRNG
+void ath9k_rng_start(struct ath_softc *sc);
+void ath9k_rng_stop(struct ath_softc *sc);
+#else
+static inline void ath9k_rng_start(struct ath_softc *sc)
+{
+}
+
+static inline void ath9k_rng_stop(struct ath_softc *sc)
+{
+}
+#endif
 
 static inline void ath_read_cachesize(struct ath_common *common, int *csz)
 {

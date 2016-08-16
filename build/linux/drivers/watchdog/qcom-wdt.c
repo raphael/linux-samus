@@ -17,18 +17,17 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
-#include <linux/reboot.h>
 #include <linux/watchdog.h>
 
 #define WDT_RST		0x38
 #define WDT_EN		0x40
+#define WDT_STS		0x44
 #define WDT_BITE_TIME	0x5C
 
 struct qcom_wdt {
 	struct watchdog_device	wdd;
 	struct clk		*clk;
 	unsigned long		rate;
-	struct notifier_block	restart_nb;
 	void __iomem		*base;
 };
 
@@ -72,25 +71,10 @@ static int qcom_wdt_set_timeout(struct watchdog_device *wdd,
 	return qcom_wdt_start(wdd);
 }
 
-static const struct watchdog_ops qcom_wdt_ops = {
-	.start		= qcom_wdt_start,
-	.stop		= qcom_wdt_stop,
-	.ping		= qcom_wdt_ping,
-	.set_timeout	= qcom_wdt_set_timeout,
-	.owner		= THIS_MODULE,
-};
-
-static const struct watchdog_info qcom_wdt_info = {
-	.options	= WDIOF_KEEPALIVEPING
-			| WDIOF_MAGICCLOSE
-			| WDIOF_SETTIMEOUT,
-	.identity	= KBUILD_MODNAME,
-};
-
-static int qcom_wdt_restart(struct notifier_block *nb, unsigned long action,
+static int qcom_wdt_restart(struct watchdog_device *wdd, unsigned long action,
 			    void *data)
 {
-	struct qcom_wdt *wdt = container_of(nb, struct qcom_wdt, restart_nb);
+	struct qcom_wdt *wdt = to_qcom_wdt(wdd);
 	u32 timeout;
 
 	/*
@@ -110,8 +94,25 @@ static int qcom_wdt_restart(struct notifier_block *nb, unsigned long action,
 	wmb();
 
 	msleep(150);
-	return NOTIFY_DONE;
+	return 0;
 }
+
+static const struct watchdog_ops qcom_wdt_ops = {
+	.start		= qcom_wdt_start,
+	.stop		= qcom_wdt_stop,
+	.ping		= qcom_wdt_ping,
+	.set_timeout	= qcom_wdt_set_timeout,
+	.restart        = qcom_wdt_restart,
+	.owner		= THIS_MODULE,
+};
+
+static const struct watchdog_info qcom_wdt_info = {
+	.options	= WDIOF_KEEPALIVEPING
+			| WDIOF_MAGICCLOSE
+			| WDIOF_SETTIMEOUT
+			| WDIOF_CARDRESET,
+	.identity	= KBUILD_MODNAME,
+};
 
 static int qcom_wdt_probe(struct platform_device *pdev)
 {
@@ -166,12 +167,14 @@ static int qcom_wdt_probe(struct platform_device *pdev)
 		goto err_clk_unprepare;
 	}
 
-	wdt->wdd.dev = &pdev->dev;
 	wdt->wdd.info = &qcom_wdt_info;
 	wdt->wdd.ops = &qcom_wdt_ops;
 	wdt->wdd.min_timeout = 1;
 	wdt->wdd.max_timeout = 0x10000000U / wdt->rate;
 	wdt->wdd.parent = &pdev->dev;
+
+	if (readl(wdt->base + WDT_STS) & 1)
+		wdt->wdd.bootstatus = WDIOF_CARDRESET;
 
 	/*
 	 * If 'timeout-sec' unspecified in devicetree, assume a 30 second
@@ -187,14 +190,6 @@ static int qcom_wdt_probe(struct platform_device *pdev)
 		goto err_clk_unprepare;
 	}
 
-	/*
-	 * WDT restart notifier has priority 0 (use as a last resort)
-	 */
-	wdt->restart_nb.notifier_call = qcom_wdt_restart;
-	ret = register_restart_handler(&wdt->restart_nb);
-	if (ret)
-		dev_err(&pdev->dev, "failed to setup restart handler\n");
-
 	platform_set_drvdata(pdev, wdt);
 	return 0;
 
@@ -207,7 +202,6 @@ static int qcom_wdt_remove(struct platform_device *pdev)
 {
 	struct qcom_wdt *wdt = platform_get_drvdata(pdev);
 
-	unregister_restart_handler(&wdt->restart_nb);
 	watchdog_unregister_device(&wdt->wdd);
 	clk_disable_unprepare(wdt->clk);
 	return 0;

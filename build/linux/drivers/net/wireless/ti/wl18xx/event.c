@@ -64,13 +64,13 @@ static int wlcore_smart_config_sync_event(struct wl1271 *wl, u8 sync_channel,
 					  u8 sync_band)
 {
 	struct sk_buff *skb;
-	enum ieee80211_band band;
+	enum nl80211_band band;
 	int freq;
 
 	if (sync_band == WLCORE_BAND_5GHZ)
-		band = IEEE80211_BAND_5GHZ;
+		band = NL80211_BAND_5GHZ;
 	else
-		band = IEEE80211_BAND_2GHZ;
+		band = NL80211_BAND_2GHZ;
 
 	freq = ieee80211_channel_to_frequency(sync_channel, band);
 
@@ -146,7 +146,8 @@ int wl18xx_process_mailbox_events(struct wl1271 *wl)
 			    mbox->radar_channel,
 			    wl18xx_radar_type_decode(mbox->radar_type));
 
-		ieee80211_radar_detected(wl->hw);
+		if (!wl->radar_debug_mode)
+			ieee80211_radar_detected(wl->hw);
 	}
 
 	if (vector & PERIODIC_SCAN_REPORT_EVENT_ID) {
@@ -205,6 +206,8 @@ int wl18xx_process_mailbox_events(struct wl1271 *wl)
 						 mbox->sc_ssid,
 						 mbox->sc_pwd_len,
 						 mbox->sc_pwd);
+	if (vector & FW_LOGGER_INDICATION)
+		wlcore_event_fw_logger(wl);
 
 	return 0;
 }

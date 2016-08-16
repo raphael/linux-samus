@@ -1323,7 +1323,7 @@ static inline int phy_aneg_done(struct phy_device *phydev)
 
 static int greth_mdio_init(struct greth_private *greth)
 {
-	int ret, phy;
+	int ret;
 	unsigned long timeout;
 
 	greth->mdio = mdiobus_alloc();
@@ -1336,11 +1336,6 @@ static int greth_mdio_init(struct greth_private *greth)
 	greth->mdio->read = greth_mdio_read;
 	greth->mdio->write = greth_mdio_write;
 	greth->mdio->priv = greth;
-
-	greth->mdio->irq = greth->mdio_irqs;
-
-	for (phy = 0; phy < PHY_MAX_ADDR; phy++)
-		greth->mdio->irq[phy] = PHY_POLL;
 
 	ret = mdiobus_register(greth->mdio);
 	if (ret) {

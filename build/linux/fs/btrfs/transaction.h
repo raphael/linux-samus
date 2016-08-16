@@ -110,7 +110,6 @@ struct btrfs_trans_handle {
 	u64 chunk_bytes_reserved;
 	unsigned long use_count;
 	unsigned long blocks_reserved;
-	unsigned long blocks_used;
 	unsigned long delayed_ref_updates;
 	struct btrfs_transaction *transaction;
 	struct btrfs_block_rsv *block_rsv;
@@ -121,6 +120,7 @@ struct btrfs_trans_handle {
 	bool can_flush_pending_bgs;
 	bool reloc_reserved;
 	bool sync;
+	bool dirty;
 	unsigned int type;
 	/*
 	 * this root is only needed to validate that the root passed to
@@ -137,12 +137,14 @@ struct btrfs_pending_snapshot {
 	struct dentry *dentry;
 	struct inode *dir;
 	struct btrfs_root *root;
+	struct btrfs_root_item *root_item;
 	struct btrfs_root *snap;
 	struct btrfs_qgroup_inherit *inherit;
+	struct btrfs_path *path;
 	/* block reservation for the operation */
 	struct btrfs_block_rsv block_rsv;
 	u64 qgroup_reserved;
-	/* extra metadata reseration for relocation */
+	/* extra metadata reservation for relocation */
 	int error;
 	bool readonly;
 	struct list_head list;

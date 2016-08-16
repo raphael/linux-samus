@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2015, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -160,8 +160,6 @@ acpi_tb_install_fixed_table(acpi_physical_address address,
 			    char *signature, u32 *table_index);
 
 acpi_status acpi_tb_parse_root_table(acpi_physical_address rsdp_address);
-
-u8 acpi_is_valid_signature(char *signature);
 
 /*
  * tbxfload

@@ -18,6 +18,9 @@
 
 #include "hnae.h"
 
+#define HNS_DEBUG_OFFSET	6
+#define HNS_SRV_OFFSET		2
+
 enum hns_nic_state {
 	NIC_STATE_TESTING = 0,
 	NIC_STATE_RESETTING,
@@ -40,8 +43,18 @@ struct hns_nic_ring_data {
 	void (*fini_process)(struct hns_nic_ring_data *);
 };
 
+/* compatible the difference between two versions */
+struct hns_nic_ops {
+	void (*fill_desc)(struct hnae_ring *ring, void *priv,
+			  int size, dma_addr_t dma, int frag_end,
+			  int buf_num, enum hns_desc_type type, int mtu);
+	int (*maybe_stop_tx)(struct sk_buff **out_skb,
+			     int *bnum, struct hnae_ring *ring);
+	void (*get_rxd_bnum)(u32 bnum_flag, int *out_bnum);
+};
+
 struct hns_nic_priv {
-	const char *ae_name;
+	const struct device_node *ae_node;
 	u32 enet_ver;
 	u32 port_id;
 	int phy_mode;
@@ -50,6 +63,8 @@ struct hns_nic_priv {
 	struct net_device *netdev;
 	struct device *dev;
 	struct hnae_handle *ae_handle;
+
+	struct hns_nic_ops ops;
 
 	/* the cb for nic to manage the ring buffer, the first half of the
 	 * array is for tx_ring and vice versa for the second half

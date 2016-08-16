@@ -766,7 +766,6 @@ xfs_growfs_rt_alloc(
 {
 	xfs_fileoff_t		bno;		/* block number in file */
 	struct xfs_buf		*bp;	/* temporary buffer for zeroing */
-	int			committed;	/* transaction committed flag */
 	xfs_daddr_t		d;		/* disk block address */
 	int			error;		/* error return value */
 	xfs_fsblock_t		firstblock;/* first block allocated in xaction */
@@ -781,15 +780,14 @@ xfs_growfs_rt_alloc(
 	 * Allocate space to the file, as necessary.
 	 */
 	while (oblocks < nblocks) {
-		tp = xfs_trans_alloc(mp, XFS_TRANS_GROWFSRT_ALLOC);
 		resblks = XFS_GROWFSRT_SPACE_RES(mp, nblocks - oblocks);
 		/*
 		 * Reserve space & log for one extent added to the file.
 		 */
-		error = xfs_trans_reserve(tp, &M_RES(mp)->tr_growrtalloc,
-					  resblks, 0);
+		error = xfs_trans_alloc(mp, &M_RES(mp)->tr_growrtalloc, resblks,
+				0, 0, &tp);
 		if (error)
-			goto out_trans_cancel;
+			return error;
 		/*
 		 * Lock the inode.
 		 */
@@ -811,7 +809,7 @@ xfs_growfs_rt_alloc(
 		/*
 		 * Free any blocks freed up in the transaction, then commit.
 		 */
-		error = xfs_bmap_finish(&tp, &flist, &committed);
+		error = xfs_bmap_finish(&tp, &flist, NULL);
 		if (error)
 			goto out_bmap_cancel;
 		error = xfs_trans_commit(tp);
@@ -824,14 +822,13 @@ xfs_growfs_rt_alloc(
 		for (bno = map.br_startoff, fsbno = map.br_startblock;
 		     bno < map.br_startoff + map.br_blockcount;
 		     bno++, fsbno++) {
-			tp = xfs_trans_alloc(mp, XFS_TRANS_GROWFSRT_ZERO);
 			/*
 			 * Reserve log for one block zeroing.
 			 */
-			error = xfs_trans_reserve(tp, &M_RES(mp)->tr_growrtzero,
-						  0, 0);
+			error = xfs_trans_alloc(mp, &M_RES(mp)->tr_growrtzero,
+					0, 0, 0, &tp);
 			if (error)
-				goto out_trans_cancel;
+				return error;
 			/*
 			 * Lock the bitmap inode.
 			 */
@@ -995,11 +992,10 @@ xfs_growfs_rt(
 		/*
 		 * Start a transaction, get the log reservation.
 		 */
-		tp = xfs_trans_alloc(mp, XFS_TRANS_GROWFSRT_FREE);
-		error = xfs_trans_reserve(tp, &M_RES(mp)->tr_growrtfree,
-					  0, 0);
+		error = xfs_trans_alloc(mp, &M_RES(mp)->tr_growrtfree, 0, 0, 0,
+				&tp);
 		if (error)
-			goto error_cancel;
+			break;
 		/*
 		 * Lock out other callers by grabbing the bitmap inode lock.
 		 */
@@ -1273,7 +1269,7 @@ xfs_rtpick_extent(
 
 	ASSERT(xfs_isilocked(mp->m_rbmip, XFS_ILOCK_EXCL));
 
-	seqp = (__uint64_t *)&mp->m_rbmip->i_d.di_atime;
+	seqp = (__uint64_t *)&VFS_I(mp->m_rbmip)->i_atime;
 	if (!(mp->m_rbmip->i_d.di_flags & XFS_DIFLAG_NEWRTBM)) {
 		mp->m_rbmip->i_d.di_flags |= XFS_DIFLAG_NEWRTBM;
 		*seqp = 0;

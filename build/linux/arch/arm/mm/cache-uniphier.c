@@ -96,6 +96,7 @@ struct uniphier_cache_data {
 	void __iomem *ctrl_base;
 	void __iomem *rev_base;
 	void __iomem *op_base;
+	void __iomem *way_ctrl_base;
 	u32 way_present_mask;
 	u32 way_locked_mask;
 	u32 nsets;
@@ -256,10 +257,13 @@ static void __init __uniphier_cache_set_locked_ways(
 					struct uniphier_cache_data *data,
 					u32 way_mask)
 {
+	unsigned int cpu;
+
 	data->way_locked_mask = way_mask & data->way_present_mask;
 
-	writel_relaxed(~data->way_locked_mask & data->way_present_mask,
-		       data->ctrl_base + UNIPHIER_SSCLPDAWCR);
+	for_each_possible_cpu(cpu)
+		writel_relaxed(~data->way_locked_mask & data->way_present_mask,
+			       data->way_ctrl_base + 4 * cpu);
 }
 
 static void uniphier_cache_maint_range(unsigned long start, unsigned long end,
@@ -377,17 +381,6 @@ static const struct of_device_id uniphier_cache_match[] __initconst = {
 	{ /* sentinel */ }
 };
 
-static struct device_node * __init uniphier_cache_get_next_level_node(
-							struct device_node *np)
-{
-	u32 phandle;
-
-	if (of_property_read_u32(np, "next-level-cache", &phandle))
-		return NULL;
-
-	return of_find_node_by_phandle(phandle);
-}
-
 static int __init __uniphier_cache_init(struct device_node *np,
 					unsigned int *cache_level)
 {
@@ -470,6 +463,8 @@ static int __init __uniphier_cache_init(struct device_node *np,
 		goto err;
 	}
 
+	data->way_ctrl_base = data->ctrl_base + 0xc00;
+
 	if (*cache_level == 2) {
 		u32 revision = readl(data->rev_base + UNIPHIER_SSCID);
 		/*
@@ -478,6 +473,22 @@ static int __init __uniphier_cache_init(struct device_node *np,
 		 */
 		if (revision <= 0x16)
 			data->range_op_max_size = (u32)1 << 22;
+
+		/*
+		 * Unfortunatly, the offset address of active way control base
+		 * varies from SoC to SoC.
+		 */
+		switch (revision) {
+		case 0x11:	/* sLD3 */
+			data->way_ctrl_base = data->ctrl_base + 0x870;
+			break;
+		case 0x12:	/* LD4 */
+		case 0x16:	/* sld8 */
+			data->way_ctrl_base = data->ctrl_base + 0x840;
+			break;
+		default:
+			break;
+		}
 	}
 
 	data->range_op_max_size -= data->line_size;
@@ -491,7 +502,7 @@ static int __init __uniphier_cache_init(struct device_node *np,
 	 * next level cache fails because we want to continue with available
 	 * cache levels.
 	 */
-	next_np = uniphier_cache_get_next_level_node(np);
+	next_np = of_find_next_cache_node(np);
 	if (next_np) {
 		(*cache_level)++;
 		ret = __uniphier_cache_init(next_np, cache_level);

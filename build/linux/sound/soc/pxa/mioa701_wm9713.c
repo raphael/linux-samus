@@ -81,8 +81,12 @@ static int rear_amp_power(struct snd_soc_codec *codec, int power)
 static int rear_amp_event(struct snd_soc_dapm_widget *widget,
 			  struct snd_kcontrol *kctl, int event)
 {
-	struct snd_soc_codec *codec = widget->dapm->card->rtd[0].codec;
+	struct snd_soc_card *card = widget->dapm->card;
+	struct snd_soc_pcm_runtime *rtd;
+	struct snd_soc_codec *codec;
 
+	rtd = snd_soc_get_pcm_runtime(card, card->dai_link[0].name);
+	codec = rtd->codec;
 	return rear_amp_power(codec, SND_SOC_DAPM_EVENT_ON(event));
 }
 
@@ -203,3 +207,4 @@ module_platform_driver(mioa701_wm9713_driver);
 MODULE_AUTHOR("Robert Jarzmik (rjarzmik@free.fr)");
 MODULE_DESCRIPTION("ALSA SoC WM9713 MIO A701");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("platform:mioa701-wm9713");

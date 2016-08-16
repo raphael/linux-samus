@@ -156,7 +156,7 @@ static int p80211knetdev_open(netdevice_t *netdev)
 		return -ENODEV;
 
 	/* Tell the MSD to open */
-	if (wlandev->open != NULL) {
+	if (wlandev->open) {
 		result = wlandev->open(wlandev);
 		if (result == 0) {
 			netif_start_queue(wlandev->netdev);
@@ -186,7 +186,7 @@ static int p80211knetdev_stop(netdevice_t *netdev)
 	int result = 0;
 	wlandevice_t *wlandev = netdev->ml_priv;
 
-	if (wlandev->close != NULL)
+	if (wlandev->close)
 		result = wlandev->close(wlandev);
 
 	netif_stop_queue(wlandev->netdev);
@@ -328,7 +328,7 @@ static int p80211knetdev_hard_start_xmit(struct sk_buff *skb,
 
 	p80211_wep.data = NULL;
 
-	if (skb == NULL)
+	if (!skb)
 		return NETDEV_TX_OK;
 
 	if (wlandev->state != WLAN_DEVICE_OPEN) {
@@ -388,12 +388,12 @@ static int p80211knetdev_hard_start_xmit(struct sk_buff *skb,
 			goto failed;
 		}
 	}
-	if (wlandev->txframe == NULL) {
+	if (!wlandev->txframe) {
 		result = 1;
 		goto failed;
 	}
 
-	netdev->trans_start = jiffies;
+	netif_trans_update(netdev);
 
 	netdev->stats.tx_packets++;
 	/* count only the packet payload */
@@ -736,7 +736,7 @@ int wlan_setup(wlandevice_t *wlandev, struct device *physdev)
 
 	/* Allocate and initialize the wiphy struct */
 	wiphy = wlan_create_wiphy(physdev, wlandev);
-	if (wiphy == NULL) {
+	if (!wiphy) {
 		dev_err(physdev, "Failed to alloc wiphy.\n");
 		return 1;
 	}
@@ -744,7 +744,7 @@ int wlan_setup(wlandevice_t *wlandev, struct device *physdev)
 	/* Allocate and initialize the struct device */
 	netdev = alloc_netdev(sizeof(struct wireless_dev), "wlan%d",
 			      NET_NAME_UNKNOWN, ether_setup);
-	if (netdev == NULL) {
+	if (!netdev) {
 		dev_err(physdev, "Failed to alloc netdev.\n");
 		wlan_free_wiphy(wiphy);
 		result = 1;

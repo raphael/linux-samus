@@ -296,7 +296,7 @@ void vp_del_vqs(struct virtio_device *vdev)
 static int vp_try_to_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 			      struct virtqueue *vqs[],
 			      vq_callback_t *callbacks[],
-			      const char *names[],
+			      const char * const names[],
 			      bool use_msix,
 			      bool per_vq_vectors)
 {
@@ -376,7 +376,7 @@ error_find:
 int vp_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		struct virtqueue *vqs[],
 		vq_callback_t *callbacks[],
-		const char *names[])
+		const char * const names[])
 {
 	int err;
 
@@ -467,7 +467,7 @@ static const struct dev_pm_ops virtio_pci_pm_ops = {
 
 /* Qumranet donated their vendor ID for devices 0x1000 thru 0x10FF. */
 static const struct pci_device_id virtio_pci_id_table[] = {
-	{ PCI_DEVICE(0x1af4, PCI_ANY_ID) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_REDHAT_QUMRANET, PCI_ANY_ID) },
 	{ 0 }
 };
 

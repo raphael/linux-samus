@@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
 			unsigned long map_size, unsigned long desc_size,
 			u32 desc_ver)
 {
-	int node, prev, num_rsv;
+	int node, num_rsv;
 	int status;
 	u32 fdt_val32;
 	u64 fdt_val64;
@@ -52,28 +52,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
 
 	if (status != 0)
 		goto fdt_set_fail;
-
-	/*
-	 * Delete any memory nodes present. We must delete nodes which
-	 * early_init_dt_scan_memory may try to use.
-	 */
-	prev = 0;
-	for (;;) {
-		const char *type;
-		int len;
-
-		node = fdt_next_node(fdt, prev, NULL);
-		if (node < 0)
-			break;
-
-		type = fdt_getprop(fdt, node, "device_type", &len);
-		if (type && strncmp(type, "memory", len) == 0) {
-			fdt_del_node(fdt, node);
-			continue;
-		}
-
-		prev = node;
-	}
 
 	/*
 	 * Delete all memory reserve map entries. When booting via UEFI,
@@ -147,6 +125,20 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
 	if (status)
 		goto fdt_set_fail;
 
+	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+		efi_status_t efi_status;
+
+		efi_status = efi_get_random_bytes(sys_table, sizeof(fdt_val64),
+						  (u8 *)&fdt_val64);
+		if (efi_status == EFI_SUCCESS) {
+			status = fdt_setprop(fdt, node, "kaslr-seed",
+					     &fdt_val64, sizeof(fdt_val64));
+			if (status)
+				goto fdt_set_fail;
+		} else if (efi_status != EFI_NOT_FOUND) {
+			return efi_status;
+		}
+	}
 	return EFI_SUCCESS;
 
 fdt_set_fail:
@@ -253,7 +245,7 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
 			sys_table->boottime->free_pool(memory_map);
 			new_fdt_size += EFI_PAGE_SIZE;
 		} else {
-			pr_efi_err(sys_table, "Unable to constuct new device tree.\n");
+			pr_efi_err(sys_table, "Unable to construct new device tree.\n");
 			goto fail_free_mmap;
 		}
 	}

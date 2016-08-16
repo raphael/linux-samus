@@ -114,6 +114,10 @@ void __kernel_fpu_begin(void)
 	kernel_fpu_disable();
 
 	if (fpu->fpregs_active) {
+		/*
+		 * Ignore return value -- we don't care if reg state
+		 * is clobbered.
+		 */
 		copy_fpregs_to_fpstate(fpu);
 	} else {
 		this_cpu_write(fpu_fpregs_owner_ctx, NULL);
@@ -189,8 +193,12 @@ void fpu__save(struct fpu *fpu)
 
 	preempt_disable();
 	if (fpu->fpregs_active) {
-		if (!copy_fpregs_to_fpstate(fpu))
-			fpregs_deactivate(fpu);
+		if (!copy_fpregs_to_fpstate(fpu)) {
+			if (use_eager_fpu())
+				copy_kernel_to_fpregs(&fpu->state);
+			else
+				fpregs_deactivate(fpu);
+		}
 	}
 	preempt_enable();
 }
@@ -209,28 +217,29 @@ static inline void fpstate_init_fstate(struct fregs_state *fp)
 
 void fpstate_init(union fpregs_state *state)
 {
-	if (!cpu_has_fpu) {
+	if (!static_cpu_has(X86_FEATURE_FPU)) {
 		fpstate_init_soft(&state->soft);
 		return;
 	}
 
 	memset(state, 0, xstate_size);
 
-	if (cpu_has_fxsr)
+	if (static_cpu_has(X86_FEATURE_FXSR))
 		fpstate_init_fxstate(&state->fxsave);
 	else
 		fpstate_init_fstate(&state->fsave);
 }
 EXPORT_SYMBOL_GPL(fpstate_init);
 
-/*
- * Copy the current task's FPU state to a new task's FPU context.
- *
- * In both the 'eager' and the 'lazy' case we save hardware registers
- * directly to the destination buffer.
- */
-static void fpu_copy(struct fpu *dst_fpu, struct fpu *src_fpu)
+int fpu__copy(struct fpu *dst_fpu, struct fpu *src_fpu)
 {
+	dst_fpu->counter = 0;
+	dst_fpu->fpregs_active = 0;
+	dst_fpu->last_cpu = -1;
+
+	if (!src_fpu->fpstate_active || !static_cpu_has(X86_FEATURE_FPU))
+		return 0;
+
 	WARN_ON_FPU(src_fpu != &current->thread.fpu);
 
 	/*
@@ -243,10 +252,9 @@ static void fpu_copy(struct fpu *dst_fpu, struct fpu *src_fpu)
 	/*
 	 * Save current FPU registers directly into the child
 	 * FPU context, without any memory-to-memory copying.
-	 *
-	 * If the FPU context got destroyed in the process (FNSAVE
-	 * done on old CPUs) then copy it back into the source
-	 * context and mark the current task for lazy restore.
+	 * In lazy mode, if the FPU context isn't loaded into
+	 * fpregs, CR0.TS will be set and do_device_not_available
+	 * will load the FPU context.
 	 *
 	 * We have to do all this with preemption disabled,
 	 * mostly because of the FNSAVE case, because in that
@@ -259,19 +267,13 @@ static void fpu_copy(struct fpu *dst_fpu, struct fpu *src_fpu)
 	preempt_disable();
 	if (!copy_fpregs_to_fpstate(dst_fpu)) {
 		memcpy(&src_fpu->state, &dst_fpu->state, xstate_size);
-		fpregs_deactivate(src_fpu);
+
+		if (use_eager_fpu())
+			copy_kernel_to_fpregs(&src_fpu->state);
+		else
+			fpregs_deactivate(src_fpu);
 	}
 	preempt_enable();
-}
-
-int fpu__copy(struct fpu *dst_fpu, struct fpu *src_fpu)
-{
-	dst_fpu->counter = 0;
-	dst_fpu->fpregs_active = 0;
-	dst_fpu->last_cpu = -1;
-
-	if (src_fpu->fpstate_active && cpu_has_fpu)
-		fpu_copy(dst_fpu, src_fpu);
 
 	return 0;
 }
@@ -352,6 +354,69 @@ void fpu__activate_fpstate_write(struct fpu *fpu)
 }
 
 /*
+ * This function must be called before we write the current
+ * task's fpstate.
+ *
+ * This call gets the current FPU register state and moves
+ * it in to the 'fpstate'.  Preemption is disabled so that
+ * no writes to the 'fpstate' can occur from context
+ * swiches.
+ *
+ * Must be followed by a fpu__current_fpstate_write_end().
+ */
+void fpu__current_fpstate_write_begin(void)
+{
+	struct fpu *fpu = &current->thread.fpu;
+
+	/*
+	 * Ensure that the context-switching code does not write
+	 * over the fpstate while we are doing our update.
+	 */
+	preempt_disable();
+
+	/*
+	 * Move the fpregs in to the fpu's 'fpstate'.
+	 */
+	fpu__activate_fpstate_read(fpu);
+
+	/*
+	 * The caller is about to write to 'fpu'.  Ensure that no
+	 * CPU thinks that its fpregs match the fpstate.  This
+	 * ensures we will not be lazy and skip a XRSTOR in the
+	 * future.
+	 */
+	fpu->last_cpu = -1;
+}
+
+/*
+ * This function must be paired with fpu__current_fpstate_write_begin()
+ *
+ * This will ensure that the modified fpstate gets placed back in
+ * the fpregs if necessary.
+ *
+ * Note: This function may be called whether or not an _actual_
+ * write to the fpstate occurred.
+ */
+void fpu__current_fpstate_write_end(void)
+{
+	struct fpu *fpu = &current->thread.fpu;
+
+	/*
+	 * 'fpu' now has an updated copy of the state, but the
+	 * registers may still be out of date.  Update them with
+	 * an XRSTOR if they are active.
+	 */
+	if (fpregs_active())
+		copy_kernel_to_fpregs(&fpu->state);
+
+	/*
+	 * Our update is done and the fpregs/fpstate are in sync
+	 * if necessary.  Context switches can happen again.
+	 */
+	preempt_enable();
+}
+
+/*
  * 'fpu__restore()' is called to copy FPU registers from
  * the FPU fpstate to the live hw registers and to activate
  * access to the hardware registers, so that FPU instructions
@@ -409,8 +474,10 @@ static inline void copy_init_fpstate_to_fpregs(void)
 {
 	if (use_xsave())
 		copy_kernel_to_xregs(&init_fpstate.xsave, -1);
-	else
+	else if (static_cpu_has(X86_FEATURE_FXSR))
 		copy_kernel_to_fxregs(&init_fpstate.fxsave);
+	else
+		copy_kernel_to_fregs(&init_fpstate.fsave);
 }
 
 /*
@@ -423,7 +490,7 @@ void fpu__clear(struct fpu *fpu)
 {
 	WARN_ON_FPU(fpu != &current->thread.fpu); /* Almost certainly an anomaly */
 
-	if (!use_eager_fpu()) {
+	if (!use_eager_fpu() || !static_cpu_has(X86_FEATURE_FPU)) {
 		/* FPU state will be reallocated lazily at the first use. */
 		fpu__drop(fpu);
 	} else {
@@ -439,33 +506,6 @@ void fpu__clear(struct fpu *fpu)
  * x87 math exception handling:
  */
 
-static inline unsigned short get_fpu_cwd(struct fpu *fpu)
-{
-	if (cpu_has_fxsr) {
-		return fpu->state.fxsave.cwd;
-	} else {
-		return (unsigned short)fpu->state.fsave.cwd;
-	}
-}
-
-static inline unsigned short get_fpu_swd(struct fpu *fpu)
-{
-	if (cpu_has_fxsr) {
-		return fpu->state.fxsave.swd;
-	} else {
-		return (unsigned short)fpu->state.fsave.swd;
-	}
-}
-
-static inline unsigned short get_fpu_mxcsr(struct fpu *fpu)
-{
-	if (cpu_has_xmm) {
-		return fpu->state.fxsave.mxcsr;
-	} else {
-		return MXCSR_DEFAULT;
-	}
-}
-
 int fpu__exception_code(struct fpu *fpu, int trap_nr)
 {
 	int err;
@@ -480,10 +520,15 @@ int fpu__exception_code(struct fpu *fpu, int trap_nr)
 		 * so if this combination doesn't produce any single exception,
 		 * then we have a bad program that isn't synchronizing its FPU usage
 		 * and it will suffer the consequences since we won't be able to
-		 * fully reproduce the context of the exception
+		 * fully reproduce the context of the exception.
 		 */
-		cwd = get_fpu_cwd(fpu);
-		swd = get_fpu_swd(fpu);
+		if (boot_cpu_has(X86_FEATURE_FXSR)) {
+			cwd = fpu->state.fxsave.cwd;
+			swd = fpu->state.fxsave.swd;
+		} else {
+			cwd = (unsigned short)fpu->state.fsave.cwd;
+			swd = (unsigned short)fpu->state.fsave.swd;
+		}
 
 		err = swd & ~cwd;
 	} else {
@@ -493,7 +538,11 @@ int fpu__exception_code(struct fpu *fpu, int trap_nr)
 		 * unmasked exception was caught we must mask the exception mask bits
 		 * at 0x1f80, and then use these to mask the exception bits at 0x3f.
 		 */
-		unsigned short mxcsr = get_fpu_mxcsr(fpu);
+		unsigned short mxcsr = MXCSR_DEFAULT;
+
+		if (boot_cpu_has(X86_FEATURE_XMM))
+			mxcsr = fpu->state.fxsave.mxcsr;
+
 		err = ~(mxcsr >> 7) & mxcsr;
 	}
 

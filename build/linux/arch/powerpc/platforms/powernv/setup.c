@@ -90,12 +90,8 @@ static void pnv_show_cpuinfo(struct seq_file *m)
 	if (root)
 		model = of_get_property(root, "model", NULL);
 	seq_printf(m, "machine\t\t: PowerNV %s\n", model);
-	if (firmware_has_feature(FW_FEATURE_OPALv3))
-		seq_printf(m, "firmware\t: OPAL v3\n");
-	else if (firmware_has_feature(FW_FEATURE_OPALv2))
-		seq_printf(m, "firmware\t: OPAL v2\n");
-	else if (firmware_has_feature(FW_FEATURE_OPAL))
-		seq_printf(m, "firmware\t: OPAL v1\n");
+	if (firmware_has_feature(FW_FEATURE_OPAL))
+		seq_printf(m, "firmware\t: OPAL\n");
 	else
 		seq_printf(m, "firmware\t: BML\n");
 	of_node_put(root);
@@ -224,9 +220,9 @@ static void pnv_kexec_cpu_down(int crash_shutdown, int secondary)
 {
 	xics_kexec_teardown_cpu(secondary);
 
-	/* On OPAL v3, we return all CPUs to firmware */
+	/* On OPAL, we return all CPUs to firmware */
 
-	if (!firmware_has_feature(FW_FEATURE_OPALv3))
+	if (!firmware_has_feature(FW_FEATURE_OPAL))
 		return;
 
 	if (secondary) {
@@ -277,7 +273,10 @@ static int __init pnv_probe(void)
 	if (!of_flat_dt_is_compatible(root, "ibm,powernv"))
 		return 0;
 
-	hpte_init_native();
+	if (IS_ENABLED(CONFIG_PPC_RADIX_MMU) && radix_enabled())
+		radix_init_native();
+	else if (IS_ENABLED(CONFIG_PPC_STD_MMU_64))
+		hpte_init_native();
 
 	if (firmware_has_feature(FW_FEATURE_OPAL))
 		pnv_setup_machdep_opal();

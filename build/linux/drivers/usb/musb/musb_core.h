@@ -168,6 +168,7 @@ struct musb_io;
  * @adjust_channel_params: pre check for standard dma channel_program func
  * @pre_root_reset_end: called before the root usb port reset flag gets cleared
  * @post_root_reset_end: called after the root usb port reset flag gets cleared
+ * @phy_callback: optional callback function for the phy to call
  */
 struct musb_platform_ops {
 
@@ -214,6 +215,7 @@ struct musb_platform_ops {
 				dma_addr_t *dma_addr, u32 *len);
 	void	(*pre_root_reset_end)(struct musb *musb);
 	void	(*post_root_reset_end)(struct musb *musb);
+	int	(*phy_callback)(enum musb_vbus_id_status status);
 };
 
 /*
@@ -310,6 +312,7 @@ struct musb {
 	struct work_struct	irq_work;
 	struct delayed_work	deassert_reset_work;
 	struct delayed_work	finish_resume_work;
+	struct delayed_work	gadget_work;
 	u16			hwvers;
 
 	u16			intrrxe;
@@ -436,7 +439,7 @@ struct musb {
 	 */
 	unsigned                double_buffer_not_ok:1;
 
-	struct musb_hdrc_config	*config;
+	const struct musb_hdrc_config *config;
 
 	int			xceiv_old_state;
 #ifdef CONFIG_DEBUG_FS

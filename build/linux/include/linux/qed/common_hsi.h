@@ -11,9 +11,11 @@
 
 #define CORE_SPQE_PAGE_SIZE_BYTES                       4096
 
+#define X_FINAL_CLEANUP_AGG_INT 1
+
 #define FW_MAJOR_VERSION	8
-#define FW_MINOR_VERSION	4
-#define FW_REVISION_VERSION	2
+#define FW_MINOR_VERSION	7
+#define FW_REVISION_VERSION	3
 #define FW_ENGINEERING_VERSION	0
 
 /***********************/
@@ -152,6 +154,9 @@
 /* number of queues in a PF queue group */
 #define QM_PF_QUEUE_GROUP_SIZE	8
 
+/* the size of a single queue element in bytes */
+#define QM_PQ_ELEMENT_SIZE                      4
+
 /* base number of Tx PQs in the CM PQ representation.
  * should be used when storing PQ IDs in CM PQ registers and context
  */
@@ -280,10 +285,77 @@
 #define PXP_ILT_PAGE_SIZE_NUM_BITS_MIN	12
 #define PXP_ILT_BLOCK_FACTOR_MULTIPLIER	1024
 
+#define PXP_VF_BAR0_START_IGU                   0
+#define PXP_VF_BAR0_IGU_LENGTH                  0x3000
+#define PXP_VF_BAR0_END_IGU                     (PXP_VF_BAR0_START_IGU + \
+						 PXP_VF_BAR0_IGU_LENGTH - 1)
+
+#define PXP_VF_BAR0_START_DQ                    0x3000
+#define PXP_VF_BAR0_DQ_LENGTH                   0x200
+#define PXP_VF_BAR0_DQ_OPAQUE_OFFSET            0
+#define PXP_VF_BAR0_ME_OPAQUE_ADDRESS           (PXP_VF_BAR0_START_DQ +	\
+						 PXP_VF_BAR0_DQ_OPAQUE_OFFSET)
+#define PXP_VF_BAR0_ME_CONCRETE_ADDRESS         (PXP_VF_BAR0_ME_OPAQUE_ADDRESS \
+						 + 4)
+#define PXP_VF_BAR0_END_DQ                      (PXP_VF_BAR0_START_DQ +	\
+						 PXP_VF_BAR0_DQ_LENGTH - 1)
+
+#define PXP_VF_BAR0_START_TSDM_ZONE_B           0x3200
+#define PXP_VF_BAR0_SDM_LENGTH_ZONE_B           0x200
+#define PXP_VF_BAR0_END_TSDM_ZONE_B             (PXP_VF_BAR0_START_TSDM_ZONE_B \
+						 +			       \
+						 PXP_VF_BAR0_SDM_LENGTH_ZONE_B \
+						 - 1)
+
+#define PXP_VF_BAR0_START_MSDM_ZONE_B           0x3400
+#define PXP_VF_BAR0_END_MSDM_ZONE_B             (PXP_VF_BAR0_START_MSDM_ZONE_B \
+						 +			       \
+						 PXP_VF_BAR0_SDM_LENGTH_ZONE_B \
+						 - 1)
+
+#define PXP_VF_BAR0_START_USDM_ZONE_B           0x3600
+#define PXP_VF_BAR0_END_USDM_ZONE_B             (PXP_VF_BAR0_START_USDM_ZONE_B \
+						 +			       \
+						 PXP_VF_BAR0_SDM_LENGTH_ZONE_B \
+						 - 1)
+
+#define PXP_VF_BAR0_START_XSDM_ZONE_B           0x3800
+#define PXP_VF_BAR0_END_XSDM_ZONE_B             (PXP_VF_BAR0_START_XSDM_ZONE_B \
+						 +			       \
+						 PXP_VF_BAR0_SDM_LENGTH_ZONE_B \
+						 - 1)
+
+#define PXP_VF_BAR0_START_YSDM_ZONE_B           0x3a00
+#define PXP_VF_BAR0_END_YSDM_ZONE_B             (PXP_VF_BAR0_START_YSDM_ZONE_B \
+						 +			       \
+						 PXP_VF_BAR0_SDM_LENGTH_ZONE_B \
+						 - 1)
+
+#define PXP_VF_BAR0_START_PSDM_ZONE_B           0x3c00
+#define PXP_VF_BAR0_END_PSDM_ZONE_B             (PXP_VF_BAR0_START_PSDM_ZONE_B \
+						 +			       \
+						 PXP_VF_BAR0_SDM_LENGTH_ZONE_B \
+						 - 1)
+
+#define PXP_VF_BAR0_START_SDM_ZONE_A            0x4000
+#define PXP_VF_BAR0_END_SDM_ZONE_A              0x10000
+
+#define PXP_VF_BAR0_GRC_WINDOW_LENGTH           32
+
 /* ILT Records */
 #define PXP_NUM_ILT_RECORDS_BB 7600
 #define PXP_NUM_ILT_RECORDS_K2 11000
 #define MAX_NUM_ILT_RECORDS MAX(PXP_NUM_ILT_RECORDS_BB, PXP_NUM_ILT_RECORDS_K2)
+
+#define SDM_COMP_TYPE_NONE              0
+#define SDM_COMP_TYPE_WAKE_THREAD       1
+#define SDM_COMP_TYPE_AGG_INT           2
+#define SDM_COMP_TYPE_CM                3
+#define SDM_COMP_TYPE_LOADER            4
+#define SDM_COMP_TYPE_PXP               5
+#define SDM_COMP_TYPE_INDICATE_ERROR    6
+#define SDM_COMP_TYPE_RELEASE_THREAD    7
+#define SDM_COMP_TYPE_RAM               8
 
 /******************/
 /* PBF CONSTANTS  */
@@ -312,9 +384,14 @@ struct regpair {
 	__le32	hi;
 };
 
+struct vf_pf_channel_eqe_data {
+	struct regpair msg_addr;
+};
+
 /* Event Data Union */
 union event_ring_data {
 	u8				bytes[8];
+	struct vf_pf_channel_eqe_data	vf_pf_channel;
 	struct async_data		async_info;
 };
 
@@ -335,7 +412,7 @@ struct event_ring_entry {
 
 /* Multi function mode */
 enum mf_mode {
-	SF,
+	ERROR_MODE /* Unsupported mode */,
 	MF_OVLAN,
 	MF_NPAR,
 	MAX_MF_MODE
@@ -606,4 +683,19 @@ struct status_block {
 #define STATUS_BLOCK_ZERO_PAD3_SHIFT  24
 };
 
+struct tunnel_parsing_flags {
+	u8 flags;
+#define TUNNEL_PARSING_FLAGS_TYPE_MASK              0x3
+#define TUNNEL_PARSING_FLAGS_TYPE_SHIFT             0
+#define TUNNEL_PARSING_FLAGS_TENNANT_ID_EXIST_MASK  0x1
+#define TUNNEL_PARSING_FLAGS_TENNANT_ID_EXIST_SHIFT 2
+#define TUNNEL_PARSING_FLAGS_NEXT_PROTOCOL_MASK     0x3
+#define TUNNEL_PARSING_FLAGS_NEXT_PROTOCOL_SHIFT    3
+#define TUNNEL_PARSING_FLAGS_FIRSTHDRIPMATCH_MASK   0x1
+#define TUNNEL_PARSING_FLAGS_FIRSTHDRIPMATCH_SHIFT  5
+#define TUNNEL_PARSING_FLAGS_IPV4_FRAGMENT_MASK     0x1
+#define TUNNEL_PARSING_FLAGS_IPV4_FRAGMENT_SHIFT    6
+#define TUNNEL_PARSING_FLAGS_IPV4_OPTIONS_MASK      0x1
+#define TUNNEL_PARSING_FLAGS_IPV4_OPTIONS_SHIFT     7
+};
 #endif /* __COMMON_HSI__ */

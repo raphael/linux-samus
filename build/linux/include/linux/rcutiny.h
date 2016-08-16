@@ -149,6 +149,22 @@ static inline unsigned long rcu_batches_completed_sched(void)
 	return 0;
 }
 
+/*
+ * Return the number of expedited grace periods completed.
+ */
+static inline unsigned long rcu_exp_batches_completed(void)
+{
+	return 0;
+}
+
+/*
+ * Return the number of expedited sched grace periods completed.
+ */
+static inline unsigned long rcu_exp_batches_completed_sched(void)
+{
+	return 0;
+}
+
 static inline void rcu_force_quiescent_state(void)
 {
 }
@@ -178,6 +194,14 @@ static inline void rcu_idle_exit(void)
 }
 
 static inline void rcu_irq_enter(void)
+{
+}
+
+static inline void rcu_irq_exit_irqson(void)
+{
+}
+
+static inline void rcu_irq_enter_irqson(void)
 {
 }
 

@@ -328,7 +328,7 @@ void virtio_gpu_dequeue_fence_func(struct work_struct *work);
 /* virtio_gpu_display.c */
 int virtio_gpu_framebuffer_init(struct drm_device *dev,
 				struct virtio_gpu_framebuffer *vgfb,
-				struct drm_mode_fb_cmd2 *mode_cmd,
+				const struct drm_mode_fb_cmd2 *mode_cmd,
 				struct drm_gem_object *obj);
 int virtio_gpu_modeset_init(struct virtio_gpu_device *vgdev);
 void virtio_gpu_modeset_fini(struct virtio_gpu_device *vgdev);
@@ -400,7 +400,7 @@ static inline int virtio_gpu_object_reserve(struct virtio_gpu_object *bo,
 {
 	int r;
 
-	r = ttm_bo_reserve(&bo->tbo, true, no_wait, false, NULL);
+	r = ttm_bo_reserve(&bo->tbo, true, no_wait, NULL);
 	if (unlikely(r != 0)) {
 		if (r != -ERESTARTSYS) {
 			struct virtio_gpu_device *qdev =

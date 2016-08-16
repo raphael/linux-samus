@@ -9,16 +9,19 @@
 #include "builtin.h"
 
 #include "util/env.h"
-#include "util/exec_cmd.h"
+#include <subcmd/exec-cmd.h>
 #include "util/cache.h"
 #include "util/quote.h"
-#include "util/run-command.h"
+#include <subcmd/run-command.h>
 #include "util/parse-events.h"
-#include "util/parse-options.h"
+#include <subcmd/parse-options.h>
 #include "util/bpf-loader.h"
 #include "util/debug.h"
+#include <api/fs/fs.h>
 #include <api/fs/tracing_path.h>
 #include <pthread.h>
+#include <stdlib.h>
+#include <time.h>
 
 const char perf_usage_string[] =
 	"perf [--version] [--help] [OPTIONS] COMMAND [ARGS]";
@@ -39,6 +42,7 @@ struct cmd_struct {
 static struct cmd_struct commands[] = {
 	{ "buildid-cache", cmd_buildid_cache, 0 },
 	{ "buildid-list", cmd_buildid_list, 0 },
+	{ "config",	cmd_config,	0 },
 	{ "diff",	cmd_diff,	0 },
 	{ "evlist",	cmd_evlist,	0 },
 	{ "help",	cmd_help,	0 },
@@ -118,7 +122,7 @@ static void commit_pager_choice(void)
 {
 	switch (use_pager) {
 	case 0:
-		setenv("PERF_PAGER", "cat", 1);
+		setenv(PERF_PAGER_ENVIRONMENT, "cat", 1);
 		break;
 	case 1:
 		/* setup_pager(); */
@@ -182,9 +186,9 @@ static int handle_options(const char ***argv, int *argc, int *envchanged)
 		if (!prefixcmp(cmd, CMD_EXEC_PATH)) {
 			cmd += strlen(CMD_EXEC_PATH);
 			if (*cmd == '=')
-				perf_set_argv_exec_path(cmd + 1);
+				set_argv_exec_path(cmd + 1);
 			else {
-				puts(perf_exec_path());
+				puts(get_argv_exec_path());
 				exit(0);
 			}
 		} else if (!strcmp(cmd, "--html-path")) {
@@ -305,9 +309,11 @@ static int handle_alias(int *argcp, const char ***argv)
 			if (*argcp > 1) {
 				struct strbuf buf;
 
-				strbuf_init(&buf, PATH_MAX);
-				strbuf_addstr(&buf, alias_string);
-				sq_quote_argv(&buf, (*argv) + 1, PATH_MAX);
+				if (strbuf_init(&buf, PATH_MAX) < 0 ||
+				    strbuf_addstr(&buf, alias_string) < 0 ||
+				    sq_quote_argv(&buf, (*argv) + 1,
+						  PATH_MAX) < 0)
+					die("Failed to allocate memory.");
 				free(alias_string);
 				alias_string = buf.buf;
 			}
@@ -383,6 +389,7 @@ static int run_builtin(struct cmd_struct *p, int argc, const char **argv)
 		use_pager = 1;
 	commit_pager_choice();
 
+	perf_env__set_cmdline(&perf_env, argc, argv);
 	status = p->fn(argc, argv, prefix);
 	exit_browser(status);
 	perf_env__exit(&perf_env);
@@ -450,11 +457,12 @@ static void handle_internal_command(int argc, const char **argv)
 
 static void execv_dashed_external(const char **argv)
 {
-	struct strbuf cmd = STRBUF_INIT;
+	char *cmd;
 	const char *tmp;
 	int status;
 
-	strbuf_addf(&cmd, "perf-%s", argv[0]);
+	if (asprintf(&cmd, "perf-%s", argv[0]) < 0)
+		goto do_die;
 
 	/*
 	 * argv[0] must be the perf command, but the argv array
@@ -463,7 +471,7 @@ static void execv_dashed_external(const char **argv)
 	 * restore it on error.
 	 */
 	tmp = argv[0];
-	argv[0] = cmd.buf;
+	argv[0] = cmd;
 
 	/*
 	 * if we fail because the command is not found, it is
@@ -471,15 +479,16 @@ static void execv_dashed_external(const char **argv)
 	 */
 	status = run_command_v_opt(argv, 0);
 	if (status != -ERR_RUN_COMMAND_EXEC) {
-		if (IS_RUN_COMMAND_ERR(status))
+		if (IS_RUN_COMMAND_ERR(status)) {
+do_die:
 			die("unable to run '%s'", argv[0]);
+		}
 		exit(-status);
 	}
 	errno = ENOENT; /* as if we called execvp */
 
 	argv[0] = tmp;
-
-	strbuf_release(&cmd);
+	zfree(&cmd);
 }
 
 static int run_argv(int *argcp, const char ***argv)
@@ -527,14 +536,30 @@ int main(int argc, const char **argv)
 {
 	const char *cmd;
 	char sbuf[STRERR_BUFSIZE];
+	int value;
+
+	/* libsubcmd init */
+	exec_cmd_init("perf", PREFIX, PERF_EXEC_PATH, EXEC_PATH_ENVIRONMENT);
+	pager_init(PERF_PAGER_ENVIRONMENT);
 
 	/* The page_size is placed in util object. */
 	page_size = sysconf(_SC_PAGE_SIZE);
 	cacheline_size = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
 
-	cmd = perf_extract_argv0_path(argv[0]);
+	if (sysctl__read_int("kernel/perf_event_max_stack", &value) == 0)
+		sysctl_perf_event_max_stack = value;
+
+	if (sysctl__read_int("kernel/perf_event_max_contexts_per_stack", &value) == 0)
+		sysctl_perf_event_max_contexts_per_stack = value;
+
+	cmd = extract_argv0_path(argv[0]);
 	if (!cmd)
 		cmd = "perf-help";
+
+	srandom(time(NULL));
+
+	perf_config(perf_default_config, NULL);
+	set_buildid_dir(NULL);
 
 	/* get debugfs/tracefs mount point from /proc/mounts */
 	tracing_path_mount();
@@ -558,7 +583,6 @@ int main(int argc, const char **argv)
 	}
 	if (!prefixcmp(cmd, "trace")) {
 #ifdef HAVE_LIBAUDIT_SUPPORT
-		set_buildid_dir(NULL);
 		setup_path();
 		argv[0] = "trace";
 		return cmd_trace(argc, argv, NULL);
@@ -573,7 +597,6 @@ int main(int argc, const char **argv)
 	argc--;
 	handle_options(&argv, &argc, NULL);
 	commit_pager_choice();
-	set_buildid_dir(NULL);
 
 	if (argc > 0) {
 		if (!prefixcmp(argv[0], "--"))
@@ -602,6 +625,8 @@ int main(int argc, const char **argv)
 	 * forever while the signal goes to some other non interested thread.
 	 */
 	pthread__block_sigwinch();
+
+	perf_debug_setup();
 
 	while (1) {
 		static int done_help;

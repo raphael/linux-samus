@@ -48,15 +48,16 @@
 #include "powernv.h"
 #include "pci.h"
 
-/* 256M DMA window, 4K TCE pages, 8 bytes TCE */
-#define TCE32_TABLE_SIZE	((0x10000000 / 0x1000) * 8)
+#define PNV_IODA1_M64_NUM	16	/* Number of M64 BARs	*/
+#define PNV_IODA1_M64_SEGS	8	/* Segments per M64 BAR	*/
+#define PNV_IODA1_DMA32_SEGSIZE	0x10000000
 
 #define POWERNV_IOMMU_DEFAULT_LEVELS	1
 #define POWERNV_IOMMU_MAX_LEVELS	5
 
 static void pnv_pci_ioda2_table_free_pages(struct iommu_table *tbl);
 
-static void pe_level_printk(const struct pnv_ioda_pe *pe, const char *level,
+void pe_level_printk(const struct pnv_ioda_pe *pe, const char *level,
 			    const char *fmt, ...)
 {
 	struct va_format vaf;
@@ -87,13 +88,6 @@ static void pe_level_printk(const struct pnv_ioda_pe *pe, const char *level,
 	va_end(args);
 }
 
-#define pe_err(pe, fmt, ...)					\
-	pe_level_printk(pe, KERN_ERR, fmt, ##__VA_ARGS__)
-#define pe_warn(pe, fmt, ...)					\
-	pe_level_printk(pe, KERN_WARNING, fmt, ##__VA_ARGS__)
-#define pe_info(pe, fmt, ...)					\
-	pe_level_printk(pe, KERN_INFO, fmt, ##__VA_ARGS__)
-
 static bool pnv_iommu_bypass_disabled __read_mostly;
 
 static int __init iommu_setup(char *str)
@@ -116,25 +110,23 @@ static int __init iommu_setup(char *str)
 }
 early_param("iommu", iommu_setup);
 
-/*
- * stdcix is only supposed to be used in hypervisor real mode as per
- * the architecture spec
- */
-static inline void __raw_rm_writeq(u64 val, volatile void __iomem *paddr)
-{
-	__asm__ __volatile__("stdcix %0,0,%1"
-		: : "r" (val), "r" (paddr) : "memory");
-}
-
 static inline bool pnv_pci_is_mem_pref_64(unsigned long flags)
 {
 	return ((flags & (IORESOURCE_MEM_64 | IORESOURCE_PREFETCH)) ==
 		(IORESOURCE_MEM_64 | IORESOURCE_PREFETCH));
 }
 
+static struct pnv_ioda_pe *pnv_ioda_init_pe(struct pnv_phb *phb, int pe_no)
+{
+	phb->ioda.pe_array[pe_no].phb = phb;
+	phb->ioda.pe_array[pe_no].pe_number = pe_no;
+
+	return &phb->ioda.pe_array[pe_no];
+}
+
 static void pnv_ioda_reserve_pe(struct pnv_phb *phb, int pe_no)
 {
-	if (!(pe_no >= 0 && pe_no < phb->ioda.total_pe)) {
+	if (!(pe_no >= 0 && pe_no < phb->ioda.total_pe_num)) {
 		pr_warn("%s: Invalid PE %d on PHB#%x\n",
 			__func__, pe_no, phb->hose->global_number);
 		return;
@@ -144,32 +136,31 @@ static void pnv_ioda_reserve_pe(struct pnv_phb *phb, int pe_no)
 		pr_debug("%s: PE %d was reserved on PHB#%x\n",
 			 __func__, pe_no, phb->hose->global_number);
 
-	phb->ioda.pe_array[pe_no].phb = phb;
-	phb->ioda.pe_array[pe_no].pe_number = pe_no;
+	pnv_ioda_init_pe(phb, pe_no);
 }
 
-static int pnv_ioda_alloc_pe(struct pnv_phb *phb)
+static struct pnv_ioda_pe *pnv_ioda_alloc_pe(struct pnv_phb *phb)
 {
 	unsigned long pe;
 
 	do {
 		pe = find_next_zero_bit(phb->ioda.pe_alloc,
-					phb->ioda.total_pe, 0);
-		if (pe >= phb->ioda.total_pe)
-			return IODA_INVALID_PE;
+					phb->ioda.total_pe_num, 0);
+		if (pe >= phb->ioda.total_pe_num)
+			return NULL;
 	} while(test_and_set_bit(pe, phb->ioda.pe_alloc));
 
-	phb->ioda.pe_array[pe].phb = phb;
-	phb->ioda.pe_array[pe].pe_number = pe;
-	return pe;
+	return pnv_ioda_init_pe(phb, pe);
 }
 
-static void pnv_ioda_free_pe(struct pnv_phb *phb, int pe)
+static void pnv_ioda_free_pe(struct pnv_ioda_pe *pe)
 {
-	WARN_ON(phb->ioda.pe_array[pe].pdev);
+	struct pnv_phb *phb = pe->phb;
 
-	memset(&phb->ioda.pe_array[pe], 0, sizeof(struct pnv_ioda_pe));
-	clear_bit(pe, phb->ioda.pe_alloc);
+	WARN_ON(pe->pdev);
+
+	memset(pe, 0, sizeof(struct pnv_ioda_pe));
+	clear_bit(pe->pe_number, phb->ioda.pe_alloc);
 }
 
 /* The default M64 BAR is shared by all PEs */
@@ -209,13 +200,13 @@ static int pnv_ioda2_init_m64(struct pnv_phb *phb)
 	 * expected to be 0 or last one of PE capabicity.
 	 */
 	r = &phb->hose->mem_resources[1];
-	if (phb->ioda.reserved_pe == 0)
+	if (phb->ioda.reserved_pe_idx == 0)
 		r->start += phb->ioda.m64_segsize;
-	else if (phb->ioda.reserved_pe == (phb->ioda.total_pe - 1))
+	else if (phb->ioda.reserved_pe_idx == (phb->ioda.total_pe_num - 1))
 		r->end -= phb->ioda.m64_segsize;
 	else
 		pr_warn("  Cannot strip M64 segment for reserved PE#%d\n",
-			phb->ioda.reserved_pe);
+			phb->ioda.reserved_pe_idx);
 
 	return 0;
 
@@ -229,7 +220,7 @@ fail:
 	return -EIO;
 }
 
-static void pnv_ioda2_reserve_dev_m64_pe(struct pci_dev *pdev,
+static void pnv_ioda_reserve_dev_m64_pe(struct pci_dev *pdev,
 					 unsigned long *pe_bitmap)
 {
 	struct pci_controller *hose = pci_bus_to_host(pdev->bus);
@@ -256,22 +247,80 @@ static void pnv_ioda2_reserve_dev_m64_pe(struct pci_dev *pdev,
 	}
 }
 
-static void pnv_ioda2_reserve_m64_pe(struct pci_bus *bus,
-				     unsigned long *pe_bitmap,
-				     bool all)
+static int pnv_ioda1_init_m64(struct pnv_phb *phb)
+{
+	struct resource *r;
+	int index;
+
+	/*
+	 * There are 16 M64 BARs, each of which has 8 segments. So
+	 * there are as many M64 segments as the maximum number of
+	 * PEs, which is 128.
+	 */
+	for (index = 0; index < PNV_IODA1_M64_NUM; index++) {
+		unsigned long base, segsz = phb->ioda.m64_segsize;
+		int64_t rc;
+
+		base = phb->ioda.m64_base +
+		       index * PNV_IODA1_M64_SEGS * segsz;
+		rc = opal_pci_set_phb_mem_window(phb->opal_id,
+				OPAL_M64_WINDOW_TYPE, index, base, 0,
+				PNV_IODA1_M64_SEGS * segsz);
+		if (rc != OPAL_SUCCESS) {
+			pr_warn("  Error %lld setting M64 PHB#%d-BAR#%d\n",
+				rc, phb->hose->global_number, index);
+			goto fail;
+		}
+
+		rc = opal_pci_phb_mmio_enable(phb->opal_id,
+				OPAL_M64_WINDOW_TYPE, index,
+				OPAL_ENABLE_M64_SPLIT);
+		if (rc != OPAL_SUCCESS) {
+			pr_warn("  Error %lld enabling M64 PHB#%d-BAR#%d\n",
+				rc, phb->hose->global_number, index);
+			goto fail;
+		}
+	}
+
+	/*
+	 * Exclude the segment used by the reserved PE, which
+	 * is expected to be 0 or last supported PE#.
+	 */
+	r = &phb->hose->mem_resources[1];
+	if (phb->ioda.reserved_pe_idx == 0)
+		r->start += phb->ioda.m64_segsize;
+	else if (phb->ioda.reserved_pe_idx == (phb->ioda.total_pe_num - 1))
+		r->end -= phb->ioda.m64_segsize;
+	else
+		WARN(1, "Wrong reserved PE#%d on PHB#%d\n",
+		     phb->ioda.reserved_pe_idx, phb->hose->global_number);
+
+	return 0;
+
+fail:
+	for ( ; index >= 0; index--)
+		opal_pci_phb_mmio_enable(phb->opal_id,
+			OPAL_M64_WINDOW_TYPE, index, OPAL_DISABLE_M64);
+
+	return -EIO;
+}
+
+static void pnv_ioda_reserve_m64_pe(struct pci_bus *bus,
+				    unsigned long *pe_bitmap,
+				    bool all)
 {
 	struct pci_dev *pdev;
 
 	list_for_each_entry(pdev, &bus->devices, bus_list) {
-		pnv_ioda2_reserve_dev_m64_pe(pdev, pe_bitmap);
+		pnv_ioda_reserve_dev_m64_pe(pdev, pe_bitmap);
 
 		if (all && pdev->subordinate)
-			pnv_ioda2_reserve_m64_pe(pdev->subordinate,
-						 pe_bitmap, all);
+			pnv_ioda_reserve_m64_pe(pdev->subordinate,
+						pe_bitmap, all);
 	}
 }
 
-static int pnv_ioda2_pick_m64_pe(struct pci_bus *bus, bool all)
+static struct pnv_ioda_pe *pnv_ioda_pick_m64_pe(struct pci_bus *bus, bool all)
 {
 	struct pci_controller *hose = pci_bus_to_host(bus);
 	struct pnv_phb *phb = hose->private_data;
@@ -281,28 +330,28 @@ static int pnv_ioda2_pick_m64_pe(struct pci_bus *bus, bool all)
 
 	/* Root bus shouldn't use M64 */
 	if (pci_is_root_bus(bus))
-		return IODA_INVALID_PE;
+		return NULL;
 
 	/* Allocate bitmap */
-	size = _ALIGN_UP(phb->ioda.total_pe / 8, sizeof(unsigned long));
+	size = _ALIGN_UP(phb->ioda.total_pe_num / 8, sizeof(unsigned long));
 	pe_alloc = kzalloc(size, GFP_KERNEL);
 	if (!pe_alloc) {
 		pr_warn("%s: Out of memory !\n",
 			__func__);
-		return IODA_INVALID_PE;
+		return NULL;
 	}
 
 	/* Figure out reserved PE numbers by the PE */
-	pnv_ioda2_reserve_m64_pe(bus, pe_alloc, all);
+	pnv_ioda_reserve_m64_pe(bus, pe_alloc, all);
 
 	/*
 	 * the current bus might not own M64 window and that's all
 	 * contributed by its child buses. For the case, we needn't
 	 * pick M64 dependent PE#.
 	 */
-	if (bitmap_empty(pe_alloc, phb->ioda.total_pe)) {
+	if (bitmap_empty(pe_alloc, phb->ioda.total_pe_num)) {
 		kfree(pe_alloc);
-		return IODA_INVALID_PE;
+		return NULL;
 	}
 
 	/*
@@ -311,10 +360,11 @@ static int pnv_ioda2_pick_m64_pe(struct pci_bus *bus, bool all)
 	 */
 	master_pe = NULL;
 	i = -1;
-	while ((i = find_next_bit(pe_alloc, phb->ioda.total_pe, i + 1)) <
-		phb->ioda.total_pe) {
+	while ((i = find_next_bit(pe_alloc, phb->ioda.total_pe_num, i + 1)) <
+		phb->ioda.total_pe_num) {
 		pe = &phb->ioda.pe_array[i];
 
+		phb->ioda.m64_segmap[pe->pe_number] = pe->pe_number;
 		if (!master_pe) {
 			pe->flags |= PNV_IODA_PE_MASTER;
 			INIT_LIST_HEAD(&pe->slaves);
@@ -324,10 +374,30 @@ static int pnv_ioda2_pick_m64_pe(struct pci_bus *bus, bool all)
 			pe->master = master_pe;
 			list_add_tail(&pe->list, &master_pe->slaves);
 		}
+
+		/*
+		 * P7IOC supports M64DT, which helps mapping M64 segment
+		 * to one particular PE#. However, PHB3 has fixed mapping
+		 * between M64 segment and PE#. In order to have same logic
+		 * for P7IOC and PHB3, we enforce fixed mapping between M64
+		 * segment and PE# on P7IOC.
+		 */
+		if (phb->type == PNV_PHB_IODA1) {
+			int64_t rc;
+
+			rc = opal_pci_map_pe_mmio_window(phb->opal_id,
+					pe->pe_number, OPAL_M64_WINDOW_TYPE,
+					pe->pe_number / PNV_IODA1_M64_SEGS,
+					pe->pe_number % PNV_IODA1_M64_SEGS);
+			if (rc != OPAL_SUCCESS)
+				pr_warn("%s: Error %lld mapping M64 for PHB#%d-PE#%d\n",
+					__func__, rc, phb->hose->global_number,
+					pe->pe_number);
+		}
 	}
 
 	kfree(pe_alloc);
-	return master_pe->pe_number;
+	return master_pe;
 }
 
 static void __init pnv_ioda_parse_m64_window(struct pnv_phb *phb)
@@ -338,13 +408,12 @@ static void __init pnv_ioda_parse_m64_window(struct pnv_phb *phb)
 	const u32 *r;
 	u64 pci_addr;
 
-	/* FIXME: Support M64 for P7IOC */
-	if (phb->type != PNV_PHB_IODA2) {
+	if (phb->type != PNV_PHB_IODA1 && phb->type != PNV_PHB_IODA2) {
 		pr_info("  Not support M64 window\n");
 		return;
 	}
 
-	if (!firmware_has_feature(FW_FEATURE_OPALv3)) {
+	if (!firmware_has_feature(FW_FEATURE_OPAL)) {
 		pr_info("  Firmware too old to support M64 window\n");
 		return;
 	}
@@ -357,6 +426,7 @@ static void __init pnv_ioda_parse_m64_window(struct pnv_phb *phb)
 	}
 
 	res = &hose->mem_resources[1];
+	res->name = dn->full_name;
 	res->start = of_translate_address(dn, r + 2);
 	res->end = res->start + of_read_number(r + 4, 2) - 1;
 	res->flags = (IORESOURCE_MEM | IORESOURCE_MEM_64 | IORESOURCE_PREFETCH);
@@ -364,7 +434,7 @@ static void __init pnv_ioda_parse_m64_window(struct pnv_phb *phb)
 	hose->mem_offset[1] = res->start - pci_addr;
 
 	phb->ioda.m64_size = resource_size(res);
-	phb->ioda.m64_segsize = phb->ioda.m64_size / phb->ioda.total_pe;
+	phb->ioda.m64_segsize = phb->ioda.m64_size / phb->ioda.total_pe_num;
 	phb->ioda.m64_base = pci_addr;
 
 	pr_info(" MEM64 0x%016llx..0x%016llx -> 0x%016llx\n",
@@ -372,9 +442,12 @@ static void __init pnv_ioda_parse_m64_window(struct pnv_phb *phb)
 
 	/* Use last M64 BAR to cover M64 window */
 	phb->ioda.m64_bar_idx = 15;
-	phb->init_m64 = pnv_ioda2_init_m64;
-	phb->reserve_m64_pe = pnv_ioda2_reserve_m64_pe;
-	phb->pick_m64_pe = pnv_ioda2_pick_m64_pe;
+	if (phb->type == PNV_PHB_IODA1)
+		phb->init_m64 = pnv_ioda1_init_m64;
+	else
+		phb->init_m64 = pnv_ioda2_init_m64;
+	phb->reserve_m64_pe = pnv_ioda_reserve_m64_pe;
+	phb->pick_m64_pe = pnv_ioda_pick_m64_pe;
 }
 
 static void pnv_ioda_freeze_pe(struct pnv_phb *phb, int pe_no)
@@ -465,7 +538,7 @@ static int pnv_ioda_get_pe_state(struct pnv_phb *phb, int pe_no)
 	s64 rc;
 
 	/* Sanity check on PE number */
-	if (pe_no < 0 || pe_no >= phb->ioda.total_pe)
+	if (pe_no < 0 || pe_no >= phb->ioda.total_pe_num)
 		return OPAL_EEH_STOPPED_PERM_UNAVAIL;
 
 	/*
@@ -780,8 +853,12 @@ static int pnv_ioda_configure_pe(struct pnv_phb *phb, struct pnv_ioda_pe *pe)
 		return -ENXIO;
 	}
 
-	/* Configure PELTV */
-	pnv_ioda_set_peltv(phb, pe, true);
+	/*
+	 * Configure PELTV. NPUs don't have a PELTV table so skip
+	 * configuration on them.
+	 */
+	if (phb->type != PNV_PHB_NPU)
+		pnv_ioda_set_peltv(phb, pe, true);
 
 	/* Setup reverse map */
 	for (rid = pe->rid; rid < rid_end; rid++)
@@ -813,44 +890,6 @@ out:
 	return 0;
 }
 
-static void pnv_ioda_link_pe_by_weight(struct pnv_phb *phb,
-				       struct pnv_ioda_pe *pe)
-{
-	struct pnv_ioda_pe *lpe;
-
-	list_for_each_entry(lpe, &phb->ioda.pe_dma_list, dma_link) {
-		if (lpe->dma_weight < pe->dma_weight) {
-			list_add_tail(&pe->dma_link, &lpe->dma_link);
-			return;
-		}
-	}
-	list_add_tail(&pe->dma_link, &phb->ioda.pe_dma_list);
-}
-
-static unsigned int pnv_ioda_dma_weight(struct pci_dev *dev)
-{
-	/* This is quite simplistic. The "base" weight of a device
-	 * is 10. 0 means no DMA is to be accounted for it.
-	 */
-
-	/* If it's a bridge, no DMA */
-	if (dev->hdr_type != PCI_HEADER_TYPE_NORMAL)
-		return 0;
-
-	/* Reduce the weight of slow USB controllers */
-	if (dev->class == PCI_CLASS_SERIAL_USB_UHCI ||
-	    dev->class == PCI_CLASS_SERIAL_USB_OHCI ||
-	    dev->class == PCI_CLASS_SERIAL_USB_EHCI)
-		return 3;
-
-	/* Increase the weight of RAID (includes Obsidian) */
-	if ((dev->class >> 8) == PCI_CLASS_STORAGE_RAID)
-		return 15;
-
-	/* Default */
-	return 10;
-}
-
 #ifdef CONFIG_PCI_IOV
 static int pnv_pci_vf_resource_shift(struct pci_dev *dev, int offset)
 {
@@ -875,9 +914,6 @@ static int pnv_pci_vf_resource_shift(struct pci_dev *dev, int offset)
 	for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
 		res = &dev->resource[i + PCI_IOV_RESOURCES];
 		if (!res->flags || !res->parent)
-			continue;
-
-		if (!pnv_pci_is_mem_pref_64(res->flags))
 			continue;
 
 		/*
@@ -908,9 +944,6 @@ static int pnv_pci_vf_resource_shift(struct pci_dev *dev, int offset)
 		if (!res->flags || !res->parent)
 			continue;
 
-		if (!pnv_pci_is_mem_pref_64(res->flags))
-			continue;
-
 		size = pci_iov_resource_size(dev, i + PCI_IOV_RESOURCES);
 		res2 = *res;
 		res->start += size * offset;
@@ -924,14 +957,12 @@ static int pnv_pci_vf_resource_shift(struct pci_dev *dev, int offset)
 }
 #endif /* CONFIG_PCI_IOV */
 
-#if 0
 static struct pnv_ioda_pe *pnv_ioda_setup_dev_PE(struct pci_dev *dev)
 {
 	struct pci_controller *hose = pci_bus_to_host(dev->bus);
 	struct pnv_phb *phb = hose->private_data;
 	struct pci_dn *pdn = pci_get_pdn(dev);
 	struct pnv_ioda_pe *pe;
-	int pe_num;
 
 	if (!pdn) {
 		pr_err("%s: Device tree node not associated properly\n",
@@ -941,12 +972,8 @@ static struct pnv_ioda_pe *pnv_ioda_setup_dev_PE(struct pci_dev *dev)
 	if (pdn->pe_number != IODA_INVALID_PE)
 		return NULL;
 
-	/* PE#0 has been pre-set */
-	if (dev->bus->number == 0)
-		pe_num = 0;
-	else
-		pe_num = pnv_ioda_alloc_pe(phb);
-	if (pe_num == IODA_INVALID_PE) {
+	pe = pnv_ioda_alloc_pe(phb);
+	if (!pe) {
 		pr_warning("%s: Not enough PE# available, disabling device\n",
 			   pci_name(dev));
 		return NULL;
@@ -959,13 +986,12 @@ static struct pnv_ioda_pe *pnv_ioda_setup_dev_PE(struct pci_dev *dev)
 	 *
 	 * At some point we want to remove the PDN completely anyways
 	 */
-	pe = &phb->ioda.pe_array[pe_num];
 	pci_dev_get(dev);
 	pdn->pcidev = dev;
-	pdn->pe_number = pe_num;
+	pdn->pe_number = pe->pe_number;
+	pe->flags = PNV_IODA_PE_DEV;
 	pe->pdev = dev;
 	pe->pbus = NULL;
-	pe->tce32_seg = -1;
 	pe->mve_number = -1;
 	pe->rid = dev->bus->number << 8 | pdn->devfn;
 
@@ -973,27 +999,18 @@ static struct pnv_ioda_pe *pnv_ioda_setup_dev_PE(struct pci_dev *dev)
 
 	if (pnv_ioda_configure_pe(phb, pe)) {
 		/* XXX What do we do here ? */
-		if (pe_num)
-			pnv_ioda_free_pe(phb, pe_num);
+		pnv_ioda_free_pe(pe);
 		pdn->pe_number = IODA_INVALID_PE;
 		pe->pdev = NULL;
 		pci_dev_put(dev);
 		return NULL;
 	}
 
-	/* Assign a DMA weight to the device */
-	pe->dma_weight = pnv_ioda_dma_weight(dev);
-	if (pe->dma_weight != 0) {
-		phb->ioda.dma_weight += pe->dma_weight;
-		phb->ioda.dma_pe_count++;
-	}
-
-	/* Link the PE */
-	pnv_ioda_link_pe_by_weight(phb, pe);
+	/* Put PE to the list */
+	list_add_tail(&pe->list, &phb->ioda.pe_list);
 
 	return pe;
 }
-#endif /* Useful for SRIOV case */
 
 static void pnv_ioda_setup_same_PE(struct pci_bus *bus, struct pnv_ioda_pe *pe)
 {
@@ -1007,8 +1024,8 @@ static void pnv_ioda_setup_same_PE(struct pci_bus *bus, struct pnv_ioda_pe *pe)
 				pci_name(dev));
 			continue;
 		}
+		pdn->pcidev = dev;
 		pdn->pe_number = pe->pe_number;
-		pe->dma_weight += pnv_ioda_dma_weight(dev);
 		if ((pe->flags & PNV_IODA_PE_BUS_ALL) && dev->subordinate)
 			pnv_ioda_setup_same_PE(dev->subordinate, pe);
 	}
@@ -1020,49 +1037,44 @@ static void pnv_ioda_setup_same_PE(struct pci_bus *bus, struct pnv_ioda_pe *pe)
  * subordinate PCI devices and buses. The second type of PE is normally
  * orgiriated by PCIe-to-PCI bridge or PLX switch downstream ports.
  */
-static void pnv_ioda_setup_bus_PE(struct pci_bus *bus, bool all)
+static struct pnv_ioda_pe *pnv_ioda_setup_bus_PE(struct pci_bus *bus, bool all)
 {
 	struct pci_controller *hose = pci_bus_to_host(bus);
 	struct pnv_phb *phb = hose->private_data;
-	struct pnv_ioda_pe *pe;
-	int pe_num = IODA_INVALID_PE;
+	struct pnv_ioda_pe *pe = NULL;
 
 	/* Check if PE is determined by M64 */
 	if (phb->pick_m64_pe)
-		pe_num = phb->pick_m64_pe(bus, all);
+		pe = phb->pick_m64_pe(bus, all);
 
 	/* The PE number isn't pinned by M64 */
-	if (pe_num == IODA_INVALID_PE)
-		pe_num = pnv_ioda_alloc_pe(phb);
+	if (!pe)
+		pe = pnv_ioda_alloc_pe(phb);
 
-	if (pe_num == IODA_INVALID_PE) {
+	if (!pe) {
 		pr_warning("%s: Not enough PE# available for PCI bus %04x:%02x\n",
 			__func__, pci_domain_nr(bus), bus->number);
-		return;
+		return NULL;
 	}
 
-	pe = &phb->ioda.pe_array[pe_num];
 	pe->flags |= (all ? PNV_IODA_PE_BUS_ALL : PNV_IODA_PE_BUS);
 	pe->pbus = bus;
 	pe->pdev = NULL;
-	pe->tce32_seg = -1;
 	pe->mve_number = -1;
 	pe->rid = bus->busn_res.start << 8;
-	pe->dma_weight = 0;
 
 	if (all)
 		pe_info(pe, "Secondary bus %d..%d associated with PE#%d\n",
-			bus->busn_res.start, bus->busn_res.end, pe_num);
+			bus->busn_res.start, bus->busn_res.end, pe->pe_number);
 	else
 		pe_info(pe, "Secondary bus %d associated with PE#%d\n",
-			bus->busn_res.start, pe_num);
+			bus->busn_res.start, pe->pe_number);
 
 	if (pnv_ioda_configure_pe(phb, pe)) {
 		/* XXX What do we do here ? */
-		if (pe_num)
-			pnv_ioda_free_pe(phb, pe_num);
+		pnv_ioda_free_pe(pe);
 		pe->pbus = NULL;
-		return;
+		return NULL;
 	}
 
 	/* Associate it with all child devices */
@@ -1071,16 +1083,77 @@ static void pnv_ioda_setup_bus_PE(struct pci_bus *bus, bool all)
 	/* Put PE to the list */
 	list_add_tail(&pe->list, &phb->ioda.pe_list);
 
-	/* Account for one DMA PE if at least one DMA capable device exist
-	 * below the bridge
+	return pe;
+}
+
+static struct pnv_ioda_pe *pnv_ioda_setup_npu_PE(struct pci_dev *npu_pdev)
+{
+	int pe_num, found_pe = false, rc;
+	long rid;
+	struct pnv_ioda_pe *pe;
+	struct pci_dev *gpu_pdev;
+	struct pci_dn *npu_pdn;
+	struct pci_controller *hose = pci_bus_to_host(npu_pdev->bus);
+	struct pnv_phb *phb = hose->private_data;
+
+	/*
+	 * Due to a hardware errata PE#0 on the NPU is reserved for
+	 * error handling. This means we only have three PEs remaining
+	 * which need to be assigned to four links, implying some
+	 * links must share PEs.
+	 *
+	 * To achieve this we assign PEs such that NPUs linking the
+	 * same GPU get assigned the same PE.
 	 */
-	if (pe->dma_weight != 0) {
-		phb->ioda.dma_weight += pe->dma_weight;
-		phb->ioda.dma_pe_count++;
+	gpu_pdev = pnv_pci_get_gpu_dev(npu_pdev);
+	for (pe_num = 0; pe_num < phb->ioda.total_pe_num; pe_num++) {
+		pe = &phb->ioda.pe_array[pe_num];
+		if (!pe->pdev)
+			continue;
+
+		if (pnv_pci_get_gpu_dev(pe->pdev) == gpu_pdev) {
+			/*
+			 * This device has the same peer GPU so should
+			 * be assigned the same PE as the existing
+			 * peer NPU.
+			 */
+			dev_info(&npu_pdev->dev,
+				"Associating to existing PE %d\n", pe_num);
+			pci_dev_get(npu_pdev);
+			npu_pdn = pci_get_pdn(npu_pdev);
+			rid = npu_pdev->bus->number << 8 | npu_pdn->devfn;
+			npu_pdn->pcidev = npu_pdev;
+			npu_pdn->pe_number = pe_num;
+			phb->ioda.pe_rmap[rid] = pe->pe_number;
+
+			/* Map the PE to this link */
+			rc = opal_pci_set_pe(phb->opal_id, pe_num, rid,
+					OpalPciBusAll,
+					OPAL_COMPARE_RID_DEVICE_NUMBER,
+					OPAL_COMPARE_RID_FUNCTION_NUMBER,
+					OPAL_MAP_PE);
+			WARN_ON(rc != OPAL_SUCCESS);
+			found_pe = true;
+			break;
+		}
 	}
 
-	/* Link the PE */
-	pnv_ioda_link_pe_by_weight(phb, pe);
+	if (!found_pe)
+		/*
+		 * Could not find an existing PE so allocate a new
+		 * one.
+		 */
+		return pnv_ioda_setup_dev_PE(npu_pdev);
+	else
+		return pe;
+}
+
+static void pnv_ioda_setup_npu_PEs(struct pci_bus *bus)
+{
+	struct pci_dev *pdev;
+
+	list_for_each_entry(pdev, &bus->devices, bus_list)
+		pnv_ioda_setup_npu_PE(pdev);
 }
 
 static void pnv_ioda_setup_PEs(struct pci_bus *bus)
@@ -1119,34 +1192,51 @@ static void pnv_pci_ioda_setup_PEs(void)
 		if (phb->reserve_m64_pe)
 			phb->reserve_m64_pe(hose->bus, NULL, true);
 
-		pnv_ioda_setup_PEs(hose->bus);
+		/*
+		 * On NPU PHB, we expect separate PEs for individual PCI
+		 * functions. PCI bus dependent PEs are required for the
+		 * remaining types of PHBs.
+		 */
+		if (phb->type == PNV_PHB_NPU) {
+			/* PE#0 is needed for error reporting */
+			pnv_ioda_reserve_pe(phb, 0);
+			pnv_ioda_setup_npu_PEs(hose->bus);
+		} else
+			pnv_ioda_setup_PEs(hose->bus);
 	}
 }
 
 #ifdef CONFIG_PCI_IOV
-static int pnv_pci_vf_release_m64(struct pci_dev *pdev)
+static int pnv_pci_vf_release_m64(struct pci_dev *pdev, u16 num_vfs)
 {
 	struct pci_bus        *bus;
 	struct pci_controller *hose;
 	struct pnv_phb        *phb;
 	struct pci_dn         *pdn;
 	int                    i, j;
+	int                    m64_bars;
 
 	bus = pdev->bus;
 	hose = pci_bus_to_host(bus);
 	phb = hose->private_data;
 	pdn = pci_get_pdn(pdev);
 
+	if (pdn->m64_single_mode)
+		m64_bars = num_vfs;
+	else
+		m64_bars = 1;
+
 	for (i = 0; i < PCI_SRIOV_NUM_BARS; i++)
-		for (j = 0; j < M64_PER_IOV; j++) {
-			if (pdn->m64_wins[i][j] == IODA_INVALID_M64)
+		for (j = 0; j < m64_bars; j++) {
+			if (pdn->m64_map[j][i] == IODA_INVALID_M64)
 				continue;
 			opal_pci_phb_mmio_enable(phb->opal_id,
-				OPAL_M64_WINDOW_TYPE, pdn->m64_wins[i][j], 0);
-			clear_bit(pdn->m64_wins[i][j], &phb->ioda.m64_bar_alloc);
-			pdn->m64_wins[i][j] = IODA_INVALID_M64;
+				OPAL_M64_WINDOW_TYPE, pdn->m64_map[j][i], 0);
+			clear_bit(pdn->m64_map[j][i], &phb->ioda.m64_bar_alloc);
+			pdn->m64_map[j][i] = IODA_INVALID_M64;
 		}
 
+	kfree(pdn->m64_map);
 	return 0;
 }
 
@@ -1163,8 +1253,7 @@ static int pnv_pci_vf_assign_m64(struct pci_dev *pdev, u16 num_vfs)
 	int                    total_vfs;
 	resource_size_t        size, start;
 	int                    pe_num;
-	int                    vf_groups;
-	int                    vf_per_group;
+	int                    m64_bars;
 
 	bus = pdev->bus;
 	hose = pci_bus_to_host(bus);
@@ -1172,29 +1261,26 @@ static int pnv_pci_vf_assign_m64(struct pci_dev *pdev, u16 num_vfs)
 	pdn = pci_get_pdn(pdev);
 	total_vfs = pci_sriov_get_totalvfs(pdev);
 
-	/* Initialize the m64_wins to IODA_INVALID_M64 */
-	for (i = 0; i < PCI_SRIOV_NUM_BARS; i++)
-		for (j = 0; j < M64_PER_IOV; j++)
-			pdn->m64_wins[i][j] = IODA_INVALID_M64;
+	if (pdn->m64_single_mode)
+		m64_bars = num_vfs;
+	else
+		m64_bars = 1;
 
-	if (pdn->m64_per_iov == M64_PER_IOV) {
-		vf_groups = (num_vfs <= M64_PER_IOV) ? num_vfs: M64_PER_IOV;
-		vf_per_group = (num_vfs <= M64_PER_IOV)? 1:
-			roundup_pow_of_two(num_vfs) / pdn->m64_per_iov;
-	} else {
-		vf_groups = 1;
-		vf_per_group = 1;
-	}
+	pdn->m64_map = kmalloc(sizeof(*pdn->m64_map) * m64_bars, GFP_KERNEL);
+	if (!pdn->m64_map)
+		return -ENOMEM;
+	/* Initialize the m64_map to IODA_INVALID_M64 */
+	for (i = 0; i < m64_bars ; i++)
+		for (j = 0; j < PCI_SRIOV_NUM_BARS; j++)
+			pdn->m64_map[i][j] = IODA_INVALID_M64;
+
 
 	for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
 		res = &pdev->resource[i + PCI_IOV_RESOURCES];
 		if (!res->flags || !res->parent)
 			continue;
 
-		if (!pnv_pci_is_mem_pref_64(res->flags))
-			continue;
-
-		for (j = 0; j < vf_groups; j++) {
+		for (j = 0; j < m64_bars; j++) {
 			do {
 				win = find_next_zero_bit(&phb->ioda.m64_bar_alloc,
 						phb->ioda.m64_bar_idx + 1, 0);
@@ -1203,12 +1289,11 @@ static int pnv_pci_vf_assign_m64(struct pci_dev *pdev, u16 num_vfs)
 					goto m64_failed;
 			} while (test_and_set_bit(win, &phb->ioda.m64_bar_alloc));
 
-			pdn->m64_wins[i][j] = win;
+			pdn->m64_map[j][i] = win;
 
-			if (pdn->m64_per_iov == M64_PER_IOV) {
+			if (pdn->m64_single_mode) {
 				size = pci_iov_resource_size(pdev,
 							PCI_IOV_RESOURCES + i);
-				size = size * vf_per_group;
 				start = res->start + size * j;
 			} else {
 				size = resource_size(res);
@@ -1216,16 +1301,16 @@ static int pnv_pci_vf_assign_m64(struct pci_dev *pdev, u16 num_vfs)
 			}
 
 			/* Map the M64 here */
-			if (pdn->m64_per_iov == M64_PER_IOV) {
-				pe_num = pdn->offset + j;
+			if (pdn->m64_single_mode) {
+				pe_num = pdn->pe_num_map[j];
 				rc = opal_pci_map_pe_mmio_window(phb->opal_id,
 						pe_num, OPAL_M64_WINDOW_TYPE,
-						pdn->m64_wins[i][j], 0);
+						pdn->m64_map[j][i], 0);
 			}
 
 			rc = opal_pci_set_phb_mem_window(phb->opal_id,
 						 OPAL_M64_WINDOW_TYPE,
-						 pdn->m64_wins[i][j],
+						 pdn->m64_map[j][i],
 						 start,
 						 0, /* unused */
 						 size);
@@ -1237,12 +1322,12 @@ static int pnv_pci_vf_assign_m64(struct pci_dev *pdev, u16 num_vfs)
 				goto m64_failed;
 			}
 
-			if (pdn->m64_per_iov == M64_PER_IOV)
+			if (pdn->m64_single_mode)
 				rc = opal_pci_phb_mmio_enable(phb->opal_id,
-				     OPAL_M64_WINDOW_TYPE, pdn->m64_wins[i][j], 2);
+				     OPAL_M64_WINDOW_TYPE, pdn->m64_map[j][i], 2);
 			else
 				rc = opal_pci_phb_mmio_enable(phb->opal_id,
-				     OPAL_M64_WINDOW_TYPE, pdn->m64_wins[i][j], 1);
+				     OPAL_M64_WINDOW_TYPE, pdn->m64_map[j][i], 1);
 
 			if (rc != OPAL_SUCCESS) {
 				dev_err(&pdev->dev, "Failed to enable M64 window #%d: %llx\n",
@@ -1254,7 +1339,7 @@ static int pnv_pci_vf_assign_m64(struct pci_dev *pdev, u16 num_vfs)
 	return 0;
 
 m64_failed:
-	pnv_pci_vf_release_m64(pdev);
+	pnv_pci_vf_release_m64(pdev, num_vfs);
 	return -EBUSY;
 }
 
@@ -1281,15 +1366,13 @@ static void pnv_pci_ioda2_release_dma_pe(struct pci_dev *dev, struct pnv_ioda_pe
 	iommu_free_table(tbl, of_node_full_name(dev->dev.of_node));
 }
 
-static void pnv_ioda_release_vf_PE(struct pci_dev *pdev, u16 num_vfs)
+static void pnv_ioda_release_vf_PE(struct pci_dev *pdev)
 {
 	struct pci_bus        *bus;
 	struct pci_controller *hose;
 	struct pnv_phb        *phb;
 	struct pnv_ioda_pe    *pe, *pe_n;
 	struct pci_dn         *pdn;
-	u16                    vf_index;
-	int64_t                rc;
 
 	bus = pdev->bus;
 	hose = pci_bus_to_host(bus);
@@ -1298,35 +1381,6 @@ static void pnv_ioda_release_vf_PE(struct pci_dev *pdev, u16 num_vfs)
 
 	if (!pdev->is_physfn)
 		return;
-
-	if (pdn->m64_per_iov == M64_PER_IOV && num_vfs > M64_PER_IOV) {
-		int   vf_group;
-		int   vf_per_group;
-		int   vf_index1;
-
-		vf_per_group = roundup_pow_of_two(num_vfs) / pdn->m64_per_iov;
-
-		for (vf_group = 0; vf_group < M64_PER_IOV; vf_group++)
-			for (vf_index = vf_group * vf_per_group;
-				vf_index < (vf_group + 1) * vf_per_group &&
-				vf_index < num_vfs;
-				vf_index++)
-				for (vf_index1 = vf_group * vf_per_group;
-					vf_index1 < (vf_group + 1) * vf_per_group &&
-					vf_index1 < num_vfs;
-					vf_index1++){
-
-					rc = opal_pci_set_peltv(phb->opal_id,
-						pdn->offset + vf_index,
-						pdn->offset + vf_index1,
-						OPAL_REMOVE_PE_FROM_DOMAIN);
-
-					if (rc)
-					    dev_warn(&pdev->dev, "%s: Failed to unlink same group PE#%d(%lld)\n",
-						__func__,
-						pdn->offset + vf_index1, rc);
-				}
-	}
 
 	list_for_each_entry_safe(pe, pe_n, &phb->ioda.pe_list, list) {
 		if (pe->parent_dev != pdev)
@@ -1341,7 +1395,7 @@ static void pnv_ioda_release_vf_PE(struct pci_dev *pdev, u16 num_vfs)
 
 		pnv_ioda_deconfigure_pe(phb, pe);
 
-		pnv_ioda_free_pe(phb, pe->pe_number);
+		pnv_ioda_free_pe(pe);
 	}
 }
 
@@ -1350,9 +1404,10 @@ void pnv_pci_sriov_disable(struct pci_dev *pdev)
 	struct pci_bus        *bus;
 	struct pci_controller *hose;
 	struct pnv_phb        *phb;
+	struct pnv_ioda_pe    *pe;
 	struct pci_dn         *pdn;
 	struct pci_sriov      *iov;
-	u16 num_vfs;
+	u16                    num_vfs, i;
 
 	bus = pdev->bus;
 	hose = pci_bus_to_host(bus);
@@ -1362,18 +1417,28 @@ void pnv_pci_sriov_disable(struct pci_dev *pdev)
 	num_vfs = pdn->num_vfs;
 
 	/* Release VF PEs */
-	pnv_ioda_release_vf_PE(pdev, num_vfs);
+	pnv_ioda_release_vf_PE(pdev);
 
 	if (phb->type == PNV_PHB_IODA2) {
-		if (pdn->m64_per_iov == 1)
-			pnv_pci_vf_resource_shift(pdev, -pdn->offset);
+		if (!pdn->m64_single_mode)
+			pnv_pci_vf_resource_shift(pdev, -*pdn->pe_num_map);
 
 		/* Release M64 windows */
-		pnv_pci_vf_release_m64(pdev);
+		pnv_pci_vf_release_m64(pdev, num_vfs);
 
 		/* Release PE numbers */
-		bitmap_clear(phb->ioda.pe_alloc, pdn->offset, num_vfs);
-		pdn->offset = 0;
+		if (pdn->m64_single_mode) {
+			for (i = 0; i < num_vfs; i++) {
+				if (pdn->pe_num_map[i] == IODA_INVALID_PE)
+					continue;
+
+				pe = &phb->ioda.pe_array[pdn->pe_num_map[i]];
+				pnv_ioda_free_pe(pe);
+			}
+		} else
+			bitmap_clear(phb->ioda.pe_alloc, *pdn->pe_num_map, num_vfs);
+		/* Releasing pe_num_map */
+		kfree(pdn->pe_num_map);
 	}
 }
 
@@ -1388,7 +1453,6 @@ static void pnv_ioda_setup_vf_PE(struct pci_dev *pdev, u16 num_vfs)
 	int                    pe_num;
 	u16                    vf_index;
 	struct pci_dn         *pdn;
-	int64_t                rc;
 
 	bus = pdev->bus;
 	hose = pci_bus_to_host(bus);
@@ -1400,7 +1464,10 @@ static void pnv_ioda_setup_vf_PE(struct pci_dev *pdev, u16 num_vfs)
 
 	/* Reserve PE for each VF */
 	for (vf_index = 0; vf_index < num_vfs; vf_index++) {
-		pe_num = pdn->offset + vf_index;
+		if (pdn->m64_single_mode)
+			pe_num = pdn->pe_num_map[vf_index];
+		else
+			pe_num = *pdn->pe_num_map + vf_index;
 
 		pe = &phb->ioda.pe_array[pe_num];
 		pe->pe_number = pe_num;
@@ -1408,7 +1475,6 @@ static void pnv_ioda_setup_vf_PE(struct pci_dev *pdev, u16 num_vfs)
 		pe->flags = PNV_IODA_PE_VF;
 		pe->pbus = NULL;
 		pe->parent_dev = pdev;
-		pe->tce32_seg = -1;
 		pe->mve_number = -1;
 		pe->rid = (pci_iov_virtfn_bus(pdev, vf_index) << 8) |
 			   pci_iov_virtfn_devfn(pdev, vf_index);
@@ -1420,8 +1486,7 @@ static void pnv_ioda_setup_vf_PE(struct pci_dev *pdev, u16 num_vfs)
 
 		if (pnv_ioda_configure_pe(phb, pe)) {
 			/* XXX What do we do here ? */
-			if (pe_num)
-				pnv_ioda_free_pe(phb, pe_num);
+			pnv_ioda_free_pe(pe);
 			pe->pdev = NULL;
 			continue;
 		}
@@ -1433,37 +1498,6 @@ static void pnv_ioda_setup_vf_PE(struct pci_dev *pdev, u16 num_vfs)
 
 		pnv_pci_ioda2_setup_dma_pe(phb, pe);
 	}
-
-	if (pdn->m64_per_iov == M64_PER_IOV && num_vfs > M64_PER_IOV) {
-		int   vf_group;
-		int   vf_per_group;
-		int   vf_index1;
-
-		vf_per_group = roundup_pow_of_two(num_vfs) / pdn->m64_per_iov;
-
-		for (vf_group = 0; vf_group < M64_PER_IOV; vf_group++) {
-			for (vf_index = vf_group * vf_per_group;
-			     vf_index < (vf_group + 1) * vf_per_group &&
-			     vf_index < num_vfs;
-			     vf_index++) {
-				for (vf_index1 = vf_group * vf_per_group;
-				     vf_index1 < (vf_group + 1) * vf_per_group &&
-				     vf_index1 < num_vfs;
-				     vf_index1++) {
-
-					rc = opal_pci_set_peltv(phb->opal_id,
-						pdn->offset + vf_index,
-						pdn->offset + vf_index1,
-						OPAL_ADD_PE_TO_DOMAIN);
-
-					if (rc)
-					    dev_warn(&pdev->dev, "%s: Failed to link same group PE#%d(%lld)\n",
-						__func__,
-						pdn->offset + vf_index1, rc);
-				}
-			}
-		}
-	}
 }
 
 int pnv_pci_sriov_enable(struct pci_dev *pdev, u16 num_vfs)
@@ -1471,8 +1505,10 @@ int pnv_pci_sriov_enable(struct pci_dev *pdev, u16 num_vfs)
 	struct pci_bus        *bus;
 	struct pci_controller *hose;
 	struct pnv_phb        *phb;
+	struct pnv_ioda_pe    *pe;
 	struct pci_dn         *pdn;
 	int                    ret;
+	u16                    i;
 
 	bus = pdev->bus;
 	hose = pci_bus_to_host(bus);
@@ -1480,20 +1516,61 @@ int pnv_pci_sriov_enable(struct pci_dev *pdev, u16 num_vfs)
 	pdn = pci_get_pdn(pdev);
 
 	if (phb->type == PNV_PHB_IODA2) {
-		/* Calculate available PE for required VFs */
-		mutex_lock(&phb->ioda.pe_alloc_mutex);
-		pdn->offset = bitmap_find_next_zero_area(
-			phb->ioda.pe_alloc, phb->ioda.total_pe,
-			0, num_vfs, 0);
-		if (pdn->offset >= phb->ioda.total_pe) {
-			mutex_unlock(&phb->ioda.pe_alloc_mutex);
-			dev_info(&pdev->dev, "Failed to enable VF%d\n", num_vfs);
-			pdn->offset = 0;
+		if (!pdn->vfs_expanded) {
+			dev_info(&pdev->dev, "don't support this SRIOV device"
+				" with non 64bit-prefetchable IOV BAR\n");
+			return -ENOSPC;
+		}
+
+		/*
+		 * When M64 BARs functions in Single PE mode, the number of VFs
+		 * could be enabled must be less than the number of M64 BARs.
+		 */
+		if (pdn->m64_single_mode && num_vfs > phb->ioda.m64_bar_idx) {
+			dev_info(&pdev->dev, "Not enough M64 BAR for VFs\n");
 			return -EBUSY;
 		}
-		bitmap_set(phb->ioda.pe_alloc, pdn->offset, num_vfs);
+
+		/* Allocating pe_num_map */
+		if (pdn->m64_single_mode)
+			pdn->pe_num_map = kmalloc(sizeof(*pdn->pe_num_map) * num_vfs,
+					GFP_KERNEL);
+		else
+			pdn->pe_num_map = kmalloc(sizeof(*pdn->pe_num_map), GFP_KERNEL);
+
+		if (!pdn->pe_num_map)
+			return -ENOMEM;
+
+		if (pdn->m64_single_mode)
+			for (i = 0; i < num_vfs; i++)
+				pdn->pe_num_map[i] = IODA_INVALID_PE;
+
+		/* Calculate available PE for required VFs */
+		if (pdn->m64_single_mode) {
+			for (i = 0; i < num_vfs; i++) {
+				pe = pnv_ioda_alloc_pe(phb);
+				if (!pe) {
+					ret = -EBUSY;
+					goto m64_failed;
+				}
+
+				pdn->pe_num_map[i] = pe->pe_number;
+			}
+		} else {
+			mutex_lock(&phb->ioda.pe_alloc_mutex);
+			*pdn->pe_num_map = bitmap_find_next_zero_area(
+				phb->ioda.pe_alloc, phb->ioda.total_pe_num,
+				0, num_vfs, 0);
+			if (*pdn->pe_num_map >= phb->ioda.total_pe_num) {
+				mutex_unlock(&phb->ioda.pe_alloc_mutex);
+				dev_info(&pdev->dev, "Failed to enable VF%d\n", num_vfs);
+				kfree(pdn->pe_num_map);
+				return -EBUSY;
+			}
+			bitmap_set(phb->ioda.pe_alloc, *pdn->pe_num_map, num_vfs);
+			mutex_unlock(&phb->ioda.pe_alloc_mutex);
+		}
 		pdn->num_vfs = num_vfs;
-		mutex_unlock(&phb->ioda.pe_alloc_mutex);
 
 		/* Assign M64 window accordingly */
 		ret = pnv_pci_vf_assign_m64(pdev, num_vfs);
@@ -1507,8 +1584,8 @@ int pnv_pci_sriov_enable(struct pci_dev *pdev, u16 num_vfs)
 		 * the IOV BAR according to the PE# allocated to the VFs.
 		 * Otherwise, the PE# for the VF will conflict with others.
 		 */
-		if (pdn->m64_per_iov == 1) {
-			ret = pnv_pci_vf_resource_shift(pdev, pdn->offset);
+		if (!pdn->m64_single_mode) {
+			ret = pnv_pci_vf_resource_shift(pdev, *pdn->pe_num_map);
 			if (ret)
 				goto m64_failed;
 		}
@@ -1520,8 +1597,19 @@ int pnv_pci_sriov_enable(struct pci_dev *pdev, u16 num_vfs)
 	return 0;
 
 m64_failed:
-	bitmap_clear(phb->ioda.pe_alloc, pdn->offset, num_vfs);
-	pdn->offset = 0;
+	if (pdn->m64_single_mode) {
+		for (i = 0; i < num_vfs; i++) {
+			if (pdn->pe_num_map[i] == IODA_INVALID_PE)
+				continue;
+
+			pe = &phb->ioda.pe_array[pdn->pe_num_map[i]];
+			pnv_ioda_free_pe(pe);
+		}
+	} else
+		bitmap_clear(phb->ioda.pe_alloc, *pdn->pe_num_map, num_vfs);
+
+	/* Releasing pe_num_map */
+	kfree(pdn->pe_num_map);
 
 	return ret;
 }
@@ -1540,8 +1628,7 @@ int pcibios_sriov_enable(struct pci_dev *pdev, u16 num_vfs)
 	/* Allocate PCI data */
 	add_dev_pci_data(pdev);
 
-	pnv_pci_sriov_enable(pdev, num_vfs);
-	return 0;
+	return pnv_pci_sriov_enable(pdev, num_vfs);
 }
 #endif /* CONFIG_PCI_IOV */
 
@@ -1596,6 +1683,10 @@ static int pnv_pci_ioda_dma_set_mask(struct pci_dev *pdev, u64 dma_mask)
 		set_dma_ops(&pdev->dev, &dma_iommu_ops);
 	}
 	*pdev->dev.dma_mask = dma_mask;
+
+	/* Update peer npu devices */
+	pnv_npu_try_dma_set_bypass(pdev, bypass);
+
 	return 0;
 }
 
@@ -1735,10 +1826,27 @@ static struct iommu_table_ops pnv_ioda1_iommu_ops = {
 	.get = pnv_tce_get,
 };
 
-static inline void pnv_pci_ioda2_tce_invalidate_entire(struct pnv_ioda_pe *pe)
+#define TCE_KILL_INVAL_ALL  PPC_BIT(0)
+#define TCE_KILL_INVAL_PE   PPC_BIT(1)
+#define TCE_KILL_INVAL_TCE  PPC_BIT(2)
+
+void pnv_pci_ioda2_tce_invalidate_entire(struct pnv_phb *phb, bool rm)
+{
+	const unsigned long val = TCE_KILL_INVAL_ALL;
+
+	mb(); /* Ensure previous TCE table stores are visible */
+	if (rm)
+		__raw_rm_writeq(cpu_to_be64(val),
+				(__be64 __iomem *)
+				phb->ioda.tce_inval_reg_phys);
+	else
+		__raw_writeq(cpu_to_be64(val), phb->ioda.tce_inval_reg);
+}
+
+static inline void pnv_pci_ioda2_tce_invalidate_pe(struct pnv_ioda_pe *pe)
 {
 	/* 01xb - invalidate TCEs that match the specified PE# */
-	unsigned long val = (0x4ull << 60) | (pe->pe_number & 0xFF);
+	unsigned long val = TCE_KILL_INVAL_PE | (pe->pe_number & 0xFF);
 	struct pnv_phb *phb = pe->phb;
 
 	if (!phb->ioda.tce_inval_reg)
@@ -1755,7 +1863,7 @@ static void pnv_pci_ioda2_do_tce_invalidate(unsigned pe_number, bool rm,
 	unsigned long start, end, inc;
 
 	/* We'll invalidate DMA address in PE scope */
-	start = 0x2ull << 60;
+	start = TCE_KILL_INVAL_TCE;
 	start |= (pe_number & 0xFF);
 	end = start;
 
@@ -1786,6 +1894,15 @@ static void pnv_pci_ioda2_tce_invalidate(struct iommu_table *tbl,
 			(__be64 __iomem *)pe->phb->ioda.tce_inval_reg_phys :
 			pe->phb->ioda.tce_inval_reg;
 
+		if (pe->phb->type == PNV_PHB_NPU) {
+			/*
+			 * The NVLink hardware does not support TCE kill
+			 * per TCE entry so we have to invalidate
+			 * the entire cache for it.
+			 */
+			pnv_pci_ioda2_tce_invalidate_entire(pe->phb, rm);
+			continue;
+		}
 		pnv_pci_ioda2_do_tce_invalidate(pe->pe_number, rm,
 			invalidate, tbl->it_page_shift,
 			index, npages);
@@ -1845,56 +1962,140 @@ static struct iommu_table_ops pnv_ioda2_iommu_ops = {
 	.free = pnv_ioda2_table_free,
 };
 
-static void pnv_pci_ioda_setup_dma_pe(struct pnv_phb *phb,
-				      struct pnv_ioda_pe *pe, unsigned int base,
-				      unsigned int segs)
+static int pnv_pci_ioda_dev_dma_weight(struct pci_dev *dev, void *data)
+{
+	unsigned int *weight = (unsigned int *)data;
+
+	/* This is quite simplistic. The "base" weight of a device
+	 * is 10. 0 means no DMA is to be accounted for it.
+	 */
+	if (dev->hdr_type != PCI_HEADER_TYPE_NORMAL)
+		return 0;
+
+	if (dev->class == PCI_CLASS_SERIAL_USB_UHCI ||
+	    dev->class == PCI_CLASS_SERIAL_USB_OHCI ||
+	    dev->class == PCI_CLASS_SERIAL_USB_EHCI)
+		*weight += 3;
+	else if ((dev->class >> 8) == PCI_CLASS_STORAGE_RAID)
+		*weight += 15;
+	else
+		*weight += 10;
+
+	return 0;
+}
+
+static unsigned int pnv_pci_ioda_pe_dma_weight(struct pnv_ioda_pe *pe)
+{
+	unsigned int weight = 0;
+
+	/* SRIOV VF has same DMA32 weight as its PF */
+#ifdef CONFIG_PCI_IOV
+	if ((pe->flags & PNV_IODA_PE_VF) && pe->parent_dev) {
+		pnv_pci_ioda_dev_dma_weight(pe->parent_dev, &weight);
+		return weight;
+	}
+#endif
+
+	if ((pe->flags & PNV_IODA_PE_DEV) && pe->pdev) {
+		pnv_pci_ioda_dev_dma_weight(pe->pdev, &weight);
+	} else if ((pe->flags & PNV_IODA_PE_BUS) && pe->pbus) {
+		struct pci_dev *pdev;
+
+		list_for_each_entry(pdev, &pe->pbus->devices, bus_list)
+			pnv_pci_ioda_dev_dma_weight(pdev, &weight);
+	} else if ((pe->flags & PNV_IODA_PE_BUS_ALL) && pe->pbus) {
+		pci_walk_bus(pe->pbus, pnv_pci_ioda_dev_dma_weight, &weight);
+	}
+
+	return weight;
+}
+
+static void pnv_pci_ioda1_setup_dma_pe(struct pnv_phb *phb,
+				       struct pnv_ioda_pe *pe)
 {
 
 	struct page *tce_mem = NULL;
 	struct iommu_table *tbl;
-	unsigned int i;
+	unsigned int weight, total_weight = 0;
+	unsigned int tce32_segsz, base, segs, avail, i;
 	int64_t rc;
 	void *addr;
 
 	/* XXX FIXME: Handle 64-bit only DMA devices */
 	/* XXX FIXME: Provide 64-bit DMA facilities & non-4K TCE tables etc.. */
 	/* XXX FIXME: Allocate multi-level tables on PHB3 */
-
-	/* We shouldn't already have a 32-bit DMA associated */
-	if (WARN_ON(pe->tce32_seg >= 0))
+	weight = pnv_pci_ioda_pe_dma_weight(pe);
+	if (!weight)
 		return;
 
+	pci_walk_bus(phb->hose->bus, pnv_pci_ioda_dev_dma_weight,
+		     &total_weight);
+	segs = (weight * phb->ioda.dma32_count) / total_weight;
+	if (!segs)
+		segs = 1;
+
+	/*
+	 * Allocate contiguous DMA32 segments. We begin with the expected
+	 * number of segments. With one more attempt, the number of DMA32
+	 * segments to be allocated is decreased by one until one segment
+	 * is allocated successfully.
+	 */
+	do {
+		for (base = 0; base <= phb->ioda.dma32_count - segs; base++) {
+			for (avail = 0, i = base; i < base + segs; i++) {
+				if (phb->ioda.dma32_segmap[i] ==
+				    IODA_INVALID_PE)
+					avail++;
+			}
+
+			if (avail == segs)
+				goto found;
+		}
+	} while (--segs);
+
+	if (!segs) {
+		pe_warn(pe, "No available DMA32 segments\n");
+		return;
+	}
+
+found:
 	tbl = pnv_pci_table_alloc(phb->hose->node);
 	iommu_register_group(&pe->table_group, phb->hose->global_number,
 			pe->pe_number);
 	pnv_pci_link_table_and_group(phb->hose->node, 0, tbl, &pe->table_group);
 
 	/* Grab a 32-bit TCE table */
-	pe->tce32_seg = base;
+	pe_info(pe, "DMA weight %d (%d), assigned (%d) %d DMA32 segments\n",
+		weight, total_weight, base, segs);
 	pe_info(pe, " Setting up 32-bit TCE table at %08x..%08x\n",
-		(base << 28), ((base + segs) << 28) - 1);
+		base * PNV_IODA1_DMA32_SEGSIZE,
+		(base + segs) * PNV_IODA1_DMA32_SEGSIZE - 1);
 
 	/* XXX Currently, we allocate one big contiguous table for the
 	 * TCEs. We only really need one chunk per 256M of TCE space
 	 * (ie per segment) but that's an optimization for later, it
 	 * requires some added smarts with our get/put_tce implementation
+	 *
+	 * Each TCE page is 4KB in size and each TCE entry occupies 8
+	 * bytes
 	 */
+	tce32_segsz = PNV_IODA1_DMA32_SEGSIZE >> (IOMMU_PAGE_SHIFT_4K - 3);
 	tce_mem = alloc_pages_node(phb->hose->node, GFP_KERNEL,
-				   get_order(TCE32_TABLE_SIZE * segs));
+				   get_order(tce32_segsz * segs));
 	if (!tce_mem) {
 		pe_err(pe, " Failed to allocate a 32-bit TCE memory\n");
 		goto fail;
 	}
 	addr = page_address(tce_mem);
-	memset(addr, 0, TCE32_TABLE_SIZE * segs);
+	memset(addr, 0, tce32_segsz * segs);
 
 	/* Configure HW */
 	for (i = 0; i < segs; i++) {
 		rc = opal_pci_map_pe_dma_window(phb->opal_id,
 					      pe->pe_number,
 					      base + i, 1,
-					      __pa(addr) + TCE32_TABLE_SIZE * i,
-					      TCE32_TABLE_SIZE, 0x1000);
+					      __pa(addr) + tce32_segsz * i,
+					      tce32_segsz, IOMMU_PAGE_SIZE_4K);
 		if (rc) {
 			pe_err(pe, " Failed to configure 32-bit TCE table,"
 			       " err %ld\n", rc);
@@ -1902,9 +2103,14 @@ static void pnv_pci_ioda_setup_dma_pe(struct pnv_phb *phb,
 		}
 	}
 
+	/* Setup DMA32 segment mapping */
+	for (i = base; i < base + segs; i++)
+		phb->ioda.dma32_segmap[i] = pe->pe_number;
+
 	/* Setup linux iommu table */
-	pnv_pci_setup_iommu_table(tbl, addr, TCE32_TABLE_SIZE * segs,
-				  base << 28, IOMMU_PAGE_SHIFT_4K);
+	pnv_pci_setup_iommu_table(tbl, addr, tce32_segsz * segs,
+				  base * PNV_IODA1_DMA32_SEGSIZE,
+				  IOMMU_PAGE_SHIFT_4K);
 
 	/* OPAL variant of P7IOC SW invalidated TCEs */
 	if (phb->ioda.tce_inval_reg)
@@ -1931,10 +2137,8 @@ static void pnv_pci_ioda_setup_dma_pe(struct pnv_phb *phb,
 	return;
  fail:
 	/* XXX Failure: Try to fallback to 64-bit only ? */
-	if (pe->tce32_seg >= 0)
-		pe->tce32_seg = -1;
 	if (tce_mem)
-		__free_pages(tce_mem, get_order(TCE32_TABLE_SIZE * segs));
+		__free_pages(tce_mem, get_order(tce32_segsz * segs));
 	if (tbl) {
 		pnv_pci_unlink_table_and_group(tbl, &pe->table_group);
 		iommu_free_table(tbl, "pnv");
@@ -1975,7 +2179,7 @@ static long pnv_pci_ioda2_set_window(struct iommu_table_group *table_group,
 
 	pnv_pci_link_table_and_group(phb->hose->node, num,
 			tbl, &pe->table_group);
-	pnv_pci_ioda2_tce_invalidate_entire(pe);
+	pnv_pci_ioda2_tce_invalidate_pe(pe);
 
 	return 0;
 }
@@ -2119,7 +2323,7 @@ static long pnv_pci_ioda2_unset_window(struct iommu_table_group *table_group,
 	if (ret)
 		pe_warn(pe, "Unmapping failed, ret = %ld\n", ret);
 	else
-		pnv_pci_ioda2_tce_invalidate_entire(pe);
+		pnv_pci_ioda2_tce_invalidate_pe(pe);
 
 	pnv_pci_unlink_table_and_group(table_group->tables[num], table_group);
 
@@ -2188,6 +2392,116 @@ static struct iommu_table_group_ops pnv_pci_ioda2_ops = {
 	.take_ownership = pnv_ioda2_take_ownership,
 	.release_ownership = pnv_ioda2_release_ownership,
 };
+
+static int gpe_table_group_to_npe_cb(struct device *dev, void *opaque)
+{
+	struct pci_controller *hose;
+	struct pnv_phb *phb;
+	struct pnv_ioda_pe **ptmppe = opaque;
+	struct pci_dev *pdev = container_of(dev, struct pci_dev, dev);
+	struct pci_dn *pdn = pci_get_pdn(pdev);
+
+	if (!pdn || pdn->pe_number == IODA_INVALID_PE)
+		return 0;
+
+	hose = pci_bus_to_host(pdev->bus);
+	phb = hose->private_data;
+	if (phb->type != PNV_PHB_NPU)
+		return 0;
+
+	*ptmppe = &phb->ioda.pe_array[pdn->pe_number];
+
+	return 1;
+}
+
+/*
+ * This returns PE of associated NPU.
+ * This assumes that NPU is in the same IOMMU group with GPU and there is
+ * no other PEs.
+ */
+static struct pnv_ioda_pe *gpe_table_group_to_npe(
+		struct iommu_table_group *table_group)
+{
+	struct pnv_ioda_pe *npe = NULL;
+	int ret = iommu_group_for_each_dev(table_group->group, &npe,
+			gpe_table_group_to_npe_cb);
+
+	BUG_ON(!ret || !npe);
+
+	return npe;
+}
+
+static long pnv_pci_ioda2_npu_set_window(struct iommu_table_group *table_group,
+		int num, struct iommu_table *tbl)
+{
+	long ret = pnv_pci_ioda2_set_window(table_group, num, tbl);
+
+	if (ret)
+		return ret;
+
+	ret = pnv_npu_set_window(gpe_table_group_to_npe(table_group), num, tbl);
+	if (ret)
+		pnv_pci_ioda2_unset_window(table_group, num);
+
+	return ret;
+}
+
+static long pnv_pci_ioda2_npu_unset_window(
+		struct iommu_table_group *table_group,
+		int num)
+{
+	long ret = pnv_pci_ioda2_unset_window(table_group, num);
+
+	if (ret)
+		return ret;
+
+	return pnv_npu_unset_window(gpe_table_group_to_npe(table_group), num);
+}
+
+static void pnv_ioda2_npu_take_ownership(struct iommu_table_group *table_group)
+{
+	/*
+	 * Detach NPU first as pnv_ioda2_take_ownership() will destroy
+	 * the iommu_table if 32bit DMA is enabled.
+	 */
+	pnv_npu_take_ownership(gpe_table_group_to_npe(table_group));
+	pnv_ioda2_take_ownership(table_group);
+}
+
+static struct iommu_table_group_ops pnv_pci_ioda2_npu_ops = {
+	.get_table_size = pnv_pci_ioda2_get_table_size,
+	.create_table = pnv_pci_ioda2_create_table,
+	.set_window = pnv_pci_ioda2_npu_set_window,
+	.unset_window = pnv_pci_ioda2_npu_unset_window,
+	.take_ownership = pnv_ioda2_npu_take_ownership,
+	.release_ownership = pnv_ioda2_release_ownership,
+};
+
+static void pnv_pci_ioda_setup_iommu_api(void)
+{
+	struct pci_controller *hose, *tmp;
+	struct pnv_phb *phb;
+	struct pnv_ioda_pe *pe, *gpe;
+
+	/*
+	 * Now we have all PHBs discovered, time to add NPU devices to
+	 * the corresponding IOMMU groups.
+	 */
+	list_for_each_entry_safe(hose, tmp, &hose_list, list_node) {
+		phb = hose->private_data;
+
+		if (phb->type != PNV_PHB_NPU)
+			continue;
+
+		list_for_each_entry(pe, &phb->ioda.pe_list, list) {
+			gpe = pnv_pci_npu_setup_iommu(pe);
+			if (gpe)
+				gpe->table_group.ops = &pnv_pci_ioda2_npu_ops;
+		}
+	}
+}
+#else /* !CONFIG_IOMMU_API */
+static void pnv_pci_ioda_setup_iommu_api(void) { };
 #endif
 
 static void pnv_pci_ioda_setup_opal_tce_kill(struct pnv_phb *phb)
@@ -2343,10 +2657,6 @@ static void pnv_pci_ioda2_setup_dma_pe(struct pnv_phb *phb,
 {
 	int64_t rc;
 
-	/* We shouldn't already have a 32-bit DMA associated */
-	if (WARN_ON(pe->tce32_seg >= 0))
-		return;
-
 	/* TVE #1 is selected by PCI address bit 59 */
 	pe->tce_bypass_base = 1ull << 59;
 
@@ -2354,7 +2664,6 @@ static void pnv_pci_ioda2_setup_dma_pe(struct pnv_phb *phb,
 			pe->pe_number);
 
 	/* The PE will reserve all possible 32-bits space */
-	pe->tce32_seg = 0;
 	pe_info(pe, "Setting up 32-bit TCE table at 0..%08x\n",
 		phb->ioda.m32_pci_base);
 
@@ -2370,11 +2679,8 @@ static void pnv_pci_ioda2_setup_dma_pe(struct pnv_phb *phb,
 #endif
 
 	rc = pnv_pci_ioda2_setup_default_config(pe);
-	if (rc) {
-		if (pe->tce32_seg >= 0)
-			pe->tce32_seg = -1;
+	if (rc)
 		return;
-	}
 
 	if (pe->flags & PNV_IODA_PE_DEV)
 		iommu_add_device(&pe->pdev->dev);
@@ -2385,47 +2691,24 @@ static void pnv_pci_ioda2_setup_dma_pe(struct pnv_phb *phb,
 static void pnv_ioda_setup_dma(struct pnv_phb *phb)
 {
 	struct pci_controller *hose = phb->hose;
-	unsigned int residual, remaining, segs, tw, base;
 	struct pnv_ioda_pe *pe;
+	unsigned int weight;
 
 	/* If we have more PE# than segments available, hand out one
 	 * per PE until we run out and let the rest fail. If not,
 	 * then we assign at least one segment per PE, plus more based
 	 * on the amount of devices under that PE
 	 */
-	if (phb->ioda.dma_pe_count > phb->ioda.tce32_count)
-		residual = 0;
-	else
-		residual = phb->ioda.tce32_count -
-			phb->ioda.dma_pe_count;
-
-	pr_info("PCI: Domain %04x has %ld available 32-bit DMA segments\n",
-		hose->global_number, phb->ioda.tce32_count);
-	pr_info("PCI: %d PE# for a total weight of %d\n",
-		phb->ioda.dma_pe_count, phb->ioda.dma_weight);
+	pr_info("PCI: Domain %04x has %d available 32-bit DMA segments\n",
+		hose->global_number, phb->ioda.dma32_count);
 
 	pnv_pci_ioda_setup_opal_tce_kill(phb);
 
-	/* Walk our PE list and configure their DMA segments, hand them
-	 * out one base segment plus any residual segments based on
-	 * weight
-	 */
-	remaining = phb->ioda.tce32_count;
-	tw = phb->ioda.dma_weight;
-	base = 0;
-	list_for_each_entry(pe, &phb->ioda.pe_dma_list, dma_link) {
-		if (!pe->dma_weight)
+	/* Walk our PE list and configure their DMA segments */
+	list_for_each_entry(pe, &phb->ioda.pe_list, list) {
+		weight = pnv_pci_ioda_pe_dma_weight(pe);
+		if (!weight)
 			continue;
-		if (!remaining) {
-			pe_warn(pe, "No DMA32 resources available\n");
-			continue;
-		}
-		segs = 1;
-		if (residual) {
-			segs += ((pe->dma_weight * residual)  + (tw / 2)) / tw;
-			if (segs > remaining)
-				segs = remaining;
-		}
 
 		/*
 		 * For IODA2 compliant PHB3, we needn't care about the weight.
@@ -2433,17 +2716,18 @@ static void pnv_ioda_setup_dma(struct pnv_phb *phb)
 		 * the specific PE.
 		 */
 		if (phb->type == PNV_PHB_IODA1) {
-			pe_info(pe, "DMA weight %d, assigned %d DMA32 segments\n",
-				pe->dma_weight, segs);
-			pnv_pci_ioda_setup_dma_pe(phb, pe, base, segs);
-		} else {
+			pnv_pci_ioda1_setup_dma_pe(phb, pe);
+		} else if (phb->type == PNV_PHB_IODA2) {
 			pe_info(pe, "Assign DMA32 space\n");
-			segs = 0;
 			pnv_pci_ioda2_setup_dma_pe(phb, pe);
+		} else if (phb->type == PNV_PHB_NPU) {
+			/*
+			 * We initialise the DMA space for an NPU PHB
+			 * after setup of the PHB is complete as we
+			 * point the NPU TVT to the the same location
+			 * as the PHB3 TVT.
+			 */
 		}
-
-		remaining -= segs;
-		base += segs;
 	}
 }
 
@@ -2734,45 +3018,58 @@ static void pnv_pci_init_ioda_msis(struct pnv_phb *phb) { }
 #ifdef CONFIG_PCI_IOV
 static void pnv_pci_ioda_fixup_iov_resources(struct pci_dev *pdev)
 {
-	struct pci_controller *hose;
-	struct pnv_phb *phb;
+	struct pci_controller *hose = pci_bus_to_host(pdev->bus);
+	struct pnv_phb *phb = hose->private_data;
+	const resource_size_t gate = phb->ioda.m64_segsize >> 2;
 	struct resource *res;
 	int i;
-	resource_size_t size;
+	resource_size_t size, total_vf_bar_sz;
 	struct pci_dn *pdn;
 	int mul, total_vfs;
 
 	if (!pdev->is_physfn || pdev->is_added)
 		return;
 
-	hose = pci_bus_to_host(pdev->bus);
-	phb = hose->private_data;
-
 	pdn = pci_get_pdn(pdev);
 	pdn->vfs_expanded = 0;
+	pdn->m64_single_mode = false;
 
 	total_vfs = pci_sriov_get_totalvfs(pdev);
-	pdn->m64_per_iov = 1;
-	mul = phb->ioda.total_pe;
+	mul = phb->ioda.total_pe_num;
+	total_vf_bar_sz = 0;
 
 	for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
 		res = &pdev->resource[i + PCI_IOV_RESOURCES];
 		if (!res->flags || res->parent)
 			continue;
 		if (!pnv_pci_is_mem_pref_64(res->flags)) {
-			dev_warn(&pdev->dev, " non M64 VF BAR%d: %pR\n",
+			dev_warn(&pdev->dev, "Don't support SR-IOV with"
+					" non M64 VF BAR%d: %pR. \n",
 				 i, res);
-			continue;
+			goto truncate_iov;
 		}
 
-		size = pci_iov_resource_size(pdev, i + PCI_IOV_RESOURCES);
+		total_vf_bar_sz += pci_iov_resource_size(pdev,
+				i + PCI_IOV_RESOURCES);
 
-		/* bigger than 64M */
-		if (size > (1 << 26)) {
-			dev_info(&pdev->dev, "PowerNV: VF BAR%d: %pR IOV size is bigger than 64M, roundup power2\n",
-				 i, res);
-			pdn->m64_per_iov = M64_PER_IOV;
+		/*
+		 * If bigger than quarter of M64 segment size, just round up
+		 * power of two.
+		 *
+		 * Generally, one M64 BAR maps one IOV BAR. To avoid conflict
+		 * with other devices, IOV BAR size is expanded to be
+		 * (total_pe * VF_BAR_size).  When VF_BAR_size is half of M64
+		 * segment size , the expanded size would equal to half of the
+		 * whole M64 space size, which will exhaust the M64 Space and
+		 * limit the system flexibility.  This is a design decision to
+		 * set the boundary to quarter of the M64 segment size.
+		 */
+		if (total_vf_bar_sz > gate) {
 			mul = roundup_pow_of_two(total_vfs);
+			dev_info(&pdev->dev,
+				"VF BAR Total IOV size %llx > %llx, roundup to %d VFs\n",
+				total_vf_bar_sz, gate, mul);
+			pdn->m64_single_mode = true;
 			break;
 		}
 	}
@@ -2781,36 +3078,100 @@ static void pnv_pci_ioda_fixup_iov_resources(struct pci_dev *pdev)
 		res = &pdev->resource[i + PCI_IOV_RESOURCES];
 		if (!res->flags || res->parent)
 			continue;
-		if (!pnv_pci_is_mem_pref_64(res->flags)) {
-			dev_warn(&pdev->dev, "Skipping expanding VF BAR%d: %pR\n",
-				 i, res);
-			continue;
-		}
 
-		dev_dbg(&pdev->dev, " Fixing VF BAR%d: %pR to\n", i, res);
 		size = pci_iov_resource_size(pdev, i + PCI_IOV_RESOURCES);
+		/*
+		 * On PHB3, the minimum size alignment of M64 BAR in single
+		 * mode is 32MB.
+		 */
+		if (pdn->m64_single_mode && (size < SZ_32M))
+			goto truncate_iov;
+		dev_dbg(&pdev->dev, " Fixing VF BAR%d: %pR to\n", i, res);
 		res->end = res->start + size * mul - 1;
 		dev_dbg(&pdev->dev, "                       %pR\n", res);
 		dev_info(&pdev->dev, "VF BAR%d: %pR (expanded to %d VFs for PE alignment)",
 			 i, res, mul);
 	}
 	pdn->vfs_expanded = mul;
+
+	return;
+
+truncate_iov:
+	/* To save MMIO space, IOV BAR is truncated. */
+	for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
+		res = &pdev->resource[i + PCI_IOV_RESOURCES];
+		res->flags = 0;
+		res->end = res->start - 1;
+	}
 }
 #endif /* CONFIG_PCI_IOV */
+
+static void pnv_ioda_setup_pe_res(struct pnv_ioda_pe *pe,
+				  struct resource *res)
+{
+	struct pnv_phb *phb = pe->phb;
+	struct pci_bus_region region;
+	int index;
+	int64_t rc;
+
+	if (!res || !res->flags || res->start > res->end)
+		return;
+
+	if (res->flags & IORESOURCE_IO) {
+		region.start = res->start - phb->ioda.io_pci_base;
+		region.end   = res->end - phb->ioda.io_pci_base;
+		index = region.start / phb->ioda.io_segsize;
+
+		while (index < phb->ioda.total_pe_num &&
+		       region.start <= region.end) {
+			phb->ioda.io_segmap[index] = pe->pe_number;
+			rc = opal_pci_map_pe_mmio_window(phb->opal_id,
+				pe->pe_number, OPAL_IO_WINDOW_TYPE, 0, index);
+			if (rc != OPAL_SUCCESS) {
+				pr_err("%s: Error %lld mapping IO segment#%d to PE#%d\n",
+				       __func__, rc, index, pe->pe_number);
+				break;
+			}
+
+			region.start += phb->ioda.io_segsize;
+			index++;
+		}
+	} else if ((res->flags & IORESOURCE_MEM) &&
+		   !pnv_pci_is_mem_pref_64(res->flags)) {
+		region.start = res->start -
+			       phb->hose->mem_offset[0] -
+			       phb->ioda.m32_pci_base;
+		region.end   = res->end -
+			       phb->hose->mem_offset[0] -
+			       phb->ioda.m32_pci_base;
+		index = region.start / phb->ioda.m32_segsize;
+
+		while (index < phb->ioda.total_pe_num &&
+		       region.start <= region.end) {
+			phb->ioda.m32_segmap[index] = pe->pe_number;
+			rc = opal_pci_map_pe_mmio_window(phb->opal_id,
+				pe->pe_number, OPAL_M32_WINDOW_TYPE, 0, index);
+			if (rc != OPAL_SUCCESS) {
+				pr_err("%s: Error %lld mapping M32 segment#%d to PE#%d",
+				       __func__, rc, index, pe->pe_number);
+				break;
+			}
+
+			region.start += phb->ioda.m32_segsize;
+			index++;
+		}
+	}
+}
 
 /*
  * This function is supposed to be called on basis of PE from top
  * to bottom style. So the the I/O or MMIO segment assigned to
  * parent PE could be overrided by its child PEs if necessary.
  */
-static void pnv_ioda_setup_pe_seg(struct pci_controller *hose,
-				  struct pnv_ioda_pe *pe)
+static void pnv_ioda_setup_pe_seg(struct pnv_ioda_pe *pe)
 {
-	struct pnv_phb *phb = hose->private_data;
-	struct pci_bus_region region;
-	struct resource *res;
-	int i, index;
-	int rc;
+	struct pci_dev *pdev;
+	int i;
 
 	/*
 	 * NOTE: We only care PCI bus based PE for now. For PCI
@@ -2819,57 +3180,20 @@ static void pnv_ioda_setup_pe_seg(struct pci_controller *hose,
 	 */
 	BUG_ON(!(pe->flags & (PNV_IODA_PE_BUS | PNV_IODA_PE_BUS_ALL)));
 
-	pci_bus_for_each_resource(pe->pbus, res, i) {
-		if (!res || !res->flags ||
-		    res->start > res->end)
+	list_for_each_entry(pdev, &pe->pbus->devices, bus_list) {
+		for (i = 0; i <= PCI_ROM_RESOURCE; i++)
+			pnv_ioda_setup_pe_res(pe, &pdev->resource[i]);
+
+		/*
+		 * If the PE contains all subordinate PCI buses, the
+		 * windows of the child bridges should be mapped to
+		 * the PE as well.
+		 */
+		if (!(pe->flags & PNV_IODA_PE_BUS_ALL) || !pci_is_bridge(pdev))
 			continue;
-
-		if (res->flags & IORESOURCE_IO) {
-			region.start = res->start - phb->ioda.io_pci_base;
-			region.end   = res->end - phb->ioda.io_pci_base;
-			index = region.start / phb->ioda.io_segsize;
-
-			while (index < phb->ioda.total_pe &&
-			       region.start <= region.end) {
-				phb->ioda.io_segmap[index] = pe->pe_number;
-				rc = opal_pci_map_pe_mmio_window(phb->opal_id,
-					pe->pe_number, OPAL_IO_WINDOW_TYPE, 0, index);
-				if (rc != OPAL_SUCCESS) {
-					pr_err("%s: OPAL error %d when mapping IO "
-					       "segment #%d to PE#%d\n",
-					       __func__, rc, index, pe->pe_number);
-					break;
-				}
-
-				region.start += phb->ioda.io_segsize;
-				index++;
-			}
-		} else if ((res->flags & IORESOURCE_MEM) &&
-			   !pnv_pci_is_mem_pref_64(res->flags)) {
-			region.start = res->start -
-				       hose->mem_offset[0] -
-				       phb->ioda.m32_pci_base;
-			region.end   = res->end -
-				       hose->mem_offset[0] -
-				       phb->ioda.m32_pci_base;
-			index = region.start / phb->ioda.m32_segsize;
-
-			while (index < phb->ioda.total_pe &&
-			       region.start <= region.end) {
-				phb->ioda.m32_segmap[index] = pe->pe_number;
-				rc = opal_pci_map_pe_mmio_window(phb->opal_id,
-					pe->pe_number, OPAL_M32_WINDOW_TYPE, 0, index);
-				if (rc != OPAL_SUCCESS) {
-					pr_err("%s: OPAL error %d when mapping M32 "
-					       "segment#%d to PE#%d",
-					       __func__, rc, index, pe->pe_number);
-					break;
-				}
-
-				region.start += phb->ioda.m32_segsize;
-				index++;
-			}
-		}
+		for (i = 0; i < PCI_BRIDGE_RESOURCE_NUM; i++)
+			pnv_ioda_setup_pe_res(pe,
+				&pdev->resource[PCI_BRIDGE_RESOURCES + i]);
 	}
 }
 
@@ -2881,8 +3205,13 @@ static void pnv_pci_ioda_setup_seg(void)
 
 	list_for_each_entry_safe(hose, tmp, &hose_list, list_node) {
 		phb = hose->private_data;
+
+		/* NPU PHB does not support IO or MMIO segmentation */
+		if (phb->type == PNV_PHB_NPU)
+			continue;
+
 		list_for_each_entry(pe, &phb->ioda.pe_list, list) {
-			pnv_ioda_setup_pe_seg(hose, pe);
+			pnv_ioda_setup_pe_seg(pe);
 		}
 	}
 }
@@ -2899,6 +3228,8 @@ static void pnv_pci_ioda_setup_DMA(void)
 		phb = hose->private_data;
 		phb->initialized = 1;
 	}
+
+	pnv_pci_ioda_setup_iommu_api();
 }
 
 static void pnv_pci_ioda_create_dbgfs(void)
@@ -2979,18 +3310,35 @@ static resource_size_t pnv_pci_window_alignment(struct pci_bus *bus,
 static resource_size_t pnv_pci_iov_resource_alignment(struct pci_dev *pdev,
 						      int resno)
 {
+	struct pci_controller *hose = pci_bus_to_host(pdev->bus);
+	struct pnv_phb *phb = hose->private_data;
 	struct pci_dn *pdn = pci_get_pdn(pdev);
-	resource_size_t align, iov_align;
+	resource_size_t align;
 
-	iov_align = resource_size(&pdev->resource[resno]);
-	if (iov_align)
-		return iov_align;
-
+	/*
+	 * On PowerNV platform, IOV BAR is mapped by M64 BAR to enable the
+	 * SR-IOV. While from hardware perspective, the range mapped by M64
+	 * BAR should be size aligned.
+	 *
+	 * When IOV BAR is mapped with M64 BAR in Single PE mode, the extra
+	 * powernv-specific hardware restriction is gone. But if just use the
+	 * VF BAR size as the alignment, PF BAR / VF BAR may be allocated with
+	 * in one segment of M64 #15, which introduces the PE conflict between
+	 * PF and VF. Based on this, the minimum alignment of an IOV BAR is
+	 * m64_segsize.
+	 *
+	 * This function returns the total IOV BAR size if M64 BAR is in
+	 * Shared PE mode or just VF BAR size if not.
+	 * If the M64 BAR is in Single PE mode, return the VF BAR size or
+	 * M64 segment size if IOV BAR size is less.
+	 */
 	align = pci_iov_resource_size(pdev, resno);
-	if (pdn->vfs_expanded)
-		return pdn->vfs_expanded * align;
+	if (!pdn->vfs_expanded)
+		return align;
+	if (pdn->m64_single_mode)
+		return max(align, (resource_size_t)phb->ioda.m64_segsize);
 
-	return align;
+	return pdn->vfs_expanded * align;
 }
 #endif /* CONFIG_PCI_IOV */
 
@@ -3018,12 +3366,6 @@ static bool pnv_pci_enable_device_hook(struct pci_dev *dev)
 	return true;
 }
 
-static u32 pnv_ioda_bdfn_to_pe(struct pnv_phb *phb, struct pci_bus *bus,
-			       u32 devfn)
-{
-	return phb->ioda.pe_rmap[(bus->number << 8) | devfn];
-}
-
 static void pnv_pci_ioda_shutdown(struct pci_controller *hose)
 {
 	struct pnv_phb *phb = hose->private_data;
@@ -3033,18 +3375,39 @@ static void pnv_pci_ioda_shutdown(struct pci_controller *hose)
 }
 
 static const struct pci_controller_ops pnv_pci_ioda_controller_ops = {
-       .dma_dev_setup = pnv_pci_dma_dev_setup,
-       .dma_bus_setup = pnv_pci_dma_bus_setup,
+	.dma_dev_setup		= pnv_pci_dma_dev_setup,
+	.dma_bus_setup		= pnv_pci_dma_bus_setup,
 #ifdef CONFIG_PCI_MSI
-       .setup_msi_irqs = pnv_setup_msi_irqs,
-       .teardown_msi_irqs = pnv_teardown_msi_irqs,
+	.setup_msi_irqs		= pnv_setup_msi_irqs,
+	.teardown_msi_irqs	= pnv_teardown_msi_irqs,
 #endif
-       .enable_device_hook = pnv_pci_enable_device_hook,
-       .window_alignment = pnv_pci_window_alignment,
-       .reset_secondary_bus = pnv_pci_reset_secondary_bus,
-       .dma_set_mask = pnv_pci_ioda_dma_set_mask,
-       .dma_get_required_mask = pnv_pci_ioda_dma_get_required_mask,
-       .shutdown = pnv_pci_ioda_shutdown,
+	.enable_device_hook	= pnv_pci_enable_device_hook,
+	.window_alignment	= pnv_pci_window_alignment,
+	.reset_secondary_bus	= pnv_pci_reset_secondary_bus,
+	.dma_set_mask		= pnv_pci_ioda_dma_set_mask,
+	.dma_get_required_mask	= pnv_pci_ioda_dma_get_required_mask,
+	.shutdown		= pnv_pci_ioda_shutdown,
+};
+
+static int pnv_npu_dma_set_mask(struct pci_dev *npdev, u64 dma_mask)
+{
+	dev_err_once(&npdev->dev,
+			"%s operation unsupported for NVLink devices\n",
+			__func__);
+	return -EPERM;
+}
+
+static const struct pci_controller_ops pnv_npu_ioda_controller_ops = {
+	.dma_dev_setup		= pnv_pci_dma_dev_setup,
+#ifdef CONFIG_PCI_MSI
+	.setup_msi_irqs		= pnv_setup_msi_irqs,
+	.teardown_msi_irqs	= pnv_teardown_msi_irqs,
+#endif
+	.enable_device_hook	= pnv_pci_enable_device_hook,
+	.window_alignment	= pnv_pci_window_alignment,
+	.reset_secondary_bus	= pnv_pci_reset_secondary_bus,
+	.dma_set_mask		= pnv_npu_dma_set_mask,
+	.shutdown		= pnv_pci_ioda_shutdown,
 };
 
 static void __init pnv_pci_init_ioda_phb(struct device_node *np,
@@ -3052,10 +3415,12 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 {
 	struct pci_controller *hose;
 	struct pnv_phb *phb;
-	unsigned long size, m32map_off, pemap_off, iomap_off = 0;
+	unsigned long size, m64map_off, m32map_off, pemap_off;
+	unsigned long iomap_off = 0, dma32map_off = 0;
 	const __be64 *prop64;
 	const __be32 *prop32;
 	int len;
+	unsigned int segno;
 	u64 phb_id;
 	void *aux;
 	long rc;
@@ -3102,6 +3467,8 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 		phb->model = PNV_PHB_MODEL_P7IOC;
 	else if (of_device_is_compatible(np, "ibm,power8-pciex"))
 		phb->model = PNV_PHB_MODEL_PHB3;
+	else if (of_device_is_compatible(np, "ibm,power8-npu-pciex"))
+		phb->model = PNV_PHB_MODEL_NPU;
 	else
 		phb->model = PNV_PHB_MODEL_UNKNOWN;
 
@@ -3114,13 +3481,13 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 		pr_err("  Failed to map registers !\n");
 
 	/* Initialize more IODA stuff */
-	phb->ioda.total_pe = 1;
+	phb->ioda.total_pe_num = 1;
 	prop32 = of_get_property(np, "ibm,opal-num-pes", NULL);
 	if (prop32)
-		phb->ioda.total_pe = be32_to_cpup(prop32);
+		phb->ioda.total_pe_num = be32_to_cpup(prop32);
 	prop32 = of_get_property(np, "ibm,opal-reserved-pe", NULL);
 	if (prop32)
-		phb->ioda.reserved_pe = be32_to_cpup(prop32);
+		phb->ioda.reserved_pe_idx = be32_to_cpup(prop32);
 
 	/* Parse 64-bit MMIO range */
 	pnv_ioda_parse_m64_window(phb);
@@ -3129,36 +3496,58 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 	/* FW Has already off top 64k of M32 space (MSI space) */
 	phb->ioda.m32_size += 0x10000;
 
-	phb->ioda.m32_segsize = phb->ioda.m32_size / phb->ioda.total_pe;
+	phb->ioda.m32_segsize = phb->ioda.m32_size / phb->ioda.total_pe_num;
 	phb->ioda.m32_pci_base = hose->mem_resources[0].start - hose->mem_offset[0];
 	phb->ioda.io_size = hose->pci_io_size;
-	phb->ioda.io_segsize = phb->ioda.io_size / phb->ioda.total_pe;
+	phb->ioda.io_segsize = phb->ioda.io_size / phb->ioda.total_pe_num;
 	phb->ioda.io_pci_base = 0; /* XXX calculate this ? */
 
+	/* Calculate how many 32-bit TCE segments we have */
+	phb->ioda.dma32_count = phb->ioda.m32_pci_base /
+				PNV_IODA1_DMA32_SEGSIZE;
+
 	/* Allocate aux data & arrays. We don't have IO ports on PHB3 */
-	size = _ALIGN_UP(phb->ioda.total_pe / 8, sizeof(unsigned long));
+	size = _ALIGN_UP(max_t(unsigned, phb->ioda.total_pe_num, 8) / 8,
+			sizeof(unsigned long));
+	m64map_off = size;
+	size += phb->ioda.total_pe_num * sizeof(phb->ioda.m64_segmap[0]);
 	m32map_off = size;
-	size += phb->ioda.total_pe * sizeof(phb->ioda.m32_segmap[0]);
+	size += phb->ioda.total_pe_num * sizeof(phb->ioda.m32_segmap[0]);
 	if (phb->type == PNV_PHB_IODA1) {
 		iomap_off = size;
-		size += phb->ioda.total_pe * sizeof(phb->ioda.io_segmap[0]);
+		size += phb->ioda.total_pe_num * sizeof(phb->ioda.io_segmap[0]);
+		dma32map_off = size;
+		size += phb->ioda.dma32_count *
+			sizeof(phb->ioda.dma32_segmap[0]);
 	}
 	pemap_off = size;
-	size += phb->ioda.total_pe * sizeof(struct pnv_ioda_pe);
+	size += phb->ioda.total_pe_num * sizeof(struct pnv_ioda_pe);
 	aux = memblock_virt_alloc(size, 0);
 	phb->ioda.pe_alloc = aux;
+	phb->ioda.m64_segmap = aux + m64map_off;
 	phb->ioda.m32_segmap = aux + m32map_off;
-	if (phb->type == PNV_PHB_IODA1)
+	for (segno = 0; segno < phb->ioda.total_pe_num; segno++) {
+		phb->ioda.m64_segmap[segno] = IODA_INVALID_PE;
+		phb->ioda.m32_segmap[segno] = IODA_INVALID_PE;
+	}
+	if (phb->type == PNV_PHB_IODA1) {
 		phb->ioda.io_segmap = aux + iomap_off;
-	phb->ioda.pe_array = aux + pemap_off;
-	set_bit(phb->ioda.reserved_pe, phb->ioda.pe_alloc);
+		for (segno = 0; segno < phb->ioda.total_pe_num; segno++)
+			phb->ioda.io_segmap[segno] = IODA_INVALID_PE;
 
-	INIT_LIST_HEAD(&phb->ioda.pe_dma_list);
+		phb->ioda.dma32_segmap = aux + dma32map_off;
+		for (segno = 0; segno < phb->ioda.dma32_count; segno++)
+			phb->ioda.dma32_segmap[segno] = IODA_INVALID_PE;
+	}
+	phb->ioda.pe_array = aux + pemap_off;
+	set_bit(phb->ioda.reserved_pe_idx, phb->ioda.pe_alloc);
+
 	INIT_LIST_HEAD(&phb->ioda.pe_list);
 	mutex_init(&phb->ioda.pe_list_mutex);
 
 	/* Calculate how many 32-bit TCE segments we have */
-	phb->ioda.tce32_count = phb->ioda.m32_pci_base >> 28;
+	phb->ioda.dma32_count = phb->ioda.m32_pci_base /
+				PNV_IODA1_DMA32_SEGSIZE;
 
 #if 0 /* We should really do that ... */
 	rc = opal_pci_set_phb_mem_window(opal->phb_id,
@@ -3170,7 +3559,7 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 #endif
 
 	pr_info("  %03d (%03d) PE's M32: 0x%x [segment=0x%x]\n",
-		phb->ioda.total_pe, phb->ioda.reserved_pe,
+		phb->ioda.total_pe_num, phb->ioda.reserved_pe_idx,
 		phb->ioda.m32_size, phb->ioda.m32_segsize);
 	if (phb->ioda.m64_size)
 		pr_info("                 M64: 0x%lx [segment=0x%lx]\n",
@@ -3185,12 +3574,6 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 	phb->freeze_pe = pnv_ioda_freeze_pe;
 	phb->unfreeze_pe = pnv_ioda_unfreeze_pe;
 
-	/* Setup RID -> PE mapping function */
-	phb->bdfn_to_pe = pnv_ioda_bdfn_to_pe;
-
-	/* Setup TCEs */
-	phb->dma_dev_setup = pnv_pci_ioda_dma_dev_setup;
-
 	/* Setup MSI support */
 	pnv_pci_init_ioda_msis(phb);
 
@@ -3202,7 +3585,13 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 	 * the child P2P bridges) can form individual PE.
 	 */
 	ppc_md.pcibios_fixup = pnv_pci_ioda_fixup;
-	hose->controller_ops = pnv_pci_ioda_controller_ops;
+
+	if (phb->type == PNV_PHB_NPU) {
+		hose->controller_ops = pnv_npu_ioda_controller_ops;
+	} else {
+		phb->dma_dev_setup = pnv_pci_ioda_dma_dev_setup;
+		hose->controller_ops = pnv_pci_ioda_controller_ops;
+	}
 
 #ifdef CONFIG_PCI_IOV
 	ppc_md.pcibios_fixup_sriov = pnv_pci_ioda_fixup_iov_resources;
@@ -3235,6 +3624,11 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 void __init pnv_pci_init_ioda2_phb(struct device_node *np)
 {
 	pnv_pci_init_ioda_phb(np, 0, PNV_PHB_IODA2);
+}
+
+void __init pnv_pci_init_npu_phb(struct device_node *np)
+{
+	pnv_pci_init_ioda_phb(np, 0, PNV_PHB_NPU);
 }
 
 void __init pnv_pci_init_ioda_hub(struct device_node *np)

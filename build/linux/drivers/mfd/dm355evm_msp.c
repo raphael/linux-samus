@@ -33,25 +33,25 @@
  * This driver was tested with firmware revision A4.
  */
 
-#if defined(CONFIG_INPUT_DM355EVM) || defined(CONFIG_INPUT_DM355EVM_MODULE)
+#if IS_ENABLED(CONFIG_INPUT_DM355EVM)
 #define msp_has_keyboard()	true
 #else
 #define msp_has_keyboard()	false
 #endif
 
-#if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
+#if IS_ENABLED(CONFIG_LEDS_GPIO)
 #define msp_has_leds()		true
 #else
 #define msp_has_leds()		false
 #endif
 
-#if defined(CONFIG_RTC_DRV_DM355EVM) || defined(CONFIG_RTC_DRV_DM355EVM_MODULE)
+#if IS_ENABLED(CONFIG_RTC_DRV_DM355EVM)
 #define msp_has_rtc()		true
 #else
 #define msp_has_rtc()		false
 #endif
 
-#if defined(CONFIG_VIDEO_TVP514X) || defined(CONFIG_VIDEO_TVP514X_MODULE)
+#if IS_ENABLED(CONFIG_VIDEO_TVP514X)
 #define msp_has_tvp()		true
 #else
 #define msp_has_tvp()		false
@@ -147,7 +147,7 @@ static int msp_gpio_get(struct gpio_chip *chip, unsigned offset)
 		return status;
 	if (reg == DM355EVM_MSP_LED)
 		msp_led_cache = status;
-	return status & MSP_GPIO_MASK(offset);
+	return !!(status & MSP_GPIO_MASK(offset));
 }
 
 static int msp_gpio_out(struct gpio_chip *chip, unsigned offset, int value)
@@ -259,8 +259,8 @@ static int add_children(struct i2c_client *client)
 	int		i;
 
 	/* GPIO-ish stuff */
-	dm355evm_msp_gpio.dev = &client->dev;
-	status = gpiochip_add(&dm355evm_msp_gpio);
+	dm355evm_msp_gpio.parent = &client->dev;
+	status = gpiochip_add_data(&dm355evm_msp_gpio, NULL);
 	if (status < 0)
 		return status;
 
