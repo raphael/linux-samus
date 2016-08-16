@@ -55,28 +55,14 @@ Once installed reboot and load the kernel.
 
 ### Sound
 
-To enable sound run the `sound.sh` script:
-```sh
-$ cd linux-samus/scripts/setup/sound
-$ ./sound.sh
-```
-> *NOTE* this scripts makes a number of assumptions on your system (e.g.
-> `alsaucm` and `amixer` are both installed and the file
-> /etc/pulse/default.pa contains a line to load the modules using udev).
-If the setup script fails please see below "Enabling sound step-by-step".
-
 ##### User settings and control
-To set the default sink from the laptop speakers when logged in, modify
-the users pulseaudio config with:
-```sh
-$ pacmd set-default-sink 1
-```
-the following commands will toggle mute, increase volume, and decrease volume,
+
+The following commands will toggle mute, decrease volume and increase volume,
 respectively.
 ```sh
-$ pactl set-sink-mute 1 toggle
-$ pactl set-sink-volume 1 -2%
-$ pactl set-sink-volume 1 +2%
+amixer -q -D pulse sset Master toggle
+amixer -q -D pulse sset Master 5%-
+amixer -q -D pulse sset Master 5%+
 ```
 
 ### Touchpad
@@ -139,66 +125,6 @@ scripts to `/usr/local/bin` and configures systemd to run the script
 The same directory also contains `setup.openrc.sh`. When executed, it copies
 scripts to `/usr/local/bin` and configures OpenRC to run the script
 `enable-brightness.sh` on boot using the `local` service.
-
-### Enabling sound step-by-step
-
-If you're reading this either the `sound.sh` script failed or better you want to
-understand what it does :)
-
-The first thing to do is to copy over the firmwares from the `firmware` directory
-to wherever your distribution installs firmwares (usually `/lib/firmware` or 
-`/usr/lib/firmware`).
-
-Next it's a good idea to make sure that the internal card driver always uses slot
-0 in Alsa so that any PulseAudio configuration done later can reliably address the
-card. This is done by adding a `.conf` file in `/etc/modprobe.d` containing the
-following line:
-```
-options snd slots=snd_soc_sst_bdw_rt5677_mach,snd-hda-intel
-```
-At that point you may want to reboot.  Once rebooted check the output of `aplay -l`,
-you should see something like:
-```
-**** List of PLAYBACK Hardware Devices ****
-card 0: bdwrt5677 [bdw-rt5677], device 0: System Playback/Capture (*) []
-  Subdevices: 1/1
-  Subdevice #0: subdevice #0
-
-```
-If that's not what you are getting then check for errors in `dmesg`.
-
-Once the driver loads correctly enable the "HiFi" verb with ALSAUCM. Make sure
-alsaucm is installed. It's usually part of the "alsa-utils" package. Assuming
-`alsaucm` is present, run the following:
-```sh
-$ cd scripts/setup
-$ ALSA_CONFIG_UCM=ucm/ alsaucm -c bdw-rt5677 set _verb HiFi
-```
-Next the microphone driver must be loaded statically by PulseAudio, add the
-lines:
-```
-load-module module-alsa-source device=hw:0,1
-load-module module-alsa-source device=hw:0,2
-```
-to `/etc/pulse/default.pa` *before* the line
-```
-load-module module-udev-detect
-```
-Restart PulseAudio with:
-```sh
-$ pulseaudio -k && pulseaudio -D
-```
-If PulseAudio fails to restart running it in the foreground may produce helpful
-output:
-```
-$ pulseaudio
-```
-Some users have also reported needing to configure PulseAudio to load the output
-driver statically, this can be done by adding the following line in 
-`/etc/pulse/default.pa`:
-```
-load-module module-alsa-sink device=hw:0,0
-```
 
 ## Contributions
 
