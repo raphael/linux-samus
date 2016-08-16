@@ -2,9 +2,9 @@
 # Maintainer: Tobias Powalowski <tpowa@archlinux.org>
 # Maintainer: Thomas Baechler <thomas@archlinux.org>
 
-pkgbase=linux-samus4.5
+pkgbase=linux-samus4
 _srcname=linux-patched
-pkgver=4.5
+pkgver=4.7
 pkgrel=1
 arch=('i686' 'x86_64')
 url="https://github.com/raphael/linux-samus"
@@ -32,7 +32,7 @@ prepare() {
 
 build() {
   cd "${srcdir}/${_srcname}"
-  make bzImage modules
+  CFLAGS+=" -march=broadwell" make bzImage modules
 }
 
 _package() {
