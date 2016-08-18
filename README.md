@@ -65,6 +65,21 @@ amixer -q -D pulse sset Master 5%-
 amixer -q -D pulse sset Master 5%+
 ```
 
+##### Users upgrading from pre-4.7 Samus kernel
+
+To get sound working, you must unwind some of the previous samus sound settings:
+
+1) edit the file `/etc/pulse/default.pa` and ensure these lines are commentted out:
+```
+#load-module module-alsa-sink device=hw:0,0
+#load-module module-alsa-source device=hw:0,1
+#load-module module-alsa-source device=hw:0,2
+```
+2) remove the following folders:  `/opt/samus`  and  `/usr/share/alsa/ucm/bdw-rt5677`  
+3) edit the file `/etc/acpi/handler.sh` and remove any samus entries  
+
+NOTE: settings to toggle headphone/speaker during `plug)` and `unplug)` events still need to be implemented.
+
 ### Touchpad
 
 Since Linux 4.3 the Atmel chip needs to be reconfigured to guarantee that the touchpad works.
