@@ -1,3 +1,8 @@
+v4.7-3 / 2016-08-20
+--------------------
+Upgrade to Linux 4.7.2
+Revert to uncompressed modules for Debian
+
 v4.7-2 / 2016-08-16
 --------------------
 Upgrade to Linux 4.7.1
