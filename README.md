@@ -58,7 +58,7 @@ GRUB_GFXMODE=1280x850x16
 GRUB_CMDLINE_LINUX_DEFAULT="modprobe.blacklist=ehci_pci video=800x600"
 ```
 The GFXMODE value could possibly be turned up to a 2560x1700 mode if you wanted ultra-high resolution for some reason (e.g. if pushing video to a big external display), but try this at your own risk.
-With a small but high-resolution display like that on the Pixel, the console text will be small enough to require a magnifying glass unless you add a `video` setting like that suggested.
+With a small but high-resolution display like that on the Pixel, the scrolling console text will be small enough to require a magnifying glass unless you add a `video` setting like that suggested.
 
 After building the samus kernel, [regenerate grub.cfg](https://wiki.archlinux.org/index.php/GRUB#Generate_the_main_configuration_file).
 
@@ -116,6 +116,7 @@ Section "InputClass"
     Driver "synaptics"
 EndSection
 ```
+(*Credit to <https://wiki.archlinux.org/index.php/Chromebook_Pixel_2>*).
 
 Since Linux 4.3 the Atmel chip needs to be reconfigured to guarantee that the touchpad works.
 See [issue #73](../../issues/73) for details. The `linux-samus/scripts/setup/touchpad` directory contains a script
