@@ -49,11 +49,34 @@ $ sudo make install
 > *NOTE* the steps above are just the standard kernel build steps and may
 > differ depending on your distro/setup.
 
+## Bootloader setup
+#### Grub configuration
+Grub users need to edit `/etc/default/grub` and
+change these two variables
+```sh
+GRUB_GFXMODE=1280x850x16
+GRUB_CMDLINE_LINUX_DEFAULT="modprobe.blacklist=ehci_pci video=800x600"
+```
+The GFXMODE value could possibly be turned up to a 2560x1700 mode if you wanted ultra-high resolution for some reason (e.g. if pushing video to a big external display), but try this at your own risk.
+With a small but high-resolution display like that on the Pixel, the console text will be small enough to require a magnifying glass unless you add a `video` setting like that suggested.
+
+After building the samus kernel, [regenerate grub.cfg](https://wiki.archlinux.org/index.php/GRUB#Generate_the_main_configuration_file).
+
 ## Post-install steps
 
 Once installed reboot and load the kernel.
 
 ### Sound
+
+##### Enabling sound
+
+If not already present, install package `alsa-utils`.
+
+If your system produces no sound, then
+download and execute this [ALSA speaker-enable shell script](https://github.com/GalliumOS/galliumos-samus/blob/master/usr/bin/samus-alsaenable-speakers) and try again.
+I need to run this for each login session.
+If somebody knows how to persist these ALSA settings, please share that information.
+Otherwise, this script should probably be invoked from a `~/.xinitrc` script or similar.
 
 ##### User settings and control
 
@@ -81,6 +104,17 @@ To get sound working, you must unwind some of the previous samus sound settings:
 NOTE: settings to toggle headphone/speaker during `plug)` and `unplug)` events still need to be implemented.
 
 ### Touchpad
+
+If not already present, install package `xf86-input-synaptics`.
+
+Paste this text into file `/etc/X11/xorg.conf.d/25-touchpad.conf`. ```
+Section "InputClass"
+    Identifier "touchpad"
+    MatchIsTouchpad "on"
+    MatchDevicePath "/dev/input/event*"
+    Driver "synaptics"
+EndSection
+```
 
 Since Linux 4.3 the Atmel chip needs to be reconfigured to guarantee that the touchpad works.
 See [issue #73](../../issues/73) for details. The `linux-samus/scripts/setup/touchpad` directory contains a script
