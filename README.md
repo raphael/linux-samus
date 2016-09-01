@@ -52,7 +52,7 @@ $ sudo make install
 ## Bootloader setup
 #### Grub configuration
 Grub users need to edit `/etc/default/grub` and
-change these two variables
+change these two variables to the values shown.
 ```sh
 GRUB_GFXMODE=1280x850x16
 GRUB_CMDLINE_LINUX_DEFAULT="modprobe.blacklist=ehci_pci video=800x600"
@@ -73,7 +73,7 @@ Once installed reboot and load the kernel.
 If not already present, install package `alsa-utils`.
 
 If your system produces no sound, then
-download and execute this [ALSA speaker-enable shell script](https://github.com/GalliumOS/galliumos-samus/blob/master/usr/bin/samus-alsaenable-speakers) and try again.
+download and execute this [ALSA speaker-enable shell script](https://raw.githubusercontent.com/GalliumOS/galliumos-samus/master/usr/bin/samus-alsaenable-speakers) and try again.
 I need to run this for each login session.
 If somebody knows how to persist these ALSA settings, please share that information.
 Otherwise, this script should probably be invoked from a `~/.xinitrc` script or similar.
@@ -107,7 +107,8 @@ NOTE: settings to toggle headphone/speaker during `plug)` and `unplug)` events s
 
 If not already present, install package `xf86-input-synaptics`.
 
-Paste this text into file `/etc/X11/xorg.conf.d/25-touchpad.conf`. ```
+Paste this text into file `/etc/X11/xorg.conf.d/25-touchpad.conf`.
+```
 Section "InputClass"
     Identifier "touchpad"
     MatchIsTouchpad "on"
