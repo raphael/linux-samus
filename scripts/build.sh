@@ -13,7 +13,7 @@ if [[ $1 == "--help" ]]; then
 fi
 export tag="$1"
 if [[ "$tag" == "" ]]; then
-  export tag="v4.7.2"
+  export tag="v4.7.4"
 fi
 $DIR/patch.sh $tag
 if [ $? -ne 0 ]; then
