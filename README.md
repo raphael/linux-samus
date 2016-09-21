@@ -59,21 +59,27 @@ Once installed reboot and load the kernel.
 
 Taken from [https://github.com/GalliumOS/galliumos-distro/issues/100#issuecomment-241534837](https://github.com/GalliumOS/galliumos-distro/issues/100#issuecomment-241534837):
 
-To enable audio
+To enable audio:
 
+```
 amixer -c 0 cset name='DAC1 MIXL DAC1 Switch' on
 amixer -c 0 cset name='DAC1 MIXR DAC1 Switch' on
+```
+
 To switch to speakers (note channel swapping)
 
+```
 amixer -c 0 cset name='Headphone Switch' off
 amixer -c 0 cset name='Stereo DAC MIXL DAC1 L Switch' off
 amixer -c 0 cset name='Stereo DAC MIXR DAC1 R Switch' off
 amixer -c 0 cset name='Stereo DAC MIXL DAC1 R Switch' on
 amixer -c 0 cset name='Stereo DAC MIXR DAC1 L Switch' on
 amixer -c 0 cset name='Speaker Switch' on
+```
 
 To switch to headphones (note channel unswapping)
 
+```
 amixer -c 0 cset name='Speaker Switch' off
 amixer -c 0 cset name='Stereo DAC MIXL DAC1 R Switch' off
 amixer -c 0 cset name='Stereo DAC MIXR DAC1 L Switch' off
@@ -82,6 +88,7 @@ amixer -c 0 cset name='Stereo DAC MIXR DAC1 R Switch' on
 amixer -c 0 cset name='OUT1 Playback Switch' on
 amixer -c 0 cset name='OUT2 Playback Switch' on
 amixer -c 0 cset name='Headphone Switch' on
+```
 
 #### User settings and control
 
