@@ -12,7 +12,7 @@ and a patched tree until they make it in an official Linux release. See https://
 
 The provided kernel config is also somewhat optimized for the Pixel 2015.
 
-*Current kernel version: 4.7.4*
+*Current kernel version: 4.7.6*
 
 ## Installation
 
