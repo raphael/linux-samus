@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Fri, 30 Sep 2016 09:57:37 -0700
+Source: linux-4.7.6-ph+
+Binary: linux-image-4.7.6-ph+ linux-headers-4.7.6-ph+ linux-firmware-image-4.7.6-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.7.6-ph+-1
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-firmware-image-4.7.6-ph+ - Linux kernel firmware, version 4.7.6-ph+
+ linux-headers-4.7.6-ph+ - Linux kernel headers for 4.7.6-ph+ on ${kernel:debarch}
+ linux-image-4.7.6-ph+ - Linux kernel, version 4.7.6-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.7.6-ph+ (4.7.6-ph+-1) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 31ac84eb63323ddf6ca64f5cc2fd15ab089b86f2 1150 linux-4.7.6-ph+_4.7.6-ph+-1.dsc
+ 9b5ee6ec4698e114710b916b6267bf71c93a16fb 345083519 linux-4.7.6-ph+_4.7.6-ph+.orig.tar.gz
+ 8716ddd5770e492416ee8fca9c6516dee06bb1e4 1282 linux-4.7.6-ph+_4.7.6-ph+-1.debian.tar.gz
+ 1e8b171746fc156774a6d2f970d4b2f8e9ef0d6d 920186 linux-firmware-image-4.7.6-ph+_4.7.6-ph+-1_amd64.deb
+ c066234e4bf70e6c8653749881b6bb849ddf54c0 10191652 linux-headers-4.7.6-ph+_4.7.6-ph+-1_amd64.deb
+ 51fd666894797ce2b73df828b8fd674c47ce5289 26887270 linux-image-4.7.6-ph+_4.7.6-ph+-1_amd64.deb
+ 2d4653c8587a5bb731f04b243eaac6712f7ff3c2 849114 linux-libc-dev_4.7.6-ph+-1_amd64.deb
+Checksums-Sha256:
+ 8ca1c1747e626e0664addbf2ff432f713415bfc2f99b49285e2fcea685d9a28f 1150 linux-4.7.6-ph+_4.7.6-ph+-1.dsc
+ 2f0fd6c399a8e358bdd845a607ffad651b85b4622522b931c37ed21438afed6a 345083519 linux-4.7.6-ph+_4.7.6-ph+.orig.tar.gz
+ 20e2a4df156c8aadfaaa876b84265e41b4e4a784c13b1ac0abccfc0911314fc0 1282 linux-4.7.6-ph+_4.7.6-ph+-1.debian.tar.gz
+ cd42893c7b59687430392fd745a6009264a86b02301a928f506fd3952a9d87f6 920186 linux-firmware-image-4.7.6-ph+_4.7.6-ph+-1_amd64.deb
+ 2e0071329a42b4cb6e3bf31eec9be4ffa5479f2bdbaac727d9bfeedb9444184f 10191652 linux-headers-4.7.6-ph+_4.7.6-ph+-1_amd64.deb
+ d529ccf9229295a7173d633c2b145d160b6d5e3ae099b51b4016e8890cf10df0 26887270 linux-image-4.7.6-ph+_4.7.6-ph+-1_amd64.deb
+ f8c8fdc695ec8185534e4cfcfeb40c70b84a83fd03e791404933a9b1dbe0b8a3 849114 linux-libc-dev_4.7.6-ph+-1_amd64.deb
+Files:
+ 87ec8344ba5298aedde5e913dbc5a68f 1150 kernel optional linux-4.7.6-ph+_4.7.6-ph+-1.dsc
+ 9650ecc0d8bc8e96d56a252ebb01c259 345083519 kernel optional linux-4.7.6-ph+_4.7.6-ph+.orig.tar.gz
+ fc02b0885919a5d0857f77acc3cee26d 1282 kernel optional linux-4.7.6-ph+_4.7.6-ph+-1.debian.tar.gz
+ 10c20717057cb28c09e8a575142a56a5 920186 kernel optional linux-firmware-image-4.7.6-ph+_4.7.6-ph+-1_amd64.deb
+ 3eedd0b5cf024a02c58cfc17dd8b1ad4 10191652 kernel optional linux-headers-4.7.6-ph+_4.7.6-ph+-1_amd64.deb
+ 0d25635c378decb8c58be1f817ba538f 26887270 kernel optional linux-image-4.7.6-ph+_4.7.6-ph+-1_amd64.deb
+ 0bee86e7b9ffc7a7703026004c1816d9 849114 devel optional linux-libc-dev_4.7.6-ph+-1_amd64.deb
