@@ -696,8 +696,12 @@ static int audit_filter_rules(struct task_struct *tsk,
 		ctx->prio = rule->prio;
 	}
 	switch (rule->action) {
-	case AUDIT_NEVER:    *state = AUDIT_DISABLED;	    break;
-	case AUDIT_ALWAYS:   *state = AUDIT_RECORD_CONTEXT; break;
+	case AUDIT_NEVER:
+		*state = AUDIT_DISABLED;
+		break;
+	case AUDIT_ALWAYS:
+		*state = AUDIT_RECORD_CONTEXT;
+		break;
 	}
 	return 1;
 }
@@ -1421,7 +1425,7 @@ static void audit_log_exit(struct audit_context *context, struct task_struct *ts
 	if (context->pwd.dentry && context->pwd.mnt) {
 		ab = audit_log_start(context, GFP_KERNEL, AUDIT_CWD);
 		if (ab) {
-			audit_log_d_path(ab, " cwd=", &context->pwd);
+			audit_log_d_path(ab, "cwd=", &context->pwd);
 			audit_log_end(ab);
 		}
 	}

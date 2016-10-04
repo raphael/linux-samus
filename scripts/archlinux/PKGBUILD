@@ -4,8 +4,8 @@
 
 pkgbase=linux-samus4
 _srcname=linux-patched
-pkgver=4.7
-pkgrel=5
+pkgver=4.8
+pkgrel=1
 arch=('i686' 'x86_64')
 url="https://github.com/raphael/linux-samus"
 license=('GPL2')
