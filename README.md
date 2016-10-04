@@ -2,7 +2,7 @@
 [![Chat with us on #linux-samus on freenode.net](https://img.shields.io/badge/chat-on%20%23linux--samus-brightgreen.svg)](https://webchat.freenode.net/?channels=linux-samus "Chat with us on #linux-samus on freenode.net")
 
 This repository contains packages for Debian and Arch Linux that installs the Linux kernel 4.7 with
-a set of patches that enable sound support. The Linux 4.7 kernel has built-in support for the Pixel
+a set of patches that enable sound support. The Linux 4.8 kernel has built-in support for the Pixel
 screen and keyboard leds as well as its touchpad and touchscreen. This makes the Pixel 2015 fully
 supported with this kernel tree.
 
@@ -12,7 +12,7 @@ and a patched tree until they make it in an official Linux release. See https://
 
 The provided kernel config is also somewhat optimized for the Pixel 2015.
 
-*Current kernel version: 4.7.6*
+*Current kernel version: 4.8*
 
 ## Installation
 
