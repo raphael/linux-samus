@@ -5,7 +5,7 @@ To build a new release:
 3. Clean up: cd build/archlinux ; rm -rf * ; cd ../debian ; rm -rf * ; cd ../..
 4. Build packages: cd scripts; ./build.sh v4.7.4
 5. Install new package, reboot and test
-6. Build source: rm -rf build/linux;cp -r build/linux-patched build/linux; cd build/linux; rm -rf .git; make clean ; rm .config ; ln -s ../../scripts/config .config
+6. Build source: cd ..;rm -rf build/linux;cp -r build/linux-patched build/linux; cd build/linux; rm -rf .git; make clean ; rm .config ; ln -s ../../scripts/config .config
 7. Commit / push all packages using "release 4.7-x" message
 8. Tag with version "v4.7-x"
 9. Create release in Github using tag
