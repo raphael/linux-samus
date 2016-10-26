@@ -32,7 +32,7 @@ prepare() {
 
 build() {
   cd "${srcdir}/${_srcname}"
-  CFLAGS+=" -march=broadwell" make bzImage modules
+  CFLAGS+=" -march=broadwell" make -j2 bzImage modules
 }
 
 _package() {
