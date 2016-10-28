@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Fri, 28 Oct 2016 12:21:57 -0700
+Source: linux-4.8.5-ph+
+Binary: linux-image-4.8.5-ph+ linux-headers-4.8.5-ph+ linux-firmware-image-4.8.5-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.8.5-ph+-1
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-firmware-image-4.8.5-ph+ - Linux kernel firmware, version 4.8.5-ph+
+ linux-headers-4.8.5-ph+ - Linux kernel headers for 4.8.5-ph+ on ${kernel:debarch}
+ linux-image-4.8.5-ph+ - Linux kernel, version 4.8.5-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.8.5-ph+ (4.8.5-ph+-1) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ c6b27b5efc0c9b2f0a06e9c76631a5dbd23850ac 1150 linux-4.8.5-ph+_4.8.5-ph+-1.dsc
+ c6e0f3d28692301a25408c67aa7bf8e00d988a71 294134746 linux-4.8.5-ph+_4.8.5-ph+.orig.tar.gz
+ 881c101ee7917e297cf286fe84de6ee7a97d3aa3 1283 linux-4.8.5-ph+_4.8.5-ph+-1.debian.tar.gz
+ 1f6dbfc32729be6cb2b826979f99d6274007cf71 688308 linux-firmware-image-4.8.5-ph+_4.8.5-ph+-1_amd64.deb
+ 53011fb30d74014cea3b9158d8dbcd2395adc488 10279402 linux-headers-4.8.5-ph+_4.8.5-ph+-1_amd64.deb
+ 2a4e4995780b89ff7c0ee8281603b1cc11b1bbba 17586850 linux-image-4.8.5-ph+_4.8.5-ph+-1_amd64.deb
+ 4becad15c9f44ac1c9243c826e39234b5b55e25e 855962 linux-libc-dev_4.8.5-ph+-1_amd64.deb
+Checksums-Sha256:
+ 93fc0fb19470052d661b8b8a88f25eb25853bfb10930053b34e63052772d27bd 1150 linux-4.8.5-ph+_4.8.5-ph+-1.dsc
+ 3b96e0dc629a36f3f2caba0998668f4c6540073dae8ff679a84224205137ddbe 294134746 linux-4.8.5-ph+_4.8.5-ph+.orig.tar.gz
+ 2f58d77aa3683260eea6d54d04c4d33bd2582aa1ba16c82b539bb91fba422ee3 1283 linux-4.8.5-ph+_4.8.5-ph+-1.debian.tar.gz
+ 98bc2d781941e3cdd1209d71b95cb3f7eab3b5ea4be6168acef336cacda2431f 688308 linux-firmware-image-4.8.5-ph+_4.8.5-ph+-1_amd64.deb
+ e8d98734843a43c1597d2ba6670169b6ac2d583e2b40ddb8eae4ac07af4f09a7 10279402 linux-headers-4.8.5-ph+_4.8.5-ph+-1_amd64.deb
+ 993e0da9b0136c631e92d61aaebab4b33616cf3d30bc88af33d2b5ecf59718a9 17586850 linux-image-4.8.5-ph+_4.8.5-ph+-1_amd64.deb
+ 2c821cfbe7a7e052cbdba17c7abfc2ac1ca4ebb0f9b23d344a7795081dd4b38b 855962 linux-libc-dev_4.8.5-ph+-1_amd64.deb
+Files:
+ cd12452beb2305869ea31bbdc399d41c 1150 kernel optional linux-4.8.5-ph+_4.8.5-ph+-1.dsc
+ 778a76b828de1d48f318922c0531d2b7 294134746 kernel optional linux-4.8.5-ph+_4.8.5-ph+.orig.tar.gz
+ 7078e7953b4e38a906c9f79032a69139 1283 kernel optional linux-4.8.5-ph+_4.8.5-ph+-1.debian.tar.gz
+ 5b8c00b673672051ae13531e00160267 688308 kernel optional linux-firmware-image-4.8.5-ph+_4.8.5-ph+-1_amd64.deb
+ 7a32132e65e23bd4ca7730836412eac1 10279402 kernel optional linux-headers-4.8.5-ph+_4.8.5-ph+-1_amd64.deb
+ 598fdd14c8bdb8cdbf1fcbc221075312 17586850 kernel optional linux-image-4.8.5-ph+_4.8.5-ph+-1_amd64.deb
+ d31d053a29e2e7e3ad89eade0dc85847 855962 devel optional linux-libc-dev_4.8.5-ph+-1_amd64.deb
