@@ -29,7 +29,7 @@ prepare() {
 
 build() {
   cd "${srcdir}/${_linuxsrc}"
-  CFLAGS+=" -march=broadwell" make bzImage modules
+  CFLAGS+=" -march=broadwell" make -j4 bzImage modules
 }
 
 _package() {
