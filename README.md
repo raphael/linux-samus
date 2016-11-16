@@ -59,6 +59,8 @@ Once installed reboot and load the kernel.
 
 Taken from [https://github.com/GalliumOS/galliumos-distro/issues/100#issuecomment-241534837](https://github.com/GalliumOS/galliumos-distro/issues/100#issuecomment-241534837):
 
+The below scripts are also provided in the scripts/setup folder.
+
 To enable audio:
 
 ```
