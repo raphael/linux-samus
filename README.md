@@ -144,7 +144,7 @@ brightness level.
 ```sh
 $ cd scripts/setup/brightness
 $ ./brightness --help
-Increase or decrease screen brighness
+Increase or decrease screen brightness
 Usage: brightness --increase | --decrease
 ```
 Put `scripts/setup/brightness` in your path and bind the F6 key to
