@@ -10,7 +10,7 @@ case "$1" in
 esac
 
 if !((val)); then
-    echo "Increase or decrease screen brighness"
+    echo "Increase or decrease screen brightness"
     echo "Usage: ${0##*/} --increase | --decrease"
     exit
 fi
