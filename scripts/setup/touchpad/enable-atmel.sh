@@ -6,6 +6,14 @@
 
 # See https://lkml.org/lkml/2016/4/7/786 for original thread.
 
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+
 # Elevate privileges if necessary
 PROMPT=sudo
 [ "$UID" -eq 0 ] || exec $PROMPT /bin/bash "$0" "$@"
@@ -13,9 +21,9 @@ PROMPT=sudo
 # Load `i2c-dev` module to access I2C devices through /dev
 $PROMPT modprobe i2c-dev &>/dev/null
 
-[ -x ./mxt-app ]
+[ -x "${DIR}/mxt-app" ]
 if [ $? -eq 0 ]; then
-  SCRIPT=./mxt-app
+  SCRIPT="${DIR}/mxt-app"
 else
   command -v mxt-app >/dev/null 2>&1 || { echo >&2 "mxt-app not installed.  Aborting."; exit 1; }
   SCRIPT=mxt-app
