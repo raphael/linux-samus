@@ -245,6 +245,7 @@ for _p in ${pkgname[@]}; do
 done
 
 # vim:set ts=8 sts=2 sw=2 et:
-md5sums=('3962164167396e5f1aef1e86c42738b0'
+md5sums=('9868d44425561f4e2307932cff1f5adc'
          '5973bbc62c942bec6ddcfd06ff301489'
          '5aae464a8085b2f3adcdcaff29853d04')
+
