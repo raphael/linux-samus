@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Sat, 26 Nov 2016 19:34:43 -0800
+Source: linux-4.8.11-ph+
+Binary: linux-image-4.8.11-ph+ linux-headers-4.8.11-ph+ linux-firmware-image-4.8.11-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.8.11-ph+-1
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia.lan>
+Changed-By: Anonymous <root@chromia.lan>
+Description:
+ linux-firmware-image-4.8.11-ph+ - Linux kernel firmware, version 4.8.11-ph+
+ linux-headers-4.8.11-ph+ - Linux kernel headers for 4.8.11-ph+ on ${kernel:debarch}
+ linux-image-4.8.11-ph+ - Linux kernel, version 4.8.11-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.8.11-ph+ (4.8.11-ph+-1) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 88b601e02616d6b59ad7d3568ced39050b746eeb 1174 linux-4.8.11-ph+_4.8.11-ph+-1.dsc
+ 1e490fff36c57f327103ffce23c431f7787be16d 294182604 linux-4.8.11-ph+_4.8.11-ph+.orig.tar.gz
+ f36412aab39ea433cd5c7301757e3bfbe0ca75c6 1288 linux-4.8.11-ph+_4.8.11-ph+-1.debian.tar.gz
+ e64f07284b38de552b3033f21b8d76cba3190271 688256 linux-firmware-image-4.8.11-ph+_4.8.11-ph+-1_amd64.deb
+ 2345960327e2d6a5f306165f6e0a4c29d0f0b3e5 10270790 linux-headers-4.8.11-ph+_4.8.11-ph+-1_amd64.deb
+ 8e82e8f47b000c8c9b4de54067a7fdc8993c4e25 17589798 linux-image-4.8.11-ph+_4.8.11-ph+-1_amd64.deb
+ 718729e5a04ac5f0333ddb39dbaf5dc35147af14 856792 linux-libc-dev_4.8.11-ph+-1_amd64.deb
+Checksums-Sha256:
+ 1a621c5470b6b00ab55d0bbf1d0f2f46967e38dae1c8514758c310fb401e12e8 1174 linux-4.8.11-ph+_4.8.11-ph+-1.dsc
+ d025f09e530326df455d89082a5c09ec4251e1448addb213863535059627f3a3 294182604 linux-4.8.11-ph+_4.8.11-ph+.orig.tar.gz
+ 77a51e31682142dea485a377d0cef99f12cac5d34dcbc99cb00d5faa704ca955 1288 linux-4.8.11-ph+_4.8.11-ph+-1.debian.tar.gz
+ c9b9d658f6973fc366232902d474fcc9c0a98f396294007833d373aa8c45ca3d 688256 linux-firmware-image-4.8.11-ph+_4.8.11-ph+-1_amd64.deb
+ ab760a2f2d3fa2c77cd0f4183d230355b09572317d93869306fc7ec5c7e8dd1e 10270790 linux-headers-4.8.11-ph+_4.8.11-ph+-1_amd64.deb
+ 9d8732ced4087c68b7e3258d2b298cae4506ec0107f5835e9e37366c75515593 17589798 linux-image-4.8.11-ph+_4.8.11-ph+-1_amd64.deb
+ 0303be1cb5efc76d6f85145a486dde32231aef6900b86a628cf8f11a4ee59435 856792 linux-libc-dev_4.8.11-ph+-1_amd64.deb
+Files:
+ 00ed9ee7ead2bbb82abc8b6748abe508 1174 kernel optional linux-4.8.11-ph+_4.8.11-ph+-1.dsc
+ 37501cf1fb10b68d8597f5730371c76f 294182604 kernel optional linux-4.8.11-ph+_4.8.11-ph+.orig.tar.gz
+ 88e9fe0615d937f984c042031c940573 1288 kernel optional linux-4.8.11-ph+_4.8.11-ph+-1.debian.tar.gz
+ d82784d0d55902c6ab00045baaa9b7fd 688256 kernel optional linux-firmware-image-4.8.11-ph+_4.8.11-ph+-1_amd64.deb
+ 52491868d5934de0720aae2d23504c01 10270790 kernel optional linux-headers-4.8.11-ph+_4.8.11-ph+-1_amd64.deb
+ cc1a0144f094f6691a1f836ac9b7432e 17589798 kernel optional linux-image-4.8.11-ph+_4.8.11-ph+-1_amd64.deb
+ 85759e5ae23b88df0b67e12c57fafd5c 856792 devel optional linux-libc-dev_4.8.11-ph+-1_amd64.deb
