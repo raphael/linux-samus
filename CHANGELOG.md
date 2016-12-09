@@ -1,3 +1,8 @@
+v4.8-12 2016-12-09
+--------------------
+Upgrade to Linux 4.8.13
+Enable USB serial devices
+
 v4.8-11 2016-12-05
 --------------------
 Upgrade to Linux 4.8.12

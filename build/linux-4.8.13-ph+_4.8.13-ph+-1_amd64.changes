@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Fri, 09 Dec 2016 09:34:06 -0800
+Source: linux-4.8.13-ph+
+Binary: linux-image-4.8.13-ph+ linux-headers-4.8.13-ph+ linux-firmware-image-4.8.13-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.8.13-ph+-1
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-firmware-image-4.8.13-ph+ - Linux kernel firmware, version 4.8.13-ph+
+ linux-headers-4.8.13-ph+ - Linux kernel headers for 4.8.13-ph+ on ${kernel:debarch}
+ linux-image-4.8.13-ph+ - Linux kernel, version 4.8.13-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.8.13-ph+ (4.8.13-ph+-1) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ a7bc69d4336b92851be4d1998b801d61699ffde8 1170 linux-4.8.13-ph+_4.8.13-ph+-1.dsc
+ 851fb17afaa1daa3b3280ad9373840b79893165f 296727439 linux-4.8.13-ph+_4.8.13-ph+.orig.tar.gz
+ 1f5df8da13be9b18a6f6b8619f7d51bf70946a82 1284 linux-4.8.13-ph+_4.8.13-ph+-1.debian.tar.gz
+ 4651cd07cf5f8774658f53b64c1540ce07cded68 736234 linux-firmware-image-4.8.13-ph+_4.8.13-ph+-1_amd64.deb
+ 279da6ac76c87b64abc36fc0dc52b3068c2569e4 10275610 linux-headers-4.8.13-ph+_4.8.13-ph+-1_amd64.deb
+ 3dcc0d4c7e94f4c35c688c954fba3d6fecee86c8 17992222 linux-image-4.8.13-ph+_4.8.13-ph+-1_amd64.deb
+ 4dc0ca82bd65adb7d658cea4abe27476fc828510 856628 linux-libc-dev_4.8.13-ph+-1_amd64.deb
+Checksums-Sha256:
+ cb9d99df35a42f43db3433bf1c1b5ad002bb85a768a4a083ec695a7261cbf050 1170 linux-4.8.13-ph+_4.8.13-ph+-1.dsc
+ 0fa10e5bc09a99339114c7c6d41b6de9a7956ad779cf9cbe918852fb2054353d 296727439 linux-4.8.13-ph+_4.8.13-ph+.orig.tar.gz
+ 159aa18a75f8fd2ca23128bf86a0bccc1d59e7dc3c6b86c37d4bfbad078e06a5 1284 linux-4.8.13-ph+_4.8.13-ph+-1.debian.tar.gz
+ b10090650c80390e1bb7f5825be9b3af05686944267103d6209998b457255907 736234 linux-firmware-image-4.8.13-ph+_4.8.13-ph+-1_amd64.deb
+ fd87e788eecfe9d784da64d986cccd3221ce53c387c7cc2cba01f469b71faf0d 10275610 linux-headers-4.8.13-ph+_4.8.13-ph+-1_amd64.deb
+ 3677a85af5c106bad3808cad0a7982d939692156add39c2687434dfdca682221 17992222 linux-image-4.8.13-ph+_4.8.13-ph+-1_amd64.deb
+ b1753044ee97e2af48986c622cf79bb4fd008a0c0f6c306c1d555303a90de56b 856628 linux-libc-dev_4.8.13-ph+-1_amd64.deb
+Files:
+ 6448574c41731b1dc8f0d3be7a570ee7 1170 kernel optional linux-4.8.13-ph+_4.8.13-ph+-1.dsc
+ e4d8805048bd43bfeac5455b5accc55f 296727439 kernel optional linux-4.8.13-ph+_4.8.13-ph+.orig.tar.gz
+ f4bd2b1ced7a2ccc3e33ec9feb2d59ff 1284 kernel optional linux-4.8.13-ph+_4.8.13-ph+-1.debian.tar.gz
+ d0df70dae66a2565a16f714e4fffb8fc 736234 kernel optional linux-firmware-image-4.8.13-ph+_4.8.13-ph+-1_amd64.deb
+ 19aa45a5a289cc2603229f517afb3708 10275610 kernel optional linux-headers-4.8.13-ph+_4.8.13-ph+-1_amd64.deb
+ 28c7453245ed03ec97c7ec8b67f28f33 17992222 kernel optional linux-image-4.8.13-ph+_4.8.13-ph+-1_amd64.deb
+ 95db849174fe4992dbeb2bd8daad9434 856628 devel optional linux-libc-dev_4.8.13-ph+-1_amd64.deb
