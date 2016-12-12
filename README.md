@@ -1,18 +1,11 @@
 # Linux for Chromebook Pixel 2015
-[![Chat with us on #linux-samus on freenode.net](https://img.shields.io/badge/chat-on%20%23linux--samus-brightgreen.svg)](https://webchat.freenode.net/?channels=linux-samus "Chat with us on #linux-samus on freenode.net")
 
-This repository contains packages for Debian and Arch Linux that installs the Linux kernel 4.8 with
-a set of patches that enable sound support. The Linux 4.8 kernel has built-in support for the Pixel
-screen and keyboard leds as well as its touchpad and touchscreen. This makes the Pixel 2015 fully
-supported with this kernel tree.
+This repository contains packages for Debian and Arch Linux that installs the Linux kernel v4.9 with
+a config that is somewhat optimized for the Chromebook Pixel 2015.
 
-The patches that were built in this repo in prior releases are no longer needed as support for the
-sound card has (finally) been submitted upstream. This repo temporarily includes the upstream patches
-and a patched tree until they make it in an official Linux release. See https://lkml.org/lkml/2016/8/14/207.
+*As of v4.9 there is no need to patch the kernel sources to get sound support*.
 
-The provided kernel config is also somewhat optimized for the Pixel 2015.
-
-*Current kernel version: 4.8.13*
+*Current kernel version: 4.9*
 
 ## Installation
 
