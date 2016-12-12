@@ -4,8 +4,8 @@
 
 pkgbase=linux-samus4
 _srcname=linux-patched
-pkgver=4.8
-pkgrel=12
+pkgver=4.9
+pkgrel=1
 arch=('i686' 'x86_64')
 url="https://github.com/raphael/linux-samus"
 license=('GPL2')
@@ -22,7 +22,7 @@ prepare() {
   if [ ! -e ${srcdir}/${_srcname} ]; then
     patched_source="${DIR}/../../build/${_srcname}"
     if [ ! -e $patched_source ]; then
-      echo Missing linux-patched directory, please run `readlink -f ${DIR}/../patch.sh` first
+      echo Missing linux-patched directory
       exit 1
     fi
     ln -s $patched_source ${srcdir}/${_srcname}
@@ -51,9 +51,12 @@ _package() {
   KARCH=x86
 
   # get kernel version
-  _kernver="$(make kernelrelease)"
+  #_kernver="$(make kernelrelease)"
+  _kernver="4.9.0-ph"
   _basekernel=${_kernver%%-*}
   _basekernel=${_basekernel%.*}
+
+  echo KERNVER=${_kernver}
 
   mkdir -p "${pkgdir}"/{lib/modules,lib/firmware,boot}
   make LOCALVERSION= INSTALL_MOD_PATH="${pkgdir}" modules_install

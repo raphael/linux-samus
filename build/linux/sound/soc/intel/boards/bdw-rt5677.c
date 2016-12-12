@@ -1,5 +1,19 @@
 /*
  * ASoC machine driver for Intel Broadwell platforms with RT5677 codec
+ *
+ * Copyright (c) 2014, The Chromium OS Authors.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <linux/module.h>
@@ -314,21 +328,13 @@ static int bdw_rt5677_probe(struct platform_device *pdev)
 
 	snd_soc_card_set_drvdata(&bdw_rt5677_card, bdw_rt5677);
 
-	return snd_soc_register_card(&bdw_rt5677_card);
-}
-
-static int bdw_rt5677_remove(struct platform_device *pdev)
-{
-	snd_soc_unregister_card(&bdw_rt5677_card);
-	return 0;
+	return devm_snd_soc_register_card(&pdev->dev, &bdw_rt5677_card);
 }
 
 static struct platform_driver bdw_rt5677_audio = {
 	.probe = bdw_rt5677_probe,
-	.remove = bdw_rt5677_remove,
 	.driver = {
 		.name = "bdw-rt5677",
-		.owner = THIS_MODULE,
 	},
 };
 

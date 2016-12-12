@@ -4,21 +4,33 @@ DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 LINUX=`readlink -f $DIR/../build/linux-patched`
 
 if [[ $1 == "--help" ]]; then
-  echo "Build linux 4.7 Samus"
-  echo "This script generates a patched Linux 4.8 kernel tree containing the code necessary to"
-  echo "enable sound on the chromebook Pixel 2."
-  echo "The patches are from https://lkml.org/lkml/2016/8/14/207"
-  echo "The script also generates Debian and ArchLinux packages."
+  echo "Build linux 4.9 Samus"
+  echo "This script generates Debian and ArchLinux packages."
   exit 0
 fi
-export tag="$1"
-if [[ "$tag" == "" ]]; then
-  export tag="v4.8"
+
+export TAG="$1"
+if [[ "$TAG" == "" ]]; then
+  echo "Usage: build.sh TAG"
 fi
-$DIR/patch.sh $tag
+
+if [ ! -d $LINUX ]; then
+  echo $LINUX does not exist, cannot proceed.
+  exit 1
+fi
+
+echo Resetting repo
+cd $LINUX
+git fetch linus
+git checkout .
+git checkout master
+git checkout $TAG
+git pull linus $TAG
 if [ $? -ne 0 ]; then
   exit 1
 fi
+git checkout $TAG
+
 cd $DIR/archlinux
 ./build.sh
 if [ $? -ne 0 ]; then
