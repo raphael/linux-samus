@@ -122,6 +122,40 @@ $ ./enable-atmel.sh
 
 This is only needed to be run once.
 
+### Keyboard
+
+Chrome OS sets up a number of useful key mappings, such as:
+
+ * Home = Search + left arrow
+ * End = Search + right arrow
+ * PgUp = Search + up arrow
+ * PgDn = Search + down arrow
+ * Delete = Search + backspace
+
+The `keyboard.sh` script will enable these mappings under standard Linux,
+and it will also set up mappings for special functions that do not exist
+on a standard 101-key PC keyboard:
+
+ * Back = Search + F1
+ * Forward = Search + F2
+ * Reload = Search + F3
+ * BrightnessDown = Search + F6
+ * BrightnessUp = Search + F7
+ * VolumeMute = Search + F8
+ * VolumeDown = Search + F9
+ * VolumeUp = Search + F10
+
+i.e. the Chromebook's F-keys will produce F1-F10 _without_ the Search modifier,
+and perform the marked functions _with_ the Search modifier.  F1-F3 can be
+handled by apps (such as a web browser) while F6-F10 tend to be handled by
+the desktop environment.  The latter keys were tested with Xfce.
+
+This will add a command to `~/.xsessionrc` that enables the mappings on login:
+```sh
+$ cd linux-samus/scripts/setup/keyboard
+$ ./keyboard.sh
+```
+
 ### Xorg
 
 To enable X11 acceleration run the `xaccel.sh` script:
