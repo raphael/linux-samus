@@ -5,8 +5,7 @@ LINUX=`readlink -f $DIR/../../build/linux-patched`
 DEBIAN=`readlink -f $LINUX/../debian`
 
 if [ ! -d $LINUX ]; then
-  echo "The patched tree must be generated first, couldn't find it at $LINUX"
-  echo "run ../build.sh to generate it"
+  echo "The tree must be setup first, couldn't find it at $LINUX"
   exit 1
 fi
 
@@ -14,6 +13,10 @@ cd $LINUX
 echo `pwd`
 export KDEB_CHANGELOG_DIST=vivid
 export DEB_BUILD_OPTIONS=parallel=4
+
+# Don't clean - we just compiled
+sed -i '/\t\$(MAKE) clean/ c\\#' scripts/package/Makefile
+
 make deb-pkg -j4
 if [ $? -ne 0 ]; then
   echo "** Build failed, aborting"

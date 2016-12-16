@@ -14,22 +14,30 @@ if [[ "$TAG" == "" ]]; then
   echo "Usage: build.sh TAG"
 fi
 
+export CLEAN=1
+if [[ "$2" == "--noclean" ]]; then
+    export CLEAN=0
+    echo "Skipping cleanup"
+fi
+
 if [ ! -d $LINUX ]; then
   echo $LINUX does not exist, cannot proceed.
   exit 1
 fi
 
-echo Resetting repo
-cd $LINUX
-git fetch linus
-git checkout .
-git checkout master
-git checkout $TAG
-git pull linus $TAG
-if [ $? -ne 0 ]; then
-  exit 1
+if [[ "$CLEAN" == "1" ]]; then
+    echo Resetting repo
+    cd $LINUX
+    git fetch linus
+    git checkout .
+    git checkout master
+    git checkout $TAG
+    git pull linus $TAG
+    if [ $? -ne 0 ]; then
+        exit 1
+    fi
+    git checkout $TAG
 fi
-git checkout $TAG
 
 cd $DIR/archlinux
 ./build.sh
