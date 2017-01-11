@@ -28,11 +28,11 @@ fi
 if [[ "$CLEAN" == "1" ]]; then
     echo Resetting repo
     cd $LINUX
-    git fetch linus
+    git fetch origin
     git checkout .
     git checkout master
     git checkout $TAG
-    git pull linus $TAG
+    git pull origin $TAG
     if [ $? -ne 0 ]; then
         exit 1
     fi
