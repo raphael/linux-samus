@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Fri, 27 Jan 2017 11:40:03 -0800
+Source: linux-4.9.6-ph+
+Binary: linux-image-4.9.6-ph+ linux-headers-4.9.6-ph+ linux-firmware-image-4.9.6-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.9.6-ph+-17
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-firmware-image-4.9.6-ph+ - Linux kernel firmware, version 4.9.6-ph+
+ linux-headers-4.9.6-ph+ - Linux kernel headers for 4.9.6-ph+ on ${kernel:debarch}
+ linux-image-4.9.6-ph+ - Linux kernel, version 4.9.6-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.9.6-ph+ (4.9.6-ph+-17) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 7b8dd0faf6cf3e0ddd88fa2006d926adc7cba59d 1154 linux-4.9.6-ph+_4.9.6-ph+-17.dsc
+ e7cae806d8b67aae36c0478e507ca48e692e572b 302138966 linux-4.9.6-ph+_4.9.6-ph+.orig.tar.gz
+ 7e4596ff9b6d3b63a5b775455b80670432f66140 1284 linux-4.9.6-ph+_4.9.6-ph+-17.debian.tar.gz
+ 7c3412e36bc8bfe4cf721a6b8c23db0e2011c9b9 735982 linux-firmware-image-4.9.6-ph+_4.9.6-ph+-17_amd64.deb
+ 250b58d024892f6f46ceaad5a90fb9ed788eaa9e 10430344 linux-headers-4.9.6-ph+_4.9.6-ph+-17_amd64.deb
+ 3a477e1855396950bed6f33becadae6f9f761002 18317736 linux-image-4.9.6-ph+_4.9.6-ph+-17_amd64.deb
+ aa80668e79c9a31c7a331f530020a501fc771f58 868574 linux-libc-dev_4.9.6-ph+-17_amd64.deb
+Checksums-Sha256:
+ 2460000875629a1296cd9c6319fafe49ac5545edffb00065fa35f3414e7c9cd2 1154 linux-4.9.6-ph+_4.9.6-ph+-17.dsc
+ ddffe41511dbc121be5e5af8d5d6ccc555eb786753bf98796f12d966db276cd0 302138966 linux-4.9.6-ph+_4.9.6-ph+.orig.tar.gz
+ de23cf29500d6c2c19a9fe479b078d0d1b38bf97f3fdacaf5c2bac9ddfa74fb2 1284 linux-4.9.6-ph+_4.9.6-ph+-17.debian.tar.gz
+ 36a706d60dfd31a9a1dd779e35b8512f0e6eb098852601d04d1cf2034bb43e65 735982 linux-firmware-image-4.9.6-ph+_4.9.6-ph+-17_amd64.deb
+ d7694bf2227d68a4f6fcec69115144e34f8113dd9497004ed886919549f895de 10430344 linux-headers-4.9.6-ph+_4.9.6-ph+-17_amd64.deb
+ 28d3636c0d3884ca7ddc05c5ec99a47b7ea5340610beab0683a546acf3795198 18317736 linux-image-4.9.6-ph+_4.9.6-ph+-17_amd64.deb
+ a467d437b885cc0be66793f88943039517efc7d033c3bbe435b323ce4c52c217 868574 linux-libc-dev_4.9.6-ph+-17_amd64.deb
+Files:
+ f60a2499cb724475e74825d7975abbf2 1154 kernel optional linux-4.9.6-ph+_4.9.6-ph+-17.dsc
+ a14770b0a59b50f922d762c90c304ea3 302138966 kernel optional linux-4.9.6-ph+_4.9.6-ph+.orig.tar.gz
+ 92400d3f33fd62521d2807d405adf9e6 1284 kernel optional linux-4.9.6-ph+_4.9.6-ph+-17.debian.tar.gz
+ 11ba60f5d93b546ee4666a98813cbd3c 735982 kernel optional linux-firmware-image-4.9.6-ph+_4.9.6-ph+-17_amd64.deb
+ 4e18f7ad08830c85046797241b525568 10430344 kernel optional linux-headers-4.9.6-ph+_4.9.6-ph+-17_amd64.deb
+ f998c2c9d3a803bf9f24b6abf0efc2ee 18317736 kernel optional linux-image-4.9.6-ph+_4.9.6-ph+-17_amd64.deb
+ 10ab8c14ba9de26d0166996c37c8b12c 868574 devel optional linux-libc-dev_4.9.6-ph+-17_amd64.deb
