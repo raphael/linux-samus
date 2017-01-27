@@ -5,7 +5,7 @@ a config that is somewhat optimized for the Chromebook Pixel 2015.
 
 *As of v4.9 there is no need to patch the kernel sources to get sound support*.
 
-*Current kernel version: 4.9.5*
+*Current kernel version: 4.9.6*
 
 ## Installation
 
