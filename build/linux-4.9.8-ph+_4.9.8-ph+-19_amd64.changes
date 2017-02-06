@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Sun, 05 Feb 2017 20:15:39 -0800
+Source: linux-4.9.8-ph+
+Binary: linux-image-4.9.8-ph+ linux-headers-4.9.8-ph+ linux-firmware-image-4.9.8-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.9.8-ph+-19
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia.lan>
+Changed-By: Anonymous <root@chromia.lan>
+Description:
+ linux-firmware-image-4.9.8-ph+ - Linux kernel firmware, version 4.9.8-ph+
+ linux-headers-4.9.8-ph+ - Linux kernel headers for 4.9.8-ph+ on ${kernel:debarch}
+ linux-image-4.9.8-ph+ - Linux kernel, version 4.9.8-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.9.8-ph+ (4.9.8-ph+-19) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ d3adb38e3d154e701b28e369b79c65637ea6f8a1 1158 linux-4.9.8-ph+_4.9.8-ph+-19.dsc
+ 92a29f5489189444121033682b376749ca213965 302174744 linux-4.9.8-ph+_4.9.8-ph+.orig.tar.gz
+ a65d37d50a2d482d290fd67edccbcd1e916a31b7 1288 linux-4.9.8-ph+_4.9.8-ph+-19.debian.tar.gz
+ 5ba0163af27851d712f462dce3c10aa85889ab6b 736304 linux-firmware-image-4.9.8-ph+_4.9.8-ph+-19_amd64.deb
+ b28fb13c5243b0b947f727431b063d32398ada2c 10430122 linux-headers-4.9.8-ph+_4.9.8-ph+-19_amd64.deb
+ 1bd60b9376ea734b2c577d855e1c846f73d661da 18319064 linux-image-4.9.8-ph+_4.9.8-ph+-19_amd64.deb
+ 46543462b4db2c6f06918c4354f57916a8dda424 868690 linux-libc-dev_4.9.8-ph+-19_amd64.deb
+Checksums-Sha256:
+ fe6fad92317dfe21b7fae8faaade6414ab71acc97432f9e7b678ca244e002bb0 1158 linux-4.9.8-ph+_4.9.8-ph+-19.dsc
+ 8ccc176ffcd2da840469ca128e0621ddf2919ccb11fc94f78d069296fbc6bc9e 302174744 linux-4.9.8-ph+_4.9.8-ph+.orig.tar.gz
+ ee5a247934c9a3ec9fcc98944e190707ca621fb006b33b3cd46a903a0d12938c 1288 linux-4.9.8-ph+_4.9.8-ph+-19.debian.tar.gz
+ dc2c34f1f2cac30fb93323c93eea47b46743a36a043b1b32b301188fddbba05f 736304 linux-firmware-image-4.9.8-ph+_4.9.8-ph+-19_amd64.deb
+ 39286871ffdcbedf71a539c88e97f30ea8e5f1be81d89893c0d5b63c1dfe2a84 10430122 linux-headers-4.9.8-ph+_4.9.8-ph+-19_amd64.deb
+ cae95bdd8bf0cc764f48a71b3d998ad772e880c033c4b6046188157a66e2d00e 18319064 linux-image-4.9.8-ph+_4.9.8-ph+-19_amd64.deb
+ 940a980ed21825cc993ba43737724d9a07ecea90677dcb14a49fdf667a57a7fd 868690 linux-libc-dev_4.9.8-ph+-19_amd64.deb
+Files:
+ 20df0bf766689b7855d7628f6bbb1359 1158 kernel optional linux-4.9.8-ph+_4.9.8-ph+-19.dsc
+ 83e0f1fb5ff55e9294cafbe795d2c69b 302174744 kernel optional linux-4.9.8-ph+_4.9.8-ph+.orig.tar.gz
+ cde9a28f5fac74ffb9f34bcc980e1a73 1288 kernel optional linux-4.9.8-ph+_4.9.8-ph+-19.debian.tar.gz
+ 63d72cd5e93d19b56718de100fad9666 736304 kernel optional linux-firmware-image-4.9.8-ph+_4.9.8-ph+-19_amd64.deb
+ b1671a874e9ca51c165d3bd04f0b7370 10430122 kernel optional linux-headers-4.9.8-ph+_4.9.8-ph+-19_amd64.deb
+ 19e07f620213f849bd048c15d67b9113 18319064 kernel optional linux-image-4.9.8-ph+_4.9.8-ph+-19_amd64.deb
+ e0627ba4423fd6620d2ac9ddc6786f48 868690 devel optional linux-libc-dev_4.9.8-ph+-19_amd64.deb
