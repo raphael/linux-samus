@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Thu, 16 Feb 2017 16:55:36 -0800
+Source: linux-4.9.10-ph+
+Binary: linux-image-4.9.10-ph+ linux-headers-4.9.10-ph+ linux-firmware-image-4.9.10-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.9.10-ph+-23
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-firmware-image-4.9.10-ph+ - Linux kernel firmware, version 4.9.10-ph+
+ linux-headers-4.9.10-ph+ - Linux kernel headers for 4.9.10-ph+ on ${kernel:debarch}
+ linux-image-4.9.10-ph+ - Linux kernel, version 4.9.10-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.9.10-ph+ (4.9.10-ph+-23) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 5a90a35bcebfe1d12c8a6b830bdd2b87591824ba 1174 linux-4.9.10-ph+_4.9.10-ph+-23.dsc
+ 83d877377b08bdcfdad95c78c1fbe5325064c030 302225211 linux-4.9.10-ph+_4.9.10-ph+.orig.tar.gz
+ f16a54c564debc6ba3401a8fa79fd21e36669755 1281 linux-4.9.10-ph+_4.9.10-ph+-23.debian.tar.gz
+ d34f82fd243761affcf652b44e8cdcd1cbca72d7 736168 linux-firmware-image-4.9.10-ph+_4.9.10-ph+-23_amd64.deb
+ 3ffd5fa3b99a1c03e49b1f84e46bb8532df91ca5 10429674 linux-headers-4.9.10-ph+_4.9.10-ph+-23_amd64.deb
+ 9cd37cdb2bb9974675ff45fe3106ce5187ef9ee7 18323362 linux-image-4.9.10-ph+_4.9.10-ph+-23_amd64.deb
+ 1a53ccc83a25c2c9a25e6e5af29f80e51098117c 868638 linux-libc-dev_4.9.10-ph+-23_amd64.deb
+Checksums-Sha256:
+ 1304bbb0404f44f6a77367d9efb327d29963a8f7c9f13b6b085f38c23819ed24 1174 linux-4.9.10-ph+_4.9.10-ph+-23.dsc
+ e47217b508da70ef3c4621f2bcaab813098cded5ffceb41070592ac3c90a81ca 302225211 linux-4.9.10-ph+_4.9.10-ph+.orig.tar.gz
+ 537547aea010b323508f6c2782de5d9e572cc63946cfde64b4722679eaa9199c 1281 linux-4.9.10-ph+_4.9.10-ph+-23.debian.tar.gz
+ cd0a474846a16c964ceddf8ab22cb1718bc4c8066dccc53053f0d3815ff21732 736168 linux-firmware-image-4.9.10-ph+_4.9.10-ph+-23_amd64.deb
+ 3a521d0646d6632b48aaee907db0acbd7152f35725328e950916d495fbd995b2 10429674 linux-headers-4.9.10-ph+_4.9.10-ph+-23_amd64.deb
+ 725e853b270af9a2e90e30d430840813271c39b789c108577f0bbc27c7ac7d20 18323362 linux-image-4.9.10-ph+_4.9.10-ph+-23_amd64.deb
+ a64649bd75bcb334960bd177d809a9e1f7133b9a5f6b42ff650d4f3f0b9d390b 868638 linux-libc-dev_4.9.10-ph+-23_amd64.deb
+Files:
+ d490fd3f8495c1e96f5c801f0fe3170c 1174 kernel optional linux-4.9.10-ph+_4.9.10-ph+-23.dsc
+ 4e160d82d0989441baf604c86b59a262 302225211 kernel optional linux-4.9.10-ph+_4.9.10-ph+.orig.tar.gz
+ 573d143f3aebc1a2baffcdf5f20bf5af 1281 kernel optional linux-4.9.10-ph+_4.9.10-ph+-23.debian.tar.gz
+ ddd27194d4ded740a260cc7d47d36135 736168 kernel optional linux-firmware-image-4.9.10-ph+_4.9.10-ph+-23_amd64.deb
+ 63e2b3abeca9f6f24041e6f10ac24c9e 10429674 kernel optional linux-headers-4.9.10-ph+_4.9.10-ph+-23_amd64.deb
+ 0060e7cffa9d4c86f4ca9414ea9a664d 18323362 kernel optional linux-image-4.9.10-ph+_4.9.10-ph+-23_amd64.deb
+ 262b17f473b2586623ebcf27c1eb37a0 868638 devel optional linux-libc-dev_4.9.10-ph+-23_amd64.deb
