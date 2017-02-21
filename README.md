@@ -1,11 +1,11 @@
 # Linux for Chromebook Pixel 2015
 
-This repository contains packages for Debian and Arch Linux that installs the Linux kernel v4.9 with
+This repository contains packages for Debian and Arch Linux that installs the Linux kernel v4.10 with
 a config that is somewhat optimized for the Chromebook Pixel 2015.
 
 *As of v4.9 there is no need to patch the kernel sources to get sound support*.
 
-*Current kernel version: 4.9.10*
+*Current kernel version: v4.10*
 
 ## Installation
 
