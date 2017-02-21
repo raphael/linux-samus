@@ -72,7 +72,7 @@
 
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/jiffies.h>
@@ -1172,6 +1172,7 @@ static void igmpv3_del_delrec(struct in_device *in_dev, struct ip_mc_list *im)
 				psf->sf_crcount = im->crcount;
 		}
 		in_dev_put(pmc->interface);
+		kfree(pmc);
 	}
 	spin_unlock_bh(&im->lock);
 }
