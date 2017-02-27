@@ -39,6 +39,7 @@ if [[ "$CLEAN" == "1" ]]; then
     git checkout $TAG
 fi
 
+cp $DIR/config $LINUX/.config
 cd $DIR/archlinux
 ./build.sh
 if [ $? -ne 0 ]; then
