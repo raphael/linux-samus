@@ -2,7 +2,7 @@
 
 pkgbase=linux-samus4
 pkgver=4.10
-pkgrel=3
+pkgrel=4
 arch=('x86_64')
 url="https://github.com/raphael/linux-samus"
 license=('GPL2')
