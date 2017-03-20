@@ -1,3 +1,8 @@
+v4.10-5 2017-03-20
+--------------------
+Update to Linux 4.10.4
+Enable `CONFIG_MAGIC_SYSRQ` (see #189)
+
 v4.10-4 2017-03-15
 --------------------
 Update to Linux 4.10.3
