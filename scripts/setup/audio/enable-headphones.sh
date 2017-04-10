@@ -2,11 +2,13 @@
 
 # see: https://github.com/GalliumOS/galliumos-distro/issues/100#issuecomment-241534837
 
-amixer -c 0 cset name='Speaker Switch' off
-amixer -c 0 cset name='Stereo DAC MIXL DAC1 R Switch' off
-amixer -c 0 cset name='Stereo DAC MIXR DAC1 L Switch' off
-amixer -c 0 cset name='Stereo DAC MIXL DAC1 L Switch' on
-amixer -c 0 cset name='Stereo DAC MIXR DAC1 R Switch' on
-amixer -c 0 cset name='OUT1 Playback Switch' on
-amixer -c 0 cset name='OUT2 Playback Switch' on
-amixer -c 0 cset name='Headphone Switch' on
+CARD="$(aplay -l | grep -Eo '^card ([0-9]): bdwrt5677' | sed 's/card //' | sed 's/:.*$//')"
+
+amixer -c $CARD cset name='Speaker Switch' off
+amixer -c $CARD cset name='Stereo DAC MIXL DAC1 R Switch' off
+amixer -c $CARD cset name='Stereo DAC MIXR DAC1 L Switch' off
+amixer -c $CARD cset name='Stereo DAC MIXL DAC1 L Switch' on
+amixer -c $CARD cset name='Stereo DAC MIXR DAC1 R Switch' on
+amixer -c $CARD cset name='OUT1 Playback Switch' on
+amixer -c $CARD cset name='OUT2 Playback Switch' on
+amixer -c $CARD cset name='Headphone Switch' on
