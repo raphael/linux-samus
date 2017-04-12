@@ -1334,6 +1334,7 @@ static int kvmgt_guest_init(struct mdev_device *mdev)
 	vgpu->handle = (unsigned long)info;
 	info->vgpu = vgpu;
 	info->kvm = kvm;
+	kvm_get_kvm(info->kvm);
 
 	kvmgt_protect_table_init(info);
 	gvt_cache_init(vgpu);
@@ -1353,6 +1354,7 @@ static bool kvmgt_guest_exit(struct kvmgt_guest_info *info)
 	}
 
 	kvm_page_track_unregister_notifier(info->kvm, &info->track_node);
+	kvm_put_kvm(info->kvm);
 	kvmgt_protect_table_destroy(info);
 	gvt_cache_destroy(info->vgpu);
 	vfree(info);
@@ -1420,7 +1422,7 @@ static int kvmgt_rw_gpa(unsigned long handle, unsigned long gpa,
 {
 	struct kvmgt_guest_info *info;
 	struct kvm *kvm;
-	int ret;
+	int idx, ret;
 	bool kthread = current->mm == NULL;
 
 	if (!handle_valid(handle))
@@ -1432,8 +1434,10 @@ static int kvmgt_rw_gpa(unsigned long handle, unsigned long gpa,
 	if (kthread)
 		use_mm(kvm->mm);
 
+	idx = srcu_read_lock(&kvm->srcu);
 	ret = write ? kvm_write_guest(kvm, gpa, buf, len) :
 		      kvm_read_guest(kvm, gpa, buf, len);
+	srcu_read_unlock(&kvm->srcu, idx);
 
 	if (kthread)
 		unuse_mm(kvm->mm);
