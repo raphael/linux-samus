@@ -1,3 +1,8 @@
+v4.10-9 2017-04-27
+--------------------
+Enable squashfs module
+Update to Linux 4.10.13
+
 v4.10-8 2017-04-12
 --------------------
 Update to Linux 4.10.10
