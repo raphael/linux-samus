@@ -1,8 +1,8 @@
 # Maintainer: Raphael Simon <simon.raphael@gmail.com>
 
 pkgbase=linux-samus4
-pkgver=4.10
-pkgrel=9
+pkgver=4.11
+pkgrel=1
 arch=('x86_64')
 url="https://github.com/raphael/linux-samus"
 license=('GPL2')
