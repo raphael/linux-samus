@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Fri, 30 Jun 2017 16:18:21 -0700
+Source: linux-4.11.8-ph+
+Binary: linux-image-4.11.8-ph+ linux-headers-4.11.8-ph+ linux-firmware-image-4.11.8-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.11.8-ph+-23
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-firmware-image-4.11.8-ph+ - Linux kernel firmware, version 4.11.8-ph+
+ linux-headers-4.11.8-ph+ - Linux kernel headers for 4.11.8-ph+ on ${kernel:debarch}
+ linux-image-4.11.8-ph+ - Linux kernel, version 4.11.8-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.11.8-ph+ (4.11.8-ph+-23) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ f82e90c96b4e41ab7a9e190ae8fcda7093abf5e4 1174 linux-4.11.8-ph+_4.11.8-ph+-23.dsc
+ e92bb11d79bd6921bee2a86fa5a7ad614b31332d 308163806 linux-4.11.8-ph+_4.11.8-ph+.orig.tar.gz
+ 4ea847f3a3d2a49d025ef1e51a43b84f6ed5db7a 1285 linux-4.11.8-ph+_4.11.8-ph+-23.debian.tar.gz
+ aded7964966d3075f9d8759aa25364a45402584e 736294 linux-firmware-image-4.11.8-ph+_4.11.8-ph+-23_amd64.deb
+ ea0420839725d1205385abc1b0fb7ae07039321a 10650822 linux-headers-4.11.8-ph+_4.11.8-ph+-23_amd64.deb
+ d07b16cadd2b009229bd2a5e4e5b6bb280002a3b 18483022 linux-image-4.11.8-ph+_4.11.8-ph+-23_amd64.deb
+ 6eb66f228ec2d4d31d3c8822ee4ce47eaf28b792 905244 linux-libc-dev_4.11.8-ph+-23_amd64.deb
+Checksums-Sha256:
+ 54e81715f119d18e9efb5e0c80cab4e9d81ff6c059e86bd429dfc9ce2e69b5c2 1174 linux-4.11.8-ph+_4.11.8-ph+-23.dsc
+ d36c9ae3b3fe755f80263469e08241d30b475f5511342e603c60f7ea5d4b0215 308163806 linux-4.11.8-ph+_4.11.8-ph+.orig.tar.gz
+ ec54677d5ed5fb3bb4348a57723f25773677ea0d5cb7fa7a38b979a131af2880 1285 linux-4.11.8-ph+_4.11.8-ph+-23.debian.tar.gz
+ 424edc30d84c425e005f17226f096b79e7313766a8caad00208fd4422448ab13 736294 linux-firmware-image-4.11.8-ph+_4.11.8-ph+-23_amd64.deb
+ 05cc3b83d53efa6f6310a3d45c44fda5b332772587018a85217256365236284a 10650822 linux-headers-4.11.8-ph+_4.11.8-ph+-23_amd64.deb
+ 2147aa97446a9e08b2d6b899860e90e484e21aaf0fd6dfb0632ff4736c5512b6 18483022 linux-image-4.11.8-ph+_4.11.8-ph+-23_amd64.deb
+ ea69ea81373373f79a023e09936b21df821d1903d6ca70f93c18660804fcf7e1 905244 linux-libc-dev_4.11.8-ph+-23_amd64.deb
+Files:
+ f61207d0d9e2b63630460a76631f150b 1174 kernel optional linux-4.11.8-ph+_4.11.8-ph+-23.dsc
+ b8a287ed4aebc38ed5046861331f069f 308163806 kernel optional linux-4.11.8-ph+_4.11.8-ph+.orig.tar.gz
+ fc0a33d8ba04a3074c0f49ab422d3658 1285 kernel optional linux-4.11.8-ph+_4.11.8-ph+-23.debian.tar.gz
+ ce1e8d944938551e83708b61a91487f2 736294 kernel optional linux-firmware-image-4.11.8-ph+_4.11.8-ph+-23_amd64.deb
+ 6f0ad78c6f2c292d1e4aa225a86a395c 10650822 kernel optional linux-headers-4.11.8-ph+_4.11.8-ph+-23_amd64.deb
+ d967cc06fe16ed07d29bd553a47e325d 18483022 kernel optional linux-image-4.11.8-ph+_4.11.8-ph+-23_amd64.deb
+ 386d5144d31160ddf889d3c720f11f15 905244 devel optional linux-libc-dev_4.11.8-ph+-23_amd64.deb

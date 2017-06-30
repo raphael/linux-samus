@@ -1,6 +1,7 @@
 build/linux-patched/
 build/chromiumos-chromeos-3.14/
 scripts/generated.patch
+.githubtoken
 
 # Linux .gitignore
 # Reproduced here so that building "build/linux" does not make the repo dirty.

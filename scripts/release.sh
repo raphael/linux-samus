@@ -40,30 +40,30 @@ then
 fi
 
 echo Update CHANGELOG
-vim $ROOT/CHANGELOG.md
+# vim $ROOT/CHANGELOG.md
 
 echo Bump versions in scripts/archlinux/PKGBUILD and aur/PKGBUILD
 sed -e "s/pkgrel=.*/pkgrel=${NEWPKGREL}/" -i $ROOT/aur/PKGBUILD
 sed -e "s/pkgrel=.*/pkgrel=${NEWPKGREL}/" -i $ROOT/scripts/archlinux/PKGBUILD
 
 echo Clean up
-rm -rf $ROOT/build/archlinux
-rm -rf $ROOT/build/debian
+# rm -rf $ROOT/build/archlinux
+# rm -rf $ROOT/build/debian
 
 echo Build packages
-cd $ROOT/scripts
-./build.sh $KERNELVER
+# cd ${ROOT}/scripts
+# ./build.sh $KERNELVER
 
 echo Build source
 rm -rf $ROOT/build/linux
-rsync -r --progress --exclude '.git' $ROOT/build/linux-patched $ROOT/build/linux
-cd $ROOT/build/linux
+rsync -r --progress --exclude '.git' $ROOT/build/linux-patched/ $ROOT/build/linux
+cd ${ROOT}/build/linux
 make clean
 rm .config
 ln -s ../../scripts/config .config
 
-echo Commit & push
-cd $ROOT
+echo Commit and push
+cd ${ROOT}
 TAG="v$PKGVER-$NEWPKGREL"
 git add .
 git commit -m "release $TAG"
@@ -76,11 +76,11 @@ API_JSON=$(printf '{"tag_name": "%s","target_commitish": "master","name": "%s","
 curl --data "$API_JSON" https://api.github.com/repos/raphael/linux-samus/releases?access_token=`cat $ROOT/.githubtoken`
 
 echo Build AUR package
-cd $ROOT/aur
+cd ${ROOT}/aur
 ./update.sh
 
 echo Push AUR package
-cd $ROOT/aur/linux-samus4
+cd ${ROOT}/aur/linux-samus4
 rm v4*.tar.gz
 git add .
 git commit -m "release $TAG"
@@ -97,7 +97,7 @@ echo Replace version in README
 sed -e "s/\*Current kernel version: .*/*Current kernel version: $KERNELVER/" -i $ROOT/README.md
 
 echo Push to master
-cd $ROOT
+cd ${ROOT}
 git add .
 git commit -m "release $TAG"
 git push origin master
