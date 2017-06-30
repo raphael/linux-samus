@@ -47,12 +47,12 @@ sed -e "s/pkgrel=.*/pkgrel=${NEWPKGREL}/" -i $ROOT/aur/PKGBUILD
 sed -e "s/pkgrel=.*/pkgrel=${NEWPKGREL}/" -i $ROOT/scripts/archlinux/PKGBUILD
 
 echo Clean up
-# rm -rf $ROOT/build/archlinux
-# rm -rf $ROOT/build/debian
+rm -rf $ROOT/build/archlinux
+rm -rf $ROOT/build/debian
 
 echo Build packages
-# cd ${ROOT}/scripts
-# ./build.sh $KERNELVER
+cd ${ROOT}/scripts
+./build.sh $KERNELVER
 
 echo Build source
 rm -rf $ROOT/build/linux
