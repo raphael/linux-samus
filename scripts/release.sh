@@ -87,11 +87,10 @@ git commit -m "release $TAG"
 git push origin master
 
 echo Update SHAs
-SHAS=$( tail -n3 PKGBUILD )
-head -n -1 $ROOT/aur/PKGBUILD > foo
+head -n -3 $ROOT/aur/PKGBUILD > foo
 cat foo > $ROOT/aur/PKGBUILD
 rm foo
-echo $SHAS >> $ROOT/aur/PKGBUILD
+tail -n3 PKGBUILD >> $ROOT/aur/PKGBUILD
 
 echo Replace version in README
 sed -e "s/\*Current kernel version: .*/*Current kernel version: $KERNELVER/" -i $ROOT/README.md
