@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Mon, 03 Jul 2017 20:08:05 -0700
+Source: linux-4.12.0-ph+
+Binary: linux-image-4.12.0-ph+ linux-headers-4.12.0-ph+ linux-firmware-image-4.12.0-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.12.0-ph+-2
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-firmware-image-4.12.0-ph+ - Linux kernel firmware, version 4.12.0-ph+
+ linux-headers-4.12.0-ph+ - Linux kernel headers for 4.12.0-ph+ on ${kernel:debarch}
+ linux-image-4.12.0-ph+ - Linux kernel, version 4.12.0-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.12.0-ph+ (4.12.0-ph+-2) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 6a4ff1e77375de2cb6fda85d9ae571d48e2c738b 1145 linux-4.12.0-ph+_4.12.0-ph+-2.dsc
+ 310eeb7f183e1a3ad9f17ef79914b1373f878131 313867040 linux-4.12.0-ph+_4.12.0-ph+.orig.tar.gz
+ 34681b3243c2dc3d89de4d03d771eb5ebaec196e 1245 linux-4.12.0-ph+_4.12.0-ph+-2.debian.tar.gz
+ ea92af4d2339a205a7c867017e0d6653a4db25a1 736478 linux-firmware-image-4.12.0-ph+_4.12.0-ph+-2_amd64.deb
+ 85d0d0cb81271d361112e0c26a4686e714dfce19 10657592 linux-headers-4.12.0-ph+_4.12.0-ph+-2_amd64.deb
+ dedb456e057428014a9a35a4504efd9deef3a7d9 18539576 linux-image-4.12.0-ph+_4.12.0-ph+-2_amd64.deb
+ 8837c2323661a0863e2bca3e5081596e10625a86 941582 linux-libc-dev_4.12.0-ph+-2_amd64.deb
+Checksums-Sha256:
+ 7370992f8ca4e1c2a951b08a772371c51b4c57368b213198a955c6438e26f822 1145 linux-4.12.0-ph+_4.12.0-ph+-2.dsc
+ e1ebc76321d21250fcdb8d2ccda80ecc426aa6fa392efdb2d49d47dce0e2d173 313867040 linux-4.12.0-ph+_4.12.0-ph+.orig.tar.gz
+ f4267d585552b4b3725a918e783401d94758ccc089275e9a7f953ea9c47f3923 1245 linux-4.12.0-ph+_4.12.0-ph+-2.debian.tar.gz
+ 519c0be3e6d90f6507b55ab3c88fa6f7e0964ab8c10b483c4fa8059f83d470d6 736478 linux-firmware-image-4.12.0-ph+_4.12.0-ph+-2_amd64.deb
+ 9c9003a83c0205caf3c16f413f3506d74bc70263368b09a4af7ab2633d779bd8 10657592 linux-headers-4.12.0-ph+_4.12.0-ph+-2_amd64.deb
+ 3997a2827db262f7f8d4f9baccd6031906b2e7dc1b9ceca6d36464fde76af16b 18539576 linux-image-4.12.0-ph+_4.12.0-ph+-2_amd64.deb
+ 828fb161056b2c38b140693b4bc25c9d71af9632754354f951528a47dac2d521 941582 linux-libc-dev_4.12.0-ph+-2_amd64.deb
+Files:
+ 38b19c5fefde2941c36a8d2d75f40a3c 1145 kernel optional linux-4.12.0-ph+_4.12.0-ph+-2.dsc
+ b1fb322a20099cf3cf4180b3b9cf53f3 313867040 kernel optional linux-4.12.0-ph+_4.12.0-ph+.orig.tar.gz
+ aa19ff4629b4ea2a7655b8babd54567a 1245 kernel optional linux-4.12.0-ph+_4.12.0-ph+-2.debian.tar.gz
+ 18a0d4935c0e666f9fabc4f1a81ba325 736478 kernel optional linux-firmware-image-4.12.0-ph+_4.12.0-ph+-2_amd64.deb
+ 1aa3ecef99a585e5fff95f54c7eba59c 10657592 kernel optional linux-headers-4.12.0-ph+_4.12.0-ph+-2_amd64.deb
+ c5b747e2b700b20477eeaf5014688970 18539576 kernel optional linux-image-4.12.0-ph+_4.12.0-ph+-2_amd64.deb
+ 5ea4422c9b03d047f369cafe554eb2dd 941582 devel optional linux-libc-dev_4.12.0-ph+-2_amd64.deb
