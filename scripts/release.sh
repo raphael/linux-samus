@@ -40,7 +40,7 @@ then
 fi
 
 echo Update CHANGELOG
-# vim $ROOT/CHANGELOG.md
+vim $ROOT/CHANGELOG.md
 
 echo Bump versions in scripts/archlinux/PKGBUILD and aur/PKGBUILD
 sed -e "s/pkgrel=.*/pkgrel=${NEWPKGREL}/" -i $ROOT/aur/PKGBUILD
@@ -49,6 +49,8 @@ sed -e "s/pkgrel=.*/pkgrel=${NEWPKGREL}/" -i $ROOT/scripts/archlinux/PKGBUILD
 echo Clean up
 rm -rf $ROOT/build/archlinux
 rm -rf $ROOT/build/debian
+mkdir -p $ROOT/build/archlinux
+mkdir -p $ROOT/build/debian
 
 echo Build packages
 cd ${ROOT}/scripts
@@ -56,7 +58,7 @@ cd ${ROOT}/scripts
 
 echo Build source
 rm -rf $ROOT/build/linux
-rsync -r --progress --exclude '.git' $ROOT/build/linux-patched/ $ROOT/build/linux
+rsync -r --exclude '.git' $ROOT/build/linux-patched/ $ROOT/build/linux
 cd ${ROOT}/build/linux
 make clean
 rm .config
