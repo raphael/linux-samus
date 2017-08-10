@@ -95,7 +95,7 @@ rm foo
 tail -n3 PKGBUILD >> $ROOT/aur/PKGBUILD
 
 echo Replace version in README
-sed -e "s/\*Current kernel version: .*/*Current kernel version: $KERNELVER/" -i $ROOT/README.md
+sed -e "s/\*Current kernel version: .*/*Current kernel version: $KERNELVER*/" -i $ROOT/README.md
 
 echo Push to master
 cd ${ROOT}
