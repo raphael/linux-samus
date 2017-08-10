@@ -1,80 +1,96 @@
+v4.12-4 2017-08-10
+--------------------
+Upgrade to Linux 4.12.5
+
+v4.12-3 2017-07-25
+--------------------
+Upgrade to Linux 4.12.3
+
+v4.12-2 2017-07-17
+--------------------
+Upgrade to Linux 4.12.2
+
+v4.12-1 2017-07-01
+--------------------
+Upgrade to Linux 4.12
+
 v4.11-3 2017-06-30
 --------------------
-Update to Linux 4.11.8
+Upgrade to Linux 4.11.8
 
 v4.11-2 2017-05-15
 --------------------
-Update to Linux 4.11.1
+Upgrade to Linux 4.11.1
 
 v4.11-1 2017-05-06
 --------------------
-Update to Linux 4.11
+Upgrade to Linux 4.11
 
 v4.10-9 2017-04-27
 --------------------
 Enable squashfs module
-Update to Linux 4.10.13
+Upgrade to Linux 4.10.13
 
 v4.10-8 2017-04-12
 --------------------
-Update to Linux 4.10.10
+Upgrade to Linux 4.10.10
 
 v4.10-7 2017-04-3
 --------------------
-Update to Linux 4.10.8
+Upgrade to Linux 4.10.8
 
 v4.10-6 2017-03-24
 --------------------
-Update to Linux 4.10.5
+Upgrade to Linux 4.10.5
 
 v4.10-5 2017-03-20
 --------------------
-Update to Linux 4.10.4
+Upgrade to Linux 4.10.4
 Enable `CONFIG_MAGIC_SYSRQ` (see #189)
 
 v4.10-4 2017-03-15
 --------------------
-Update to Linux 4.10.3
+Upgrade to Linux 4.10.3
 
 v4.10-3 2017-03-13
 --------------------
-Update to Linux 4.10.2
+Upgrade to Linux 4.10.2
 
 v4.10-2 2017-02-27
 --------------------
-Update to Linux 4.10.1
+Upgrade to Linux 4.10.1
 
 v4.10-1 2017-02-2
 --------------------
-Update to Linux 4.10
+Upgrade to Linux 4.10
 
 v4.9-9 2017-02-16
 --------------------
-Update to Linux 4.9.10
+Upgrade to Linux 4.9.10
 
 v4.9-8 2017-02-09
 --------------------
-Update to Linux 4.9.9
+Upgrade to Linux 4.9.9
 
 v4.9-7 2017-02-05
 --------------------
-Update to Linux 4.9.8
+Upgrade to Linux 4.9.8
 
 v4.9-6 2017-01-27
 --------------------
-Update to Linux 4.9.6
+Upgrade to Linux 4.9.6
 
 v4.9-5 2017-01-23
 --------------------
-Update to Linux 4.9.5
+Upgrade to Linux 4.9.5
 
 v4.9-4 2017-01-15
 --------------------
-Update to Linux 4.9.4
+Upgrade to Linux 4.9.4
 
 v4.9-3 2017-01-10
 --------------------
-Update to Linux 4.9.2
+Upgrade to Linux 4.9.2
 
 v4.9-2 2016-12-16
 --------------------
