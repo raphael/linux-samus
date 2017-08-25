@@ -25,11 +25,16 @@ if [[ $PKGREL == "" ]]; then
     echo "couldn't retrieve PKGREL - giving up"
     exit 1
 fi
-NEWPKGREL=$(($PKGREL+1))
+if [[ $2 == "--continue" ]]; then
+    NEWPKGREL=$PKGREL
+else 
+    NEWPKGREL=$(($PKGREL+1))
+fi
 
 echo ROOT:               $ROOT
 echo PKGVER \(current\): $PKGVER
 echo PKGREL \(current\): $PKGREL
+echo PKGREL \(new\):     $NEWPKGREL
 echo KERNEL \(new\):     $KERNELVER
 
 read -p "Proceed? " -n 1 -r
@@ -39,12 +44,14 @@ then
     exit 1
 fi
 
-echo Update CHANGELOG
-vim $ROOT/CHANGELOG.md
+if [[ $2 != "--continue" ]]; then
+    echo Update CHANGELOG
+    vim $ROOT/CHANGELOG.md
 
-echo Bump versions in scripts/archlinux/PKGBUILD and aur/PKGBUILD
-sed -e "s/pkgrel=.*/pkgrel=${NEWPKGREL}/" -i $ROOT/aur/PKGBUILD
-sed -e "s/pkgrel=.*/pkgrel=${NEWPKGREL}/" -i $ROOT/scripts/archlinux/PKGBUILD
+    echo Bump versions in scripts/archlinux/PKGBUILD and aur/PKGBUILD
+    sed -e "s/pkgrel=.*/pkgrel=${NEWPKGREL}/" -i $ROOT/aur/PKGBUILD
+    sed -e "s/pkgrel=.*/pkgrel=${NEWPKGREL}/" -i $ROOT/scripts/archlinux/PKGBUILD
+fi
 
 echo Clean up
 rm -rf $ROOT/build/archlinux

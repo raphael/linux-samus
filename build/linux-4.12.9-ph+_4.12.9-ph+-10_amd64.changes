@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Fri, 25 Aug 2017 11:00:37 -0700
+Source: linux-4.12.9-ph+
+Binary: linux-image-4.12.9-ph+ linux-headers-4.12.9-ph+ linux-firmware-image-4.12.9-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.12.9-ph+-10
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-firmware-image-4.12.9-ph+ - Linux kernel firmware, version 4.12.9-ph+
+ linux-headers-4.12.9-ph+ - Linux kernel headers for 4.12.9-ph+ on ${kernel:debarch}
+ linux-image-4.12.9-ph+ - Linux kernel, version 4.12.9-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.12.9-ph+ (4.12.9-ph+-10) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 66573b42a08686dd1803e3c2b250fa574c83d4c6 1149 linux-4.12.9-ph+_4.12.9-ph+-10.dsc
+ e1bfcf9319c9fcc23390a455eb0849964120f6d4 315567561 linux-4.12.9-ph+_4.12.9-ph+.orig.tar.gz
+ 9c106eccbf2c70692d6225830391e7d90bec85bd 1245 linux-4.12.9-ph+_4.12.9-ph+-10.debian.tar.gz
+ 645f389ecfb515703bc1360752996e7bdf3f6542 736622 linux-firmware-image-4.12.9-ph+_4.12.9-ph+-10_amd64.deb
+ d03582257a26ce11ded38cdf0dfdb58ae952d06b 10674216 linux-headers-4.12.9-ph+_4.12.9-ph+-10_amd64.deb
+ 218e764a92b73f8e8f3c5ae428ad06d6b002ac00 18539380 linux-image-4.12.9-ph+_4.12.9-ph+-10_amd64.deb
+ b6ee0678e7a331bc8aeaa618c617d98b20fc2a37 941486 linux-libc-dev_4.12.9-ph+-10_amd64.deb
+Checksums-Sha256:
+ a6927920a704573612b2def2b49f4bbb6c8b3c966d67317b980a3b04726668b1 1149 linux-4.12.9-ph+_4.12.9-ph+-10.dsc
+ 622480c1dafe067f79934ede171fb97f2f8a96da928468f105f6861be874350b 315567561 linux-4.12.9-ph+_4.12.9-ph+.orig.tar.gz
+ 5db20bfd3250de4a44121e80af43bb504092628dec50ba009d3f927ea4cb6845 1245 linux-4.12.9-ph+_4.12.9-ph+-10.debian.tar.gz
+ 25b3f7cf3b5d05cb055f4361ff217d724a456f614ddb18256cf3dfb207b91fbc 736622 linux-firmware-image-4.12.9-ph+_4.12.9-ph+-10_amd64.deb
+ c6d60e2f6acea432d958406a5f27cb6f3d82aecd456cbe263478a03b0872c9df 10674216 linux-headers-4.12.9-ph+_4.12.9-ph+-10_amd64.deb
+ 7f70a97b8d17176702584416f1277c86a3a6585d656558d76233283922431bab 18539380 linux-image-4.12.9-ph+_4.12.9-ph+-10_amd64.deb
+ 7e7234af2d15a041a97c10e2bb1b473fa7407fca44bfcd799ca6e84dc474d7cc 941486 linux-libc-dev_4.12.9-ph+-10_amd64.deb
+Files:
+ 43ce924ae84351a84ac1b5be64217d63 1149 kernel optional linux-4.12.9-ph+_4.12.9-ph+-10.dsc
+ 5a296e952ed3094b0338e55603a1cc69 315567561 kernel optional linux-4.12.9-ph+_4.12.9-ph+.orig.tar.gz
+ b4a90e5f3b50016696c9bbd1056cf83d 1245 kernel optional linux-4.12.9-ph+_4.12.9-ph+-10.debian.tar.gz
+ b33fa374cd676d779281a216c9dd9be5 736622 kernel optional linux-firmware-image-4.12.9-ph+_4.12.9-ph+-10_amd64.deb
+ ce79416cd6cc6100f4f2da08324b572f 10674216 kernel optional linux-headers-4.12.9-ph+_4.12.9-ph+-10_amd64.deb
+ c44491538a3f78e2e4b28df96eb2406f 18539380 kernel optional linux-image-4.12.9-ph+_4.12.9-ph+-10_amd64.deb
+ 2a7e1d8a2d25c73b7b6e7a311430aead 941486 devel optional linux-libc-dev_4.12.9-ph+-10_amd64.deb
