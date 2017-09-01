@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Thu, 31 Aug 2017 20:05:02 -0700
+Source: linux-4.12.10-ph+
+Binary: linux-image-4.12.10-ph+ linux-headers-4.12.10-ph+ linux-firmware-image-4.12.10-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.12.10-ph+-12
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia.lan>
+Changed-By: Anonymous <root@chromia.lan>
+Description:
+ linux-firmware-image-4.12.10-ph+ - Linux kernel firmware, version 4.12.10-ph+
+ linux-headers-4.12.10-ph+ - Linux kernel headers for 4.12.10-ph+ on ${kernel:debarch}
+ linux-image-4.12.10-ph+ - Linux kernel, version 4.12.10-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.12.10-ph+ (4.12.10-ph+-12) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 7647172c4936e6507800b7fc50a9581a8c9bf231 1173 linux-4.12.10-ph+_4.12.10-ph+-12.dsc
+ 54a2cdad55e87a23ba2f796a51e54c292230ec0e 315532895 linux-4.12.10-ph+_4.12.10-ph+.orig.tar.gz
+ a7ed87706b64076b68e6b5b061e2cf63de968291 1251 linux-4.12.10-ph+_4.12.10-ph+-12.debian.tar.gz
+ 667993ab2c07afa346e40d144c22296e2df174cf 736562 linux-firmware-image-4.12.10-ph+_4.12.10-ph+-12_amd64.deb
+ 05ac915691bd4431ff53f89e37836e1e4b44b4d1 10676430 linux-headers-4.12.10-ph+_4.12.10-ph+-12_amd64.deb
+ 5b255e8aaa28a9057f90802aae0418069373b755 18540522 linux-image-4.12.10-ph+_4.12.10-ph+-12_amd64.deb
+ cf68656d5c65a21b329baf6aad6df41d30d82c62 941760 linux-libc-dev_4.12.10-ph+-12_amd64.deb
+Checksums-Sha256:
+ 18a982c43fb533b54a1c4d29c8ef1f8418067d01a14224e7fcb3a3e4f91f76d2 1173 linux-4.12.10-ph+_4.12.10-ph+-12.dsc
+ c7f02b8391d6a2fe583405b9aac3a5963fe958a9d18a68a511808066e6b52690 315532895 linux-4.12.10-ph+_4.12.10-ph+.orig.tar.gz
+ a7abaa8b4ce16eb88852cb4bdbc9386711e263ecad3091064c3840650fdbd0a2 1251 linux-4.12.10-ph+_4.12.10-ph+-12.debian.tar.gz
+ 0772ea717d1b3ed4e39cdee4ea0cd67175483f1a8ecc436d16ef520e48b7fb8a 736562 linux-firmware-image-4.12.10-ph+_4.12.10-ph+-12_amd64.deb
+ cb9cf1520d558e4254036c619da5fc17b13986d993bd1a9b48e605b08cd18f9b 10676430 linux-headers-4.12.10-ph+_4.12.10-ph+-12_amd64.deb
+ 446c2a9a9ce9ca04cbbe45b157b6cfee5b5b9d765d8f562196988e08df1133c8 18540522 linux-image-4.12.10-ph+_4.12.10-ph+-12_amd64.deb
+ b81e58f27f04146b6e16147bc2d7d5d27bc3c0e6d1fd0b7196651c76c8452de3 941760 linux-libc-dev_4.12.10-ph+-12_amd64.deb
+Files:
+ a24699acded861592a973116bf747660 1173 kernel optional linux-4.12.10-ph+_4.12.10-ph+-12.dsc
+ 5c129055727dc3aaae553b1f14355cff 315532895 kernel optional linux-4.12.10-ph+_4.12.10-ph+.orig.tar.gz
+ 0c2939e80faa5cf69253246f40b07f35 1251 kernel optional linux-4.12.10-ph+_4.12.10-ph+-12.debian.tar.gz
+ 3f585de3fb149d307f7044a7b8b0df1b 736562 kernel optional linux-firmware-image-4.12.10-ph+_4.12.10-ph+-12_amd64.deb
+ 13cc64fd310a3600020dbd8217ef5623 10676430 kernel optional linux-headers-4.12.10-ph+_4.12.10-ph+-12_amd64.deb
+ 6abdab0f6f019104a38d439637433f02 18540522 kernel optional linux-image-4.12.10-ph+_4.12.10-ph+-12_amd64.deb
+ b82603c3012d9fd834dd25a76ee62b8b 941760 devel optional linux-libc-dev_4.12.10-ph+-12_amd64.deb
