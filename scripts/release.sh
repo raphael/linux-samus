@@ -27,15 +27,23 @@ if [[ $PKGREL == "" ]]; then
 fi
 if [[ $2 == "--continue" ]]; then
     NEWPKGREL=$PKGREL
+    NEWPKGVER=$PKGVER
 else 
     NEWPKGREL=$(($PKGREL+1))
+    REGEX='v(4\.[0-9]+)'
+    if [[ $KERNELVER =~ $REGEX ]]; then
+        NEWPKGVER=${BASH_REMATCH[1]}
+    else
+        echo "Invalid kernel version $KERNELVER"
+        exit 1
+    fi
+fi
+if [[ $PKGVER != $NEWPKGVER ]]; then
+    NEWPKGREL=1
 fi
 
-echo ROOT:               $ROOT
-echo PKGVER \(current\): $PKGVER
-echo PKGREL \(current\): $PKGREL
-echo PKGREL \(new\):     $NEWPKGREL
-echo KERNEL \(new\):     $KERNELVER
+echo "CURRENT: PKGVER=$PKGVER PKGREL=$PKGREL"
+echo "NEW:     PKGVER=$NEWPKGVER PKGREL=$NEWPKGREL"
 
 read -p "Proceed? " -n 1 -r
 echo
@@ -49,6 +57,8 @@ if [[ $2 != "--continue" ]]; then
     vim $ROOT/CHANGELOG.md
 
     echo Bump versions in scripts/archlinux/PKGBUILD and aur/PKGBUILD
+    sed -e "s/pkgver=.*/pkgver=${NEWPKGVER}/" -i $ROOT/aur/PKGBUILD
+    sed -e "s/pkgver=.*/pkgver=${NEWPKGVER}/" -i $ROOT/scripts/archlinux/PKGBUILD
     sed -e "s/pkgrel=.*/pkgrel=${NEWPKGREL}/" -i $ROOT/aur/PKGBUILD
     sed -e "s/pkgrel=.*/pkgrel=${NEWPKGREL}/" -i $ROOT/scripts/archlinux/PKGBUILD
 fi
@@ -73,7 +83,7 @@ ln -s ../../scripts/config .config
 
 echo Commit and push
 cd ${ROOT}
-TAG="v$PKGVER-$NEWPKGREL"
+TAG="v$NEWPKGVER-$NEWPKGREL"
 git add .
 git commit -m "release $TAG"
 git push origin master

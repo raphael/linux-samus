@@ -4,8 +4,8 @@
 
 pkgbase=linux-samus4
 _srcname=linux-patched
-pkgver=4.11
-pkgrel=6
+pkgver=4.13
+pkgrel=1
 arch=('i686' 'x86_64')
 url="https://github.com/raphael/linux-samus"
 license=('GPL2')
@@ -146,8 +146,9 @@ _package-headers() {
   cp arch/${KARCH}/kernel/asm-offsets.s "${pkgdir}/usr/lib/modules/${_kernver}/build/arch/${KARCH}/kernel/"
 
   # add docbook makefile
-  install -D -m644 Documentation/DocBook/Makefile \
-    "${pkgdir}/usr/lib/modules/${_kernver}/build/Documentation/DocBook/Makefile"
+  # v4.13: disabled
+  #install -D -m644 Documentation/DocBook/Makefile \
+  #  "${pkgdir}/usr/lib/modules/${_kernver}/build/Documentation/DocBook/Makefile"
 
   # add dm headers
   mkdir -p "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/md"
