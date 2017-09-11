@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Mon, 11 Sep 2017 14:53:52 -0700
+Source: linux-4.13.1-ph+
+Binary: linux-image-4.13.1-ph+ linux-headers-4.13.1-ph+ linux-firmware-image-4.13.1-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.13.1-ph+-17
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-firmware-image-4.13.1-ph+ - Linux kernel firmware, version 4.13.1-ph+
+ linux-headers-4.13.1-ph+ - Linux kernel headers for 4.13.1-ph+ on ${kernel:debarch}
+ linux-image-4.13.1-ph+ - Linux kernel, version 4.13.1-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.13.1-ph+ (4.13.1-ph+-17) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 307574328232c1ba8a549ca539ad97240bd765cf 1149 linux-4.13.1-ph+_4.13.1-ph+-17.dsc
+ b65fbf5556425e56db7b38d0b14b68526a800fb5 305042728 linux-4.13.1-ph+_4.13.1-ph+.orig.tar.gz
+ e4826391386f6ca46cb72dead9082ee07523fab6 1248 linux-4.13.1-ph+_4.13.1-ph+-17.debian.tar.gz
+ 0937ccbe49163a4c09827d14e666264f3c409ec5 736548 linux-firmware-image-4.13.1-ph+_4.13.1-ph+-17_amd64.deb
+ 001d3dadc395ad3dd4f1d27dafd67894bd195dd7 10763366 linux-headers-4.13.1-ph+_4.13.1-ph+-17_amd64.deb
+ 7c87cb1b0ae7d38980bb8635bcf8319c2b9369bb 18736824 linux-image-4.13.1-ph+_4.13.1-ph+-17_amd64.deb
+ dc043275c3c0c6a4067870c51612078af4f3005f 947046 linux-libc-dev_4.13.1-ph+-17_amd64.deb
+Checksums-Sha256:
+ 22a95c5e543c1d3fac1b38670acfcf3e531be13b8d125de63009c76d76fed827 1149 linux-4.13.1-ph+_4.13.1-ph+-17.dsc
+ ab8a7db47325f5e11d2c39a5287cd41e332a06f5ad3c2ed2d88bd4381023be2c 305042728 linux-4.13.1-ph+_4.13.1-ph+.orig.tar.gz
+ 84f482eadb2181f92a8808af15c81ec5d06f1cf44f738bd663a48a8e9a183176 1248 linux-4.13.1-ph+_4.13.1-ph+-17.debian.tar.gz
+ 585cfb847870ede54dbecea56fd7f2686cbb421d32499f5a53163c1a5ed12ddc 736548 linux-firmware-image-4.13.1-ph+_4.13.1-ph+-17_amd64.deb
+ 44e5a5d2c722e6dffba38e1cae0bb40a3f4676ff71c6fe025fe66cf356194b64 10763366 linux-headers-4.13.1-ph+_4.13.1-ph+-17_amd64.deb
+ 096c338065777253da7206cc7b867db80f852791ff8227471f8779285b57bef8 18736824 linux-image-4.13.1-ph+_4.13.1-ph+-17_amd64.deb
+ 8fa0aca998f142795a686ef13455ef12da14bc99d34ea50edf0b93058593d858 947046 linux-libc-dev_4.13.1-ph+-17_amd64.deb
+Files:
+ f580ff0af1c69a8e7383798be4ca1ec1 1149 kernel optional linux-4.13.1-ph+_4.13.1-ph+-17.dsc
+ c01d840d20f2a27b5266fe42a4b5c93e 305042728 kernel optional linux-4.13.1-ph+_4.13.1-ph+.orig.tar.gz
+ 864adf9d00cbbb891ac3bec239387472 1248 kernel optional linux-4.13.1-ph+_4.13.1-ph+-17.debian.tar.gz
+ b3d7f73ef4d3fdcbe8d1d347b15163e2 736548 kernel optional linux-firmware-image-4.13.1-ph+_4.13.1-ph+-17_amd64.deb
+ ed47baa2634cbba225ea28ba89dd68e0 10763366 kernel optional linux-headers-4.13.1-ph+_4.13.1-ph+-17_amd64.deb
+ b59a39fae880ecec541f24e5c84cdf1c 18736824 kernel optional linux-image-4.13.1-ph+_4.13.1-ph+-17_amd64.deb
+ 70f966525ab9e810ab588c80ad1866d7 947046 devel optional linux-libc-dev_4.13.1-ph+-17_amd64.deb
