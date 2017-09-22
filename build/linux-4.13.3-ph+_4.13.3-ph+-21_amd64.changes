@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Fri, 22 Sep 2017 10:05:47 -0700
+Source: linux-4.13.3-ph+
+Binary: linux-image-4.13.3-ph+ linux-headers-4.13.3-ph+ linux-firmware-image-4.13.3-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.13.3-ph+-21
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-firmware-image-4.13.3-ph+ - Linux kernel firmware, version 4.13.3-ph+
+ linux-headers-4.13.3-ph+ - Linux kernel headers for 4.13.3-ph+ on ${kernel:debarch}
+ linux-image-4.13.3-ph+ - Linux kernel, version 4.13.3-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.13.3-ph+ (4.13.3-ph+-21) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 10ec782fcfcdbe57f77d56bede25d2187f9e3f70 1149 linux-4.13.3-ph+_4.13.3-ph+-21.dsc
+ 61e41f8561edcd5f55ec634887ce976c22f3929a 305108701 linux-4.13.3-ph+_4.13.3-ph+.orig.tar.gz
+ 69690ad65c6deff7e9337d4eb2c3c52181662e83 1248 linux-4.13.3-ph+_4.13.3-ph+-21.debian.tar.gz
+ 23726bcf1fbcf993f01b2accb3bc25f574bfe342 736314 linux-firmware-image-4.13.3-ph+_4.13.3-ph+-21_amd64.deb
+ e7308f56b115bbd2ca15e028a80ed9ed08dd71d3 10762320 linux-headers-4.13.3-ph+_4.13.3-ph+-21_amd64.deb
+ 34dd4354ebe13ba5ae3baf266bbe04a53d166837 18736092 linux-image-4.13.3-ph+_4.13.3-ph+-21_amd64.deb
+ abfd60e018a32ac6131f2dc8e7cc2fba699e5036 947132 linux-libc-dev_4.13.3-ph+-21_amd64.deb
+Checksums-Sha256:
+ da83e652aba45466ce4cc2a15ae567942e73813710a901119a0f1ddaca8272cc 1149 linux-4.13.3-ph+_4.13.3-ph+-21.dsc
+ e66f08c95970b6a4a62fe733d73bfe3442b18a49c5e7e3453b0af04bd1364dd7 305108701 linux-4.13.3-ph+_4.13.3-ph+.orig.tar.gz
+ f115e015909215af67d9b173a1abbd811b3eee29ed5d841ec69eb7ada502fbb7 1248 linux-4.13.3-ph+_4.13.3-ph+-21.debian.tar.gz
+ 304f89199daad0c7f0e4b6bd187c9fadb0a36ffb83c745fb6ba340561be7c322 736314 linux-firmware-image-4.13.3-ph+_4.13.3-ph+-21_amd64.deb
+ 8a0313b11aaf0a3df51c8bce2727a5765c6781b19a7d59d901d5443092c3b59a 10762320 linux-headers-4.13.3-ph+_4.13.3-ph+-21_amd64.deb
+ 2029c297831e914048f4e29e3ae1cd91cf0259178b147a6cb05af2c7f6f3558e 18736092 linux-image-4.13.3-ph+_4.13.3-ph+-21_amd64.deb
+ 000b784f9273a42daf7d5d26a338dbabaf239744d88898e8fb3edea519ca0c7f 947132 linux-libc-dev_4.13.3-ph+-21_amd64.deb
+Files:
+ 9fb876f873eefa81661b3af2f7656f3c 1149 kernel optional linux-4.13.3-ph+_4.13.3-ph+-21.dsc
+ 3fe048696034b183f7d600efa8739e12 305108701 kernel optional linux-4.13.3-ph+_4.13.3-ph+.orig.tar.gz
+ 9c4d65965ea46efb840d7679b1b51828 1248 kernel optional linux-4.13.3-ph+_4.13.3-ph+-21.debian.tar.gz
+ a903cd32bbb859537ecc5f54685a9141 736314 kernel optional linux-firmware-image-4.13.3-ph+_4.13.3-ph+-21_amd64.deb
+ 30e3f1d938d0a0df85429458c78d146d 10762320 kernel optional linux-headers-4.13.3-ph+_4.13.3-ph+-21_amd64.deb
+ ab50743e8d34e971a2cd11ec17eea039 18736092 kernel optional linux-image-4.13.3-ph+_4.13.3-ph+-21_amd64.deb
+ 8d6c1fa2cf9bfa6f195a7d8595ce2319 947132 devel optional linux-libc-dev_4.13.3-ph+-21_amd64.deb
