@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Sat, 30 Sep 2017 02:46:22 -0700
+Source: linux-4.13.4-ph+
+Binary: linux-image-4.13.4-ph+ linux-headers-4.13.4-ph+ linux-firmware-image-4.13.4-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.13.4-ph+-23
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia.lan>
+Changed-By: Anonymous <root@chromia.lan>
+Description:
+ linux-firmware-image-4.13.4-ph+ - Linux kernel firmware, version 4.13.4-ph+
+ linux-headers-4.13.4-ph+ - Linux kernel headers for 4.13.4-ph+ on ${kernel:debarch}
+ linux-image-4.13.4-ph+ - Linux kernel, version 4.13.4-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.13.4-ph+ (4.13.4-ph+-23) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 63b79b8ce1b47daf58c7427a57caa16f88ca217a 1153 linux-4.13.4-ph+_4.13.4-ph+-23.dsc
+ 9147c3d24ff37f5152a4957f81a3c8942e31ad2f 305041643 linux-4.13.4-ph+_4.13.4-ph+.orig.tar.gz
+ ac501c36a90af9191b6550629b76dab6361c130d 1249 linux-4.13.4-ph+_4.13.4-ph+-23.debian.tar.gz
+ 67d63e18036dec137824e9d5952fc98c6b41e9f2 736448 linux-firmware-image-4.13.4-ph+_4.13.4-ph+-23_amd64.deb
+ 73724ad157c5fdbe9fc99d66341b20e98a2e4caa 10762592 linux-headers-4.13.4-ph+_4.13.4-ph+-23_amd64.deb
+ 34db8d3be462abce25b8f6cbe0fc25feb9585694 18741370 linux-image-4.13.4-ph+_4.13.4-ph+-23_amd64.deb
+ 65dfb8c6b49da673608bc6b0903e7f5e60a1cc5e 947102 linux-libc-dev_4.13.4-ph+-23_amd64.deb
+Checksums-Sha256:
+ 0d545865507e2a2b2470106974fedbfe32b79cfede8a62b49f943a13eead1ca3 1153 linux-4.13.4-ph+_4.13.4-ph+-23.dsc
+ 523609717d297acca86b4676ebcd029e0bff7fec40dc9b3bb25c9e633db0ff55 305041643 linux-4.13.4-ph+_4.13.4-ph+.orig.tar.gz
+ 89f1bb2ca59241baa6f1a25d322719ef3da64a6d45156f4b74976573796b07ec 1249 linux-4.13.4-ph+_4.13.4-ph+-23.debian.tar.gz
+ 7803bb00819c78439b14ada9b72b1d88505261bd62d8628d45a8bd07e96b4c9a 736448 linux-firmware-image-4.13.4-ph+_4.13.4-ph+-23_amd64.deb
+ 47fe6a119be95aca1b22c36a5bb282002338e5730075a4ad678eb05e54b462b0 10762592 linux-headers-4.13.4-ph+_4.13.4-ph+-23_amd64.deb
+ 30935dbec36741d5c6281f1e650d7fefb277f7d7970f4a03cbcf3d2267486736 18741370 linux-image-4.13.4-ph+_4.13.4-ph+-23_amd64.deb
+ f7fa88f7aa3a7d4fd904537f8fece7aa409a3e86237e3ec0b146d7ff9db521d4 947102 linux-libc-dev_4.13.4-ph+-23_amd64.deb
+Files:
+ f4f130248932433b73b8cf2c19feecd5 1153 kernel optional linux-4.13.4-ph+_4.13.4-ph+-23.dsc
+ 34f84e632c63c67febd6ab92944c2d48 305041643 kernel optional linux-4.13.4-ph+_4.13.4-ph+.orig.tar.gz
+ 39584e53a624b13cc4a0ea103463b649 1249 kernel optional linux-4.13.4-ph+_4.13.4-ph+-23.debian.tar.gz
+ 6f3ed71d976eb35bff9bd688dfc7e323 736448 kernel optional linux-firmware-image-4.13.4-ph+_4.13.4-ph+-23_amd64.deb
+ 52fc8e2ed0107c794965858a11309d0a 10762592 kernel optional linux-headers-4.13.4-ph+_4.13.4-ph+-23_amd64.deb
+ 209cf5cc9e409828c62a4aa712114594 18741370 kernel optional linux-image-4.13.4-ph+_4.13.4-ph+-23_amd64.deb
+ 39d1980894a6cbe84a94535da9620100 947102 devel optional linux-libc-dev_4.13.4-ph+-23_amd64.deb
