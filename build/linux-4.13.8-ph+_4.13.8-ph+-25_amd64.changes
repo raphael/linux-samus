@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Wed, 18 Oct 2017 11:29:18 -0700
+Source: linux-4.13.8-ph+
+Binary: linux-image-4.13.8-ph+ linux-headers-4.13.8-ph+ linux-firmware-image-4.13.8-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.13.8-ph+-25
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-firmware-image-4.13.8-ph+ - Linux kernel firmware, version 4.13.8-ph+
+ linux-headers-4.13.8-ph+ - Linux kernel headers for 4.13.8-ph+ on ${kernel:debarch}
+ linux-image-4.13.8-ph+ - Linux kernel, version 4.13.8-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.13.8-ph+ (4.13.8-ph+-25) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 2d6c8060badb3a2e125b02b99524f7b9187bb7f8 1149 linux-4.13.8-ph+_4.13.8-ph+-25.dsc
+ bb946ee1ac2ee6d8bbc405355569ecfc31349f6b 305298017 linux-4.13.8-ph+_4.13.8-ph+.orig.tar.gz
+ 99531cade762cc92ce8c71e722a3771ca7d1d316 1249 linux-4.13.8-ph+_4.13.8-ph+-25.debian.tar.gz
+ 5af9fb7a56d5490654f6e1199c6558d410f2906a 736204 linux-firmware-image-4.13.8-ph+_4.13.8-ph+-25_amd64.deb
+ 4b7aa768fb404dac283a6dac25fa4a968e2f136f 10808788 linux-headers-4.13.8-ph+_4.13.8-ph+-25_amd64.deb
+ c20b55e431df4faec7201ce75c27dee0f7237bd7 18744088 linux-image-4.13.8-ph+_4.13.8-ph+-25_amd64.deb
+ e6e2af56fffef6b38dc065b7aa0d12bd2bd5b0db 947450 linux-libc-dev_4.13.8-ph+-25_amd64.deb
+Checksums-Sha256:
+ 132e239dbfd5b6c035f22a4dbfaa2a52102ed44194393b1c376127d662fdf004 1149 linux-4.13.8-ph+_4.13.8-ph+-25.dsc
+ 8f9a73dfce48aab0ccaf294b92319309b03aff0cb6fd6fc4860aca22b0890779 305298017 linux-4.13.8-ph+_4.13.8-ph+.orig.tar.gz
+ 6d5aee0a2abcc46f98f2b3735c0a2d74490285fa3d4d8a67aede28f8088f4522 1249 linux-4.13.8-ph+_4.13.8-ph+-25.debian.tar.gz
+ 9748a734e2d9aa0e3b299dffb0b79236df57cc9dcd2f58d051497e33b1b6c037 736204 linux-firmware-image-4.13.8-ph+_4.13.8-ph+-25_amd64.deb
+ 3a824d0332b45f98cdfd5c2db1f74b1a209b62e7ecd00d38c81c18fbca7560cb 10808788 linux-headers-4.13.8-ph+_4.13.8-ph+-25_amd64.deb
+ 579016790cd75878f60e26023d88625a510ad7113748d699bcf2ca0961d8b22c 18744088 linux-image-4.13.8-ph+_4.13.8-ph+-25_amd64.deb
+ 7e36f6bb6d1303a92936c2980a0e97ba45485a20b64e712132d239e427dafb1b 947450 linux-libc-dev_4.13.8-ph+-25_amd64.deb
+Files:
+ 21b6bb42e751cfe8ca763493393eff45 1149 kernel optional linux-4.13.8-ph+_4.13.8-ph+-25.dsc
+ a373047f33eaa1d97e862ac8faf6747a 305298017 kernel optional linux-4.13.8-ph+_4.13.8-ph+.orig.tar.gz
+ fecb35a80cfc381568547ad8af126a77 1249 kernel optional linux-4.13.8-ph+_4.13.8-ph+-25.debian.tar.gz
+ 7709ceb09013fc4261bdeb3c27f90049 736204 kernel optional linux-firmware-image-4.13.8-ph+_4.13.8-ph+-25_amd64.deb
+ 4d65e51ca0015f8c9e6e2663d0ce59cb 10808788 kernel optional linux-headers-4.13.8-ph+_4.13.8-ph+-25_amd64.deb
+ 998dbc3a5f92ed345aa58cd4a0830573 18744088 kernel optional linux-image-4.13.8-ph+_4.13.8-ph+-25_amd64.deb
+ f479e1bef4bab9b118141936f6167416 947450 devel optional linux-libc-dev_4.13.8-ph+-25_amd64.deb
