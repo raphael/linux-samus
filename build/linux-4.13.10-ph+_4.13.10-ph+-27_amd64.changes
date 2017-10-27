@@ -1,0 +1,43 @@
+Format: 1.8
+Date: Fri, 27 Oct 2017 12:42:23 -0700
+Source: linux-4.13.10-ph+
+Binary: linux-image-4.13.10-ph+ linux-headers-4.13.10-ph+ linux-firmware-image-4.13.10-ph+ linux-libc-dev
+Architecture: source amd64 all
+Version: 4.13.10-ph+-27
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-firmware-image-4.13.10-ph+ - Linux kernel firmware, version 4.13.10-ph+
+ linux-headers-4.13.10-ph+ - Linux kernel headers for 4.13.10-ph+ on ${kernel:debarch}
+ linux-image-4.13.10-ph+ - Linux kernel, version 4.13.10-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.13.10-ph+ (4.13.10-ph+-27) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ e5a8d00d1fba6a2de087330115112f8d573b2094 1169 linux-4.13.10-ph+_4.13.10-ph+-27.dsc
+ 292214a95b8204f1f76f068e353d29575ad922d1 305141667 linux-4.13.10-ph+_4.13.10-ph+.orig.tar.gz
+ 741d1d8e7d4fb029b27c1c98fa77b47599bcd277 1249 linux-4.13.10-ph+_4.13.10-ph+-27.debian.tar.gz
+ 602941797b930f5883aa5a188fadaba7e140f876 736574 linux-firmware-image-4.13.10-ph+_4.13.10-ph+-27_amd64.deb
+ 9b61c9dfcfc4900f1645988e77db5b36439296c1 10808482 linux-headers-4.13.10-ph+_4.13.10-ph+-27_amd64.deb
+ 28f033f1691d506d0439f7c10e08329af3959c27 18743010 linux-image-4.13.10-ph+_4.13.10-ph+-27_amd64.deb
+ 49c9ceab62e91ac79f84899ab613fb0124dae929 947014 linux-libc-dev_4.13.10-ph+-27_amd64.deb
+Checksums-Sha256:
+ d5d3ef89bdcfdd3bda547088f3273341f4c35f6f7d20640d38bc6f5863915071 1169 linux-4.13.10-ph+_4.13.10-ph+-27.dsc
+ 12dfb571900cff1fb5032688e4b560df134467675f0d904713be4f2cec075406 305141667 linux-4.13.10-ph+_4.13.10-ph+.orig.tar.gz
+ 30ecf36e738eb0119678182d0b79db2f1fed1b3fb6c153e2e6950123790d440a 1249 linux-4.13.10-ph+_4.13.10-ph+-27.debian.tar.gz
+ aacd2bdc2a55d21f3c0c7c930269e4ca496b4151b459e4f89a1cf833c85d9370 736574 linux-firmware-image-4.13.10-ph+_4.13.10-ph+-27_amd64.deb
+ 675a5bf0a0b6ad82e34951ba6f38728f086644a6febed5669cabd02410e297ea 10808482 linux-headers-4.13.10-ph+_4.13.10-ph+-27_amd64.deb
+ 4f517e64e476d748f1da4fca6d0e7c6395411e0a309638d2c93d4724ab906255 18743010 linux-image-4.13.10-ph+_4.13.10-ph+-27_amd64.deb
+ 4ee0eac6736ded93210a8bf483e9b1e3c2391e7d935771932b96a5154ff218b6 947014 linux-libc-dev_4.13.10-ph+-27_amd64.deb
+Files:
+ 7d88bad60ddfb01cbd21647ec2448fb5 1169 kernel optional linux-4.13.10-ph+_4.13.10-ph+-27.dsc
+ df5c6a3ec970317b463ec1a5e7577f54 305141667 kernel optional linux-4.13.10-ph+_4.13.10-ph+.orig.tar.gz
+ 58f79044be1b939ecd199972a742f483 1249 kernel optional linux-4.13.10-ph+_4.13.10-ph+-27.debian.tar.gz
+ f8d9594befdf4d5dea8d3056e6e8675a 736574 kernel optional linux-firmware-image-4.13.10-ph+_4.13.10-ph+-27_amd64.deb
+ 3e07f229cbdc1a672b6e6b40f27c201d 10808482 kernel optional linux-headers-4.13.10-ph+_4.13.10-ph+-27_amd64.deb
+ 5bc18efc84d95f6355cc42c0c85a9e83 18743010 kernel optional linux-image-4.13.10-ph+_4.13.10-ph+-27_amd64.deb
+ a41972b65344bcdafde5843f19dd066e 947014 devel optional linux-libc-dev_4.13.10-ph+-27_amd64.deb
