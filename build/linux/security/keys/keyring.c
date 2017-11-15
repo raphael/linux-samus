@@ -459,34 +459,33 @@ static long keyring_read(const struct key *keyring,
 			 char __user *buffer, size_t buflen)
 {
 	struct keyring_read_iterator_context ctx;
-	unsigned long nr_keys;
-	int ret;
+	long ret;
 
 	kenter("{%d},,%zu", key_serial(keyring), buflen);
 
 	if (buflen & (sizeof(key_serial_t) - 1))
 		return -EINVAL;
 
-	nr_keys = keyring->keys.nr_leaves_on_tree;
-	if (nr_keys == 0)
-		return 0;
-
-	/* Calculate how much data we could return */
-	if (!buffer || !buflen)
-		return nr_keys * sizeof(key_serial_t);
-
-	/* Copy the IDs of the subscribed keys into the buffer */
-	ctx.buffer = (key_serial_t __user *)buffer;
-	ctx.buflen = buflen;
-	ctx.count = 0;
-	ret = assoc_array_iterate(&keyring->keys, keyring_read_iterator, &ctx);
-	if (ret < 0) {
-		kleave(" = %d [iterate]", ret);
-		return ret;
+	/* Copy as many key IDs as fit into the buffer */
+	if (buffer && buflen) {
+		ctx.buffer = (key_serial_t __user *)buffer;
+		ctx.buflen = buflen;
+		ctx.count = 0;
+		ret = assoc_array_iterate(&keyring->keys,
+					  keyring_read_iterator, &ctx);
+		if (ret < 0) {
+			kleave(" = %ld [iterate]", ret);
+			return ret;
+		}
 	}
 
-	kleave(" = %zu [ok]", ctx.count);
-	return ctx.count;
+	/* Return the size of the buffer needed */
+	ret = keyring->keys.nr_leaves_on_tree * sizeof(key_serial_t);
+	if (ret <= buflen)
+		kleave("= %ld [ok]", ret);
+	else
+		kleave("= %ld [buffer too small]", ret);
+	return ret;
 }
 
 /*
@@ -566,6 +565,8 @@ static int keyring_search_iterator(const void *object, void *iterator_data)
 
 	/* skip invalidated, revoked and expired keys */
 	if (ctx->flags & KEYRING_SEARCH_DO_STATE_CHECK) {
+		time_t expiry = READ_ONCE(key->expiry);
+
 		if (kflags & ((1 << KEY_FLAG_INVALIDATED) |
 			      (1 << KEY_FLAG_REVOKED))) {
 			ctx->result = ERR_PTR(-EKEYREVOKED);
@@ -573,7 +574,7 @@ static int keyring_search_iterator(const void *object, void *iterator_data)
 			goto skipped;
 		}
 
-		if (key->expiry && ctx->now.tv_sec >= key->expiry) {
+		if (expiry && ctx->now.tv_sec >= expiry) {
 			if (!(ctx->flags & KEYRING_SEARCH_SKIP_EXPIRED))
 				ctx->result = ERR_PTR(-EKEYEXPIRED);
 			kleave(" = %d [expire]", ctx->skipped_ret);

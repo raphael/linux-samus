@@ -1,0 +1,39 @@
+Format: 1.8
+Date: Tue, 14 Nov 2017 19:23:43 -0800
+Source: linux-4.14.0-ph+
+Binary: linux-image-4.14.0-ph+ linux-headers-4.14.0-ph+ linux-libc-dev
+Architecture: source amd64
+Version: 4.14.0-ph+-29
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia.lan>
+Changed-By: Anonymous <root@chromia.lan>
+Description:
+ linux-headers-4.14.0-ph+ - Linux kernel headers for 4.14.0-ph+ on ${kernel:debarch}
+ linux-image-4.14.0-ph+ - Linux kernel, version 4.14.0-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.14.0-ph+ (4.14.0-ph+-29) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ a5e2553683bb6172988b03031890f79e0f67a091 1054 linux-4.14.0-ph+_4.14.0-ph+-29.dsc
+ 19640bb335ba16c11b55590bcfed91be58e36b89 308349337 linux-4.14.0-ph+_4.14.0-ph+.orig.tar.gz
+ e74807977a8550228102d505b541b3fe097a3121 1215 linux-4.14.0-ph+_4.14.0-ph+-29.debian.tar.gz
+ 791b0af23fba179bd6f8e6a86d0a3f24fecc9394 10902230 linux-headers-4.14.0-ph+_4.14.0-ph+-29_amd64.deb
+ 55e6e75eff5bac9a686c0d594a6d56725a98bb20 18838066 linux-image-4.14.0-ph+_4.14.0-ph+-29_amd64.deb
+ e0befedddd496b960447bfaa12ffa65e0c7c1cdc 959898 linux-libc-dev_4.14.0-ph+-29_amd64.deb
+Checksums-Sha256:
+ b63cf89bba2ba94974ad10049b1b89cfec01c7677966b745b7f235765b605e1c 1054 linux-4.14.0-ph+_4.14.0-ph+-29.dsc
+ 52734d2c7dfb1a6cfff0f4a8466ccc44c5c2f89d20722a6fe7161491af5fca02 308349337 linux-4.14.0-ph+_4.14.0-ph+.orig.tar.gz
+ a64e8fad8382efd22c1575834dd0498638240399b6bb58f0f311a7a9ebc6f13e 1215 linux-4.14.0-ph+_4.14.0-ph+-29.debian.tar.gz
+ ae448a4695dea6686d67e64b2348dfdbe3212e28f96e453c7acde0f08980d258 10902230 linux-headers-4.14.0-ph+_4.14.0-ph+-29_amd64.deb
+ 63c2963a10fdaf3ad36500bb6b1b488d14c4760df8b844bff9a1f567b703613d 18838066 linux-image-4.14.0-ph+_4.14.0-ph+-29_amd64.deb
+ 59810cce9064f0515213eb5c8d52f00416cdea56be40310fa404cc7116da19b7 959898 linux-libc-dev_4.14.0-ph+-29_amd64.deb
+Files:
+ fb90d3e194fa5e9d47bf08857fc24816 1054 kernel optional linux-4.14.0-ph+_4.14.0-ph+-29.dsc
+ 5a74af9220cb6be9b4740523d7d13417 308349337 kernel optional linux-4.14.0-ph+_4.14.0-ph+.orig.tar.gz
+ 51feecceb941cd2397302f318d08dd6a 1215 kernel optional linux-4.14.0-ph+_4.14.0-ph+-29.debian.tar.gz
+ c3a2c383976445c3e2ad693eca1b0328 10902230 kernel optional linux-headers-4.14.0-ph+_4.14.0-ph+-29_amd64.deb
+ b891611727d198608fb468b79dae7331 18838066 kernel optional linux-image-4.14.0-ph+_4.14.0-ph+-29_amd64.deb
+ 92bb649b07fd1806af8113481a5f8e8f 959898 devel optional linux-libc-dev_4.14.0-ph+-29_amd64.deb
