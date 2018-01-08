@@ -1,0 +1,39 @@
+Format: 1.8
+Date: Mon, 08 Jan 2018 15:13:51 -0800
+Source: linux-4.14.12-ph+
+Binary: linux-image-4.14.12-ph+ linux-headers-4.14.12-ph+ linux-libc-dev
+Architecture: source amd64
+Version: 4.14.12-ph+-33
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia.lan>
+Changed-By: Anonymous <root@chromia.lan>
+Description:
+ linux-headers-4.14.12-ph+ - Linux kernel headers for 4.14.12-ph+ on ${kernel:debarch}
+ linux-image-4.14.12-ph+ - Linux kernel, version 4.14.12-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.14.12-ph+ (4.14.12-ph+-33) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 67579e8c9fffe935f807123ef639e3a5864fbd14 1072 linux-4.14.12-ph+_4.14.12-ph+-33.dsc
+ d69f89ea1994767b0a20e4c6d7983f285138b0f4 323993257 linux-4.14.12-ph+_4.14.12-ph+.orig.tar.gz
+ a44cb7dbed9f94abe4641bb0d831ce8b6de1f3ed 1212 linux-4.14.12-ph+_4.14.12-ph+-33.debian.tar.gz
+ ca930366ca50e7d4387dd4f1a888f9c3a69722a8 11059144 linux-headers-4.14.12-ph+_4.14.12-ph+-33_amd64.deb
+ f1d5651e627578d7512517615bc9a88019e75c6c 20457876 linux-image-4.14.12-ph+_4.14.12-ph+-33_amd64.deb
+ 6dae16db9c36d0150b20ffdea4c1294ea745921d 959932 linux-libc-dev_4.14.12-ph+-33_amd64.deb
+Checksums-Sha256:
+ 137d19081906b3fb1239e40ff9136a530a0cf0ad3c06eab89845fac6e2cf846d 1072 linux-4.14.12-ph+_4.14.12-ph+-33.dsc
+ fe6b087a1531cf25c0b84239f2db49f9dfe1db222b6efbf8add7fe6ff191ca28 323993257 linux-4.14.12-ph+_4.14.12-ph+.orig.tar.gz
+ fac6737821999d3a1e4885b11b508816e64b5728c1c2a76719675cde019d6f20 1212 linux-4.14.12-ph+_4.14.12-ph+-33.debian.tar.gz
+ 19f3d356cdd1689a57c271473155eee5fca0397628cdf3979dd281d9e6faf7e4 11059144 linux-headers-4.14.12-ph+_4.14.12-ph+-33_amd64.deb
+ 7454ca9179d32e046788f3f492e01a145750f7ccd4c12da1b79a09fc3ceb7996 20457876 linux-image-4.14.12-ph+_4.14.12-ph+-33_amd64.deb
+ acc68ff142876b326a1c4061adf9458682e4badd70107391a023f9de4b204663 959932 linux-libc-dev_4.14.12-ph+-33_amd64.deb
+Files:
+ 26be381b8091c8fd6fd10529e09abd65 1072 kernel optional linux-4.14.12-ph+_4.14.12-ph+-33.dsc
+ 6dc7f0532aaff754bac3da21f9ef78ad 323993257 kernel optional linux-4.14.12-ph+_4.14.12-ph+.orig.tar.gz
+ 9c01f1aa924e58382bffd51c413140fc 1212 kernel optional linux-4.14.12-ph+_4.14.12-ph+-33.debian.tar.gz
+ 1640fb19e2c802581506d828c226b6bb 11059144 kernel optional linux-headers-4.14.12-ph+_4.14.12-ph+-33_amd64.deb
+ 21aa13c8e2af8d2940ae3de001a194e6 20457876 kernel optional linux-image-4.14.12-ph+_4.14.12-ph+-33_amd64.deb
+ 3ad7a6c844be74a3c3d37d83912ef114 959932 devel optional linux-libc-dev_4.14.12-ph+-33_amd64.deb
