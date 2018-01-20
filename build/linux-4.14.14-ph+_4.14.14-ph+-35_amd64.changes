@@ -1,0 +1,39 @@
+Format: 1.8
+Date: Fri, 19 Jan 2018 16:02:24 -0800
+Source: linux-4.14.14-ph+
+Binary: linux-image-4.14.14-ph+ linux-headers-4.14.14-ph+ linux-libc-dev
+Architecture: source amd64
+Version: 4.14.14-ph+-35
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-headers-4.14.14-ph+ - Linux kernel headers for 4.14.14-ph+ on ${kernel:debarch}
+ linux-image-4.14.14-ph+ - Linux kernel, version 4.14.14-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.14.14-ph+ (4.14.14-ph+-35) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ febea6dedd2eaed555f16c837b61ab2f6c21a337 1068 linux-4.14.14-ph+_4.14.14-ph+-35.dsc
+ 68ec0910b64b4ac3152f9e0b7f07ccde6f90343d 324282479 linux-4.14.14-ph+_4.14.14-ph+.orig.tar.gz
+ f56191cef277e7dca3bd35e9cb87e4bd4fe1bd1c 1209 linux-4.14.14-ph+_4.14.14-ph+-35.debian.tar.gz
+ 84ff6b350ae041817e55e3f565fbecae1514152f 11061536 linux-headers-4.14.14-ph+_4.14.14-ph+-35_amd64.deb
+ 824be4030c5126023c9f058f60e466953c07eaa8 20463188 linux-image-4.14.14-ph+_4.14.14-ph+-35_amd64.deb
+ ddbc60dee9b304f495b03af2aa5639520f287089 959992 linux-libc-dev_4.14.14-ph+-35_amd64.deb
+Checksums-Sha256:
+ ac3d446100b94e9792f2a1a25574a019b183b446839504f8a5f56b9495e93a82 1068 linux-4.14.14-ph+_4.14.14-ph+-35.dsc
+ 0c0680fcf557c7a5cd1cab2f219c1dd6c61ca8015f34310c23d1708f9e6aad25 324282479 linux-4.14.14-ph+_4.14.14-ph+.orig.tar.gz
+ 7721fa76b27c170f2c9267ad77df53ff05fd8c4ca899dceb4831c72545f58150 1209 linux-4.14.14-ph+_4.14.14-ph+-35.debian.tar.gz
+ 88bec05f604ce4bd481950dd4b077dd75aff2f8b1d3895562c17d7a6819262c1 11061536 linux-headers-4.14.14-ph+_4.14.14-ph+-35_amd64.deb
+ fa76b1ce5bd22c9c8822006afd107609bb97ee6cc5b4e1ab269c5bd7ab8ae9f8 20463188 linux-image-4.14.14-ph+_4.14.14-ph+-35_amd64.deb
+ 56ae770d51ebd3cb683b013517b42dd790b0722f2098bc5cdaa6d7d1d0723e8b 959992 linux-libc-dev_4.14.14-ph+-35_amd64.deb
+Files:
+ 6db9e0746e3b9005936bd2a42d5b08d4 1068 kernel optional linux-4.14.14-ph+_4.14.14-ph+-35.dsc
+ 49b024c85fd4e59e2a83cdf4901fa702 324282479 kernel optional linux-4.14.14-ph+_4.14.14-ph+.orig.tar.gz
+ f2ef594d18c45a416b30d8af96ad7dc4 1209 kernel optional linux-4.14.14-ph+_4.14.14-ph+-35.debian.tar.gz
+ f9acde1a7032cec889cb03acbbc14776 11061536 kernel optional linux-headers-4.14.14-ph+_4.14.14-ph+-35_amd64.deb
+ 18d4eb9fc2a60f970def79bad9ea5f41 20463188 kernel optional linux-image-4.14.14-ph+_4.14.14-ph+-35_amd64.deb
+ 38331d258f8688ec1e9a42130a37409c 959992 devel optional linux-libc-dev_4.14.14-ph+-35_amd64.deb
