@@ -53,13 +53,17 @@ ENTRY(native_usergs_sysret64)
 END(native_usergs_sysret64)
 #endif /* CONFIG_PARAVIRT */
 
-.macro TRACE_IRQS_IRETQ
+.macro TRACE_IRQS_FLAGS flags:req
 #ifdef CONFIG_TRACE_IRQFLAGS
-	bt	$9, EFLAGS(%rsp)		/* interrupts off? */
+	bt	$9, \flags		/* interrupts off? */
 	jnc	1f
 	TRACE_IRQS_ON
 1:
 #endif
+.endm
+
+.macro TRACE_IRQS_IRETQ
+	TRACE_IRQS_FLAGS EFLAGS(%rsp)
 .endm
 
 /*
@@ -485,6 +489,17 @@ ENTRY(__switch_to_asm)
 #ifdef CONFIG_CC_STACKPROTECTOR
 	movq	TASK_stack_canary(%rsi), %rbx
 	movq	%rbx, PER_CPU_VAR(irq_stack_union)+stack_canary_offset
+#endif
+
+#ifdef CONFIG_RETPOLINE
+	/*
+	 * When switching from a shallower to a deeper call stack
+	 * the RSB may either underflow or use entries populated
+	 * with userspace addresses. On CPUs where those concerns
+	 * exist, overwrite the RSB with entries which capture
+	 * speculative execution to prevent attack.
+	 */
+	FILL_RETURN_BUFFER %r12, RSB_CLEAR_LOOPS, X86_FEATURE_RSB_CTXSW
 #endif
 
 	/* restore callee-saved registers */
@@ -1098,11 +1113,13 @@ ENTRY(native_load_gs_index)
 	FRAME_BEGIN
 	pushfq
 	DISABLE_INTERRUPTS(CLBR_ANY & ~CLBR_RDI)
+	TRACE_IRQS_OFF
 	SWAPGS
 .Lgs_change:
 	movl	%edi, %gs
 2:	ALTERNATIVE "", "mfence", X86_BUG_SWAPGS_FENCE
 	SWAPGS
+	TRACE_IRQS_FLAGS (%rsp)
 	popfq
 	FRAME_END
 	ret
@@ -1247,7 +1264,7 @@ idtentry async_page_fault	do_async_page_fault	has_error_code=1
 #endif
 
 #ifdef CONFIG_X86_MCE
-idtentry machine_check					has_error_code=0	paranoid=1 do_sym=*machine_check_vector(%rip)
+idtentry machine_check		do_mce			has_error_code=0	paranoid=1
 #endif
 
 /*

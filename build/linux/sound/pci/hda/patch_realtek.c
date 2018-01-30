@@ -1809,6 +1809,7 @@ enum {
 	ALC887_FIXUP_ASUS_BASS,
 	ALC887_FIXUP_BASS_CHMAP,
 	ALC1220_FIXUP_GB_DUAL_CODECS,
+	ALC1220_FIXUP_CLEVO_P950,
 };
 
 static void alc889_fixup_coef(struct hda_codec *codec,
@@ -2024,6 +2025,23 @@ static void alc1220_fixup_gb_dual_codecs(struct hda_codec *codec,
 			   "Front-Panel Capture Switch");
 		break;
 	}
+}
+
+static void alc1220_fixup_clevo_p950(struct hda_codec *codec,
+				     const struct hda_fixup *fix,
+				     int action)
+{
+	hda_nid_t conn1[1] = { 0x0c };
+
+	if (action != HDA_FIXUP_ACT_PRE_PROBE)
+		return;
+
+	alc_update_coef_idx(codec, 0x7, 0, 0x3c3);
+	/* We therefore want to make sure 0x14 (front headphone) and
+	 * 0x1b (speakers) use the stereo DAC 0x02
+	 */
+	snd_hda_override_conn_list(codec, 0x14, 1, conn1);
+	snd_hda_override_conn_list(codec, 0x1b, 1, conn1);
 }
 
 static const struct hda_fixup alc882_fixups[] = {
@@ -2266,6 +2284,10 @@ static const struct hda_fixup alc882_fixups[] = {
 		.type = HDA_FIXUP_FUNC,
 		.v.func = alc1220_fixup_gb_dual_codecs,
 	},
+	[ALC1220_FIXUP_CLEVO_P950] = {
+		.type = HDA_FIXUP_FUNC,
+		.v.func = alc1220_fixup_clevo_p950,
+	},
 };
 
 static const struct snd_pci_quirk alc882_fixup_tbl[] = {
@@ -2339,6 +2361,7 @@ static const struct snd_pci_quirk alc882_fixup_tbl[] = {
 	SND_PCI_QUIRK(0x1462, 0xda57, "MSI Z270-Gaming", ALC1220_FIXUP_GB_DUAL_CODECS),
 	SND_PCI_QUIRK_VENDOR(0x1462, "MSI", ALC882_FIXUP_GPIO3),
 	SND_PCI_QUIRK(0x147b, 0x107a, "Abit AW9D-MAX", ALC882_FIXUP_ABIT_AW9D_MAX),
+	SND_PCI_QUIRK(0x1558, 0x9501, "Clevo P950HR", ALC1220_FIXUP_CLEVO_P950),
 	SND_PCI_QUIRK_VENDOR(0x1558, "Clevo laptop", ALC882_FIXUP_EAPD),
 	SND_PCI_QUIRK(0x161f, 0x2054, "Medion laptop", ALC883_FIXUP_EAPD),
 	SND_PCI_QUIRK(0x17aa, 0x3a0d, "Lenovo Y530", ALC882_FIXUP_LENOVO_Y530),
@@ -6173,6 +6196,7 @@ static const struct snd_pci_quirk alc269_fixup_tbl[] = {
 	SND_PCI_QUIRK(0x1028, 0x075b, "Dell XPS 13 9360", ALC256_FIXUP_DELL_XPS_13_HEADPHONE_NOISE),
 	SND_PCI_QUIRK(0x1028, 0x075d, "Dell AIO", ALC298_FIXUP_SPK_VOLUME),
 	SND_PCI_QUIRK(0x1028, 0x0798, "Dell Inspiron 17 7000 Gaming", ALC256_FIXUP_DELL_INSPIRON_7559_SUBWOOFER),
+	SND_PCI_QUIRK(0x1028, 0x082a, "Dell XPS 13 9360", ALC256_FIXUP_DELL_XPS_13_HEADPHONE_NOISE),
 	SND_PCI_QUIRK(0x1028, 0x164a, "Dell", ALC293_FIXUP_DELL1_MIC_NO_PRESENCE),
 	SND_PCI_QUIRK(0x1028, 0x164b, "Dell", ALC293_FIXUP_DELL1_MIC_NO_PRESENCE),
 	SND_PCI_QUIRK(0x103c, 0x1586, "HP", ALC269_FIXUP_HP_MUTE_LED_MIC2),
@@ -6408,6 +6432,7 @@ static const struct hda_model_fixup alc269_fixup_models[] = {
 	{.id = ALC292_FIXUP_TPT440, .name = "tpt440"},
 	{.id = ALC292_FIXUP_TPT460, .name = "tpt460"},
 	{.id = ALC233_FIXUP_LENOVO_MULTI_CODECS, .name = "dual-codecs"},
+	{.id = ALC700_FIXUP_INTEL_REFERENCE, .name = "alc700-ref"},
 	{}
 };
 #define ALC225_STANDARD_PINS \
@@ -6470,6 +6495,10 @@ static const struct snd_hda_pin_quirk alc269_pin_fixup_tbl[] = {
 		ALC225_STANDARD_PINS,
 		{0x12, 0xb7a60130},
 		{0x1b, 0x90170110}),
+	SND_HDA_PIN_QUIRK(0x10ec0233, 0x8086, "Intel NUC Skull Canyon", ALC269_FIXUP_DELL1_MIC_NO_PRESENCE,
+		{0x1b, 0x01111010},
+		{0x1e, 0x01451130},
+		{0x21, 0x02211020}),
 	SND_HDA_PIN_QUIRK(0x10ec0236, 0x1028, "Dell", ALC255_FIXUP_DELL1_MIC_NO_PRESENCE,
 		{0x12, 0x90a60140},
 		{0x14, 0x90170110},
