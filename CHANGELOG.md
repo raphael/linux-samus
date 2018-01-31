@@ -1,3 +1,7 @@
+v4.15-3 2018-01-30
+--------------------
+Fix error `ASoC: CPU DAI System Pin not registered`
+
 v4.15-2 2018-01-30
 --------------------
 Re-enable sound
