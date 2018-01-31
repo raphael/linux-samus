@@ -1,0 +1,39 @@
+Format: 1.8
+Date: Tue, 30 Jan 2018 23:51:31 -0800
+Source: linux-4.15.0-ph+
+Binary: linux-image-4.15.0-ph+ linux-headers-4.15.0-ph+ linux-libc-dev
+Architecture: source amd64
+Version: 4.15.0-ph+-45
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia.lan>
+Changed-By: Anonymous <root@chromia.lan>
+Description:
+ linux-headers-4.15.0-ph+ - Linux kernel headers for 4.15.0-ph+ on ${kernel:debarch}
+ linux-image-4.15.0-ph+ - Linux kernel, version 4.15.0-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.15.0-ph+ (4.15.0-ph+-45) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ d238e9336a4e7a74d94d59d5dd2614dcf40a2c20 1054 linux-4.15.0-ph+_4.15.0-ph+-45.dsc
+ e6036efd4e8ed1af0038819f6a399cc0d42d2998 328139270 linux-4.15.0-ph+_4.15.0-ph+.orig.tar.gz
+ d3c2c7b377c9586bb2ab3b6c43cfe7a8ddf69088 1216 linux-4.15.0-ph+_4.15.0-ph+-45.debian.tar.gz
+ 93ba33e3d4dea82450dbb5eebe0ba19758d033ec 11184154 linux-headers-4.15.0-ph+_4.15.0-ph+-45_amd64.deb
+ 7338c2369aa1e72a1d49a0441ac268173ddd1b13 20678212 linux-image-4.15.0-ph+_4.15.0-ph+-45_amd64.deb
+ 000af94620deec1739630a0e68ec6ff6d667b392 967238 linux-libc-dev_4.15.0-ph+-45_amd64.deb
+Checksums-Sha256:
+ 2d7bede8a2c0610d58d819b4e72a37862d27a63e588977e0bb28a2cf77193179 1054 linux-4.15.0-ph+_4.15.0-ph+-45.dsc
+ f54b28bcf62bdeff8ab95234b76cfd5db467359b3a90bd776aff5bf63461b39e 328139270 linux-4.15.0-ph+_4.15.0-ph+.orig.tar.gz
+ a0296861da1d6399be187a40d70c52bcd7a403e7f779ea4e392c69b2b68682be 1216 linux-4.15.0-ph+_4.15.0-ph+-45.debian.tar.gz
+ 25b87c6bf0268510a2ebbb810e700a62b49cfb83426c75fc0be733f12c47aae5 11184154 linux-headers-4.15.0-ph+_4.15.0-ph+-45_amd64.deb
+ 85bae2ad1c56c44e4d0c8f6aaebd33611f03f1f52b6e2a49b5d437372c8a9ec0 20678212 linux-image-4.15.0-ph+_4.15.0-ph+-45_amd64.deb
+ d9931b0af4f8a437a7c69ac7b6c65fe5709205cd4b2ed2e91ffcddd1afc245c8 967238 linux-libc-dev_4.15.0-ph+-45_amd64.deb
+Files:
+ c0f9e3fc7b72563482d29cffd6b34cda 1054 kernel optional linux-4.15.0-ph+_4.15.0-ph+-45.dsc
+ 966fbd5aa5f04b640f0f1ebf33936145 328139270 kernel optional linux-4.15.0-ph+_4.15.0-ph+.orig.tar.gz
+ e487717b87d16a656b1aa7a86a8003ec 1216 kernel optional linux-4.15.0-ph+_4.15.0-ph+-45.debian.tar.gz
+ 25b2bfcc94e99e464d388e8bcfb06686 11184154 kernel optional linux-headers-4.15.0-ph+_4.15.0-ph+-45_amd64.deb
+ 34d285d8c315a0b16d65a27c7d31a725 20678212 kernel optional linux-image-4.15.0-ph+_4.15.0-ph+-45_amd64.deb
+ 6336a31a7b15455d08bb211f36bcbdd4 967238 devel optional linux-libc-dev_4.15.0-ph+-45_amd64.deb
