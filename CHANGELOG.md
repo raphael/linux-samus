@@ -1,3 +1,11 @@
+v4.15-6 2018-01-30
+--------------------
+Initial working 4.15 release
+
+v4.15-5 2018-01-30
+--------------------
+Update config to vanilla kernel
+
 v4.15-4 2018-01-30
 --------------------
 Fix error `ASoC: CPU DAI System Pin not registered`

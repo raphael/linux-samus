@@ -15,7 +15,7 @@ export KDEB_CHANGELOG_DIST=vivid
 export DEB_BUILD_OPTIONS=parallel=4
 
 # Don't clean - we just compiled
-sed -i '/\t\$(MAKE) clean/ c\\#' scripts/package/Makefile
+sed -i '/\t\$(MAKE) clean/ c\\#' scripts/package/builddeb
 
 make deb-pkg -j4
 if [ $? -ne 0 ]; then

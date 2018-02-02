@@ -15,10 +15,10 @@ if [[ "$TAG" == "" ]]; then
 fi
 
 export CLEAN=1
-#if [[ "$2" == "--noclean" ]]; then
+if [[ "$2" == "--noclean" ]]; then
     export CLEAN=0
     echo "Skipping cleanup"
-#fi
+fi
 
 if [ ! -d $LINUX ]; then
   echo $LINUX does not exist, cannot proceed.
