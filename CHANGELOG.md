@@ -1,3 +1,8 @@
+v4.15-4 2018-01-30
+--------------------
+Fix error `ASoC: CPU DAI System Pin not registered`
+(really)
+
 v4.15-3 2018-01-30
 --------------------
 Fix error `ASoC: CPU DAI System Pin not registered`
