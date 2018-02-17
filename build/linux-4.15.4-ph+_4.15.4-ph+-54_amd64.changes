@@ -1,0 +1,39 @@
+Format: 1.8
+Date: Sat, 17 Feb 2018 14:10:33 -0800
+Source: linux-4.15.4-ph+
+Binary: linux-image-4.15.4-ph+ linux-headers-4.15.4-ph+ linux-libc-dev
+Architecture: source amd64
+Version: 4.15.4-ph+-54
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia.lan>
+Changed-By: Anonymous <root@chromia.lan>
+Description:
+ linux-headers-4.15.4-ph+ - Linux kernel headers for 4.15.4-ph+ on ${kernel:debarch}
+ linux-image-4.15.4-ph+ - Linux kernel, version 4.15.4-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.15.4-ph+ (4.15.4-ph+-54) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ c2b94ad60e1ce88cd7ab921bfc9c2bda67ab8a5e 1054 linux-4.15.4-ph+_4.15.4-ph+-54.dsc
+ 0a6d537c88dbffa3e5c1b46f659f4d577f941aad 163103314 linux-4.15.4-ph+_4.15.4-ph+.orig.tar.gz
+ 2fc44cf9ece05c29bffb367ab6080f832931359f 1213 linux-4.15.4-ph+_4.15.4-ph+-54.debian.tar.gz
+ 3256ea0f955fef0838ee04873084560fde3930f3 11391762 linux-headers-4.15.4-ph+_4.15.4-ph+-54_amd64.deb
+ 18d8c9999d671191c89bc44ac025d41900fa5018 52887692 linux-image-4.15.4-ph+_4.15.4-ph+-54_amd64.deb
+ f5faf4c4860081ea1d4fe016a3e1f540460cbf64 967118 linux-libc-dev_4.15.4-ph+-54_amd64.deb
+Checksums-Sha256:
+ 2bfd192e5970bd5320abec506d09258cc668b740b5e99e92dc3d944311895930 1054 linux-4.15.4-ph+_4.15.4-ph+-54.dsc
+ 305da18fc115fa7041af7920e83eb640fdf7a6a6cc58b5ce34c95b9a2c0b8138 163103314 linux-4.15.4-ph+_4.15.4-ph+.orig.tar.gz
+ 032cd232aec6a2f150d829b16d20fe45fe50953ef29ee48a986c979868bf40de 1213 linux-4.15.4-ph+_4.15.4-ph+-54.debian.tar.gz
+ 3d9ac761353738b0b9ba7a50451ac549822f0603a4200018f7cdf380e0191eb1 11391762 linux-headers-4.15.4-ph+_4.15.4-ph+-54_amd64.deb
+ ebdda4539f6e031696676622338f2e07ef2acbee83e9c80e2d49a7eaeef784f6 52887692 linux-image-4.15.4-ph+_4.15.4-ph+-54_amd64.deb
+ 486c5bb22ee4f004daa186a860aa6b4ce71602c2d2dd05922f7811ceb31051f7 967118 linux-libc-dev_4.15.4-ph+-54_amd64.deb
+Files:
+ 95c9a9f02964c8588a8c225145c8d3f1 1054 kernel optional linux-4.15.4-ph+_4.15.4-ph+-54.dsc
+ 3aa789145fd69ce08b892fc75f8a90be 163103314 kernel optional linux-4.15.4-ph+_4.15.4-ph+.orig.tar.gz
+ aea142084846dfc645873fd1794becfc 1213 kernel optional linux-4.15.4-ph+_4.15.4-ph+-54.debian.tar.gz
+ 3debdbb6c691298f65064671907fdab0 11391762 kernel optional linux-headers-4.15.4-ph+_4.15.4-ph+-54_amd64.deb
+ db3138b482de943b978c612867f1c3ab 52887692 kernel optional linux-image-4.15.4-ph+_4.15.4-ph+-54_amd64.deb
+ dc25d086b3235cf4ef8f05828f6910f0 967118 devel optional linux-libc-dev_4.15.4-ph+-54_amd64.deb
