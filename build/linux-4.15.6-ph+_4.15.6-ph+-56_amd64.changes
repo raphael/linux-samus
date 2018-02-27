@@ -1,0 +1,39 @@
+Format: 1.8
+Date: Tue, 27 Feb 2018 14:55:35 -0800
+Source: linux-4.15.6-ph+
+Binary: linux-image-4.15.6-ph+ linux-headers-4.15.6-ph+ linux-libc-dev
+Architecture: source amd64
+Version: 4.15.6-ph+-56
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-headers-4.15.6-ph+ - Linux kernel headers for 4.15.6-ph+ on ${kernel:debarch}
+ linux-image-4.15.6-ph+ - Linux kernel, version 4.15.6-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.15.6-ph+ (4.15.6-ph+-56) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 8a2f146d7b44762c80324533a80c1e851d35d314 1050 linux-4.15.6-ph+_4.15.6-ph+-56.dsc
+ 6a630b8b2da618e359dff0e40da05017d75d5f01 162866723 linux-4.15.6-ph+_4.15.6-ph+.orig.tar.gz
+ 8413393b03c9a9acba8afd1ad0ed4c50c86d4917 1211 linux-4.15.6-ph+_4.15.6-ph+-56.debian.tar.gz
+ c929df34681ad08cb6fe19a5b3c1dc50d6c7be28 11388522 linux-headers-4.15.6-ph+_4.15.6-ph+-56_amd64.deb
+ 09cfc9f771c4c299ef55d827eec4bc9e09c7c0fb 52897268 linux-image-4.15.6-ph+_4.15.6-ph+-56_amd64.deb
+ 3b39dd010ada146771202493b292e7bc8d9797d0 967020 linux-libc-dev_4.15.6-ph+-56_amd64.deb
+Checksums-Sha256:
+ 7906e4ef48c80b2dea37ad5208852cf47ac36483161563e7f051201b3344c1bb 1050 linux-4.15.6-ph+_4.15.6-ph+-56.dsc
+ 746f6adc315ce6207832a55a73515bf07e44518be5ca8c917e20781c74a50117 162866723 linux-4.15.6-ph+_4.15.6-ph+.orig.tar.gz
+ cec968e948b7ec7da9509a3394c0eecdc346c882356ebff2aac491b551e4623b 1211 linux-4.15.6-ph+_4.15.6-ph+-56.debian.tar.gz
+ f7a9c7ac60a0b492c390b6b4b18dc2ae8a88319587581dd0da24d9560c22ab27 11388522 linux-headers-4.15.6-ph+_4.15.6-ph+-56_amd64.deb
+ f1b33503cb235fbdfd787849a883e84d769b884b1b517f269a0f50ca8da10e85 52897268 linux-image-4.15.6-ph+_4.15.6-ph+-56_amd64.deb
+ 5f24ffd9d058ba63f9e4d065aa5ab16d0cdb50426b115ae377a35cd7b287a59c 967020 linux-libc-dev_4.15.6-ph+-56_amd64.deb
+Files:
+ ff77cdc204c75b6605c92e0bc6bda343 1050 kernel optional linux-4.15.6-ph+_4.15.6-ph+-56.dsc
+ 4d718b4b1e3f42cdc1f5abe77e2b0db9 162866723 kernel optional linux-4.15.6-ph+_4.15.6-ph+.orig.tar.gz
+ be8453d844a261324bd963e562d739cf 1211 kernel optional linux-4.15.6-ph+_4.15.6-ph+-56.debian.tar.gz
+ 9020286524c612f780c7d75629a3d215 11388522 kernel optional linux-headers-4.15.6-ph+_4.15.6-ph+-56_amd64.deb
+ fce53943c012c678e8344b0563070652 52897268 kernel optional linux-image-4.15.6-ph+_4.15.6-ph+-56_amd64.deb
+ b9e766fddca7a52a37cbc28a0384cc83 967020 devel optional linux-libc-dev_4.15.6-ph+-56_amd64.deb
