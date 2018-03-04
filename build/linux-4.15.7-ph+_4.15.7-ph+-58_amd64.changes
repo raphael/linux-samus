@@ -1,0 +1,39 @@
+Format: 1.8
+Date: Sat, 03 Mar 2018 17:56:46 -0800
+Source: linux-4.15.7-ph+
+Binary: linux-image-4.15.7-ph+ linux-headers-4.15.7-ph+ linux-libc-dev
+Architecture: source amd64
+Version: 4.15.7-ph+-58
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia.lan>
+Changed-By: Anonymous <root@chromia.lan>
+Description:
+ linux-headers-4.15.7-ph+ - Linux kernel headers for 4.15.7-ph+ on ${kernel:debarch}
+ linux-image-4.15.7-ph+ - Linux kernel, version 4.15.7-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.15.7-ph+ (4.15.7-ph+-58) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ dd0a8cd67c4156cf549169a4778683876c87c6e7 1054 linux-4.15.7-ph+_4.15.7-ph+-58.dsc
+ 73f8cfa821493804154b9f31f4fcb8a3dc9ae4fc 162873894 linux-4.15.7-ph+_4.15.7-ph+.orig.tar.gz
+ 515b7fe1b5055dd0a4561e66193f8928795b6048 1211 linux-4.15.7-ph+_4.15.7-ph+-58.debian.tar.gz
+ 937610598be40db5125db7d57d7ae0b266f82c36 11388528 linux-headers-4.15.7-ph+_4.15.7-ph+-58_amd64.deb
+ 7a57dc57245d8196540c987b662de3a1c08cad83 52908506 linux-image-4.15.7-ph+_4.15.7-ph+-58_amd64.deb
+ 7342efb092da69cccf15934bb64054a3a4be344c 967242 linux-libc-dev_4.15.7-ph+-58_amd64.deb
+Checksums-Sha256:
+ b90401d53d467752f26a174505258a4df6501dc36d472956f92f911a5e032468 1054 linux-4.15.7-ph+_4.15.7-ph+-58.dsc
+ aab96def2046f3c6fe26a96d1dd85b2c34f435b2fe21b71b93fd76f071d7739b 162873894 linux-4.15.7-ph+_4.15.7-ph+.orig.tar.gz
+ 06188f2ff19cc660a1a5883512bf071aa5557a91aa0c3ea2cd2fa302be82da71 1211 linux-4.15.7-ph+_4.15.7-ph+-58.debian.tar.gz
+ a271ea753e150c95662aaba5275cc466b3a0c6a25ec32ad7436c0caae2599f6e 11388528 linux-headers-4.15.7-ph+_4.15.7-ph+-58_amd64.deb
+ e308cfc34ddfe14fa135281c98cf61204e6df6b8e90301b4a732a039662c94ea 52908506 linux-image-4.15.7-ph+_4.15.7-ph+-58_amd64.deb
+ f28892afaf1c3366f4bf1274be49474c1ec7ea4c336a720063959054d9e0bf84 967242 linux-libc-dev_4.15.7-ph+-58_amd64.deb
+Files:
+ 6bd003380e73701c1836b94eb0688d8f 1054 kernel optional linux-4.15.7-ph+_4.15.7-ph+-58.dsc
+ d7cba7798fe419779c8abb3e13fc976f 162873894 kernel optional linux-4.15.7-ph+_4.15.7-ph+.orig.tar.gz
+ f2ca05edfa539804805a19916bc4e450 1211 kernel optional linux-4.15.7-ph+_4.15.7-ph+-58.debian.tar.gz
+ f81f8e89cca239f3f3fab508ebecce54 11388528 kernel optional linux-headers-4.15.7-ph+_4.15.7-ph+-58_amd64.deb
+ d5e51d91eb08e58b74caf0de4db322f7 52908506 kernel optional linux-image-4.15.7-ph+_4.15.7-ph+-58_amd64.deb
+ 6dde0fd341afa6818d2f56aeae0391d0 967242 devel optional linux-libc-dev_4.15.7-ph+-58_amd64.deb
