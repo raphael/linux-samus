@@ -54,7 +54,7 @@ fi
 
 if [[ $2 != "--continue" ]]; then
     echo Update CHANGELOG
-    vim $ROOT/CHANGELOG.md
+    vi $ROOT/CHANGELOG.md
 
     echo Bump versions in scripts/archlinux/PKGBUILD and aur/PKGBUILD
     sed -e "s/pkgver=.*/pkgver=${NEWPKGVER}/" -i $ROOT/aur/PKGBUILD

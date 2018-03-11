@@ -1,0 +1,39 @@
+Format: 1.8
+Date: Sun, 11 Mar 2018 14:23:37 -0700
+Source: linux-4.15.9-ph+
+Binary: linux-image-4.15.9-ph+ linux-headers-4.15.9-ph+ linux-libc-dev
+Architecture: source amd64
+Version: 4.15.9-ph+-60
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-headers-4.15.9-ph+ - Linux kernel headers for 4.15.9-ph+ on ${kernel:debarch}
+ linux-image-4.15.9-ph+ - Linux kernel, version 4.15.9-ph+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.15.9-ph+ (4.15.9-ph+-60) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ f306c3e6b81a2d4fb0987141ef712eb2a68a2cd6 1050 linux-4.15.9-ph+_4.15.9-ph+-60.dsc
+ e31567bcf129afca8b55c7acb19be38a8850d1d3 162861032 linux-4.15.9-ph+_4.15.9-ph+.orig.tar.gz
+ 566f80e05e96f7a6d0b3b8c0cf3399dfe3ba178c 1204 linux-4.15.9-ph+_4.15.9-ph+-60.debian.tar.gz
+ b602e13239bf18088372b099dad6c50bcead23ae 11387896 linux-headers-4.15.9-ph+_4.15.9-ph+-60_amd64.deb
+ bd59a8c1f80c17996c2883081538c791a586c087 52911868 linux-image-4.15.9-ph+_4.15.9-ph+-60_amd64.deb
+ 4a8aa010ea1f7a5e036970bf72aa43c0fd29aae6 967222 linux-libc-dev_4.15.9-ph+-60_amd64.deb
+Checksums-Sha256:
+ c53ee120c7a58d110d4cf775487e621978f8bcf07de9c5ef89b25656c5f55c11 1050 linux-4.15.9-ph+_4.15.9-ph+-60.dsc
+ b397e34176ae4a615c22850c8fd2ee34f01916fab24b5359a32984494e61c5a1 162861032 linux-4.15.9-ph+_4.15.9-ph+.orig.tar.gz
+ 66b36dea504533b22dc487da5f6356fcb159cd207a944ba833b310da00d192e1 1204 linux-4.15.9-ph+_4.15.9-ph+-60.debian.tar.gz
+ 7c4bbe0f6ed6ea244df13b9e4da9a0a81593f44d13081cd3c5d8148183bd229a 11387896 linux-headers-4.15.9-ph+_4.15.9-ph+-60_amd64.deb
+ 267f28990fb7cf6a01bc4093ac9690288c39987f264d6b2e261b09434e26df02 52911868 linux-image-4.15.9-ph+_4.15.9-ph+-60_amd64.deb
+ c4725ea522c6a2a5bf03e01fd5500255ffbcaa973cdfb9a3dbbdf6cf75e512e8 967222 linux-libc-dev_4.15.9-ph+-60_amd64.deb
+Files:
+ b1b0c842602da007db6209c1ecc43309 1050 kernel optional linux-4.15.9-ph+_4.15.9-ph+-60.dsc
+ 1283ef712edff5865efea98b9a9c15ed 162861032 kernel optional linux-4.15.9-ph+_4.15.9-ph+.orig.tar.gz
+ abfe89ba22d1140f05a83c0cb423430b 1204 kernel optional linux-4.15.9-ph+_4.15.9-ph+-60.debian.tar.gz
+ 1deef01e383e26e216e0138036b5869e 11387896 kernel optional linux-headers-4.15.9-ph+_4.15.9-ph+-60_amd64.deb
+ 5b788c0163d57d7c1d690cc64c425215 52911868 kernel optional linux-image-4.15.9-ph+_4.15.9-ph+-60_amd64.deb
+ bf69a9042f570a9fb34fabdad4460aa0 967222 devel optional linux-libc-dev_4.15.9-ph+-60_amd64.deb

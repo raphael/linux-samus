@@ -398,7 +398,6 @@ binary-arch:
 clean:
 	rm -rf debian/*tmp debian/files
 	mv debian/ debian.backup # debian/ might be cleaned away
-#
 	mv debian.backup debian
 
 binary: binary-arch
