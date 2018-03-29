@@ -16,7 +16,8 @@ export DEB_BUILD_OPTIONS=parallel=4
 
 # Don't clean - we just compiled
 cd scripts/package
-sed -i '/(MAKE) clean/ c\\#' builddeb
+#sed -i '/(MAKE) clean/ c\\#' builddeb
+#sed -i '/(MAKE) clean/ c\\#' Makefile
 cd ../..
 
 make deb-pkg -j4
