@@ -32,10 +32,14 @@ MKSPEC     := $(srctree)/scripts/package/mkspec
 
 quiet_cmd_src_tar = TAR     $(2).tar.gz
       cmd_src_tar = \
+set -e; \
 if test "$(objtree)" != "$(srctree)"; then \
-	echo "Building source tarball is not possible outside the"; \
-	echo "kernel source tree. Don't set KBUILD_OUTPUT, or use the"; \
-	echo "binrpm-pkg or bindeb-pkg target instead."; \
+	echo >&2; \
+	echo >&2 "  ERROR:"; \
+	echo >&2 "  Building source tarball is not possible outside the"; \
+	echo >&2 "  kernel source tree. Don't set KBUILD_OUTPUT, or use the"; \
+	echo >&2 "  binrpm-pkg or bindeb-pkg target instead."; \
+	echo >&2; \
 	false; \
 fi ; \
 $(srctree)/scripts/setlocalversion --save-scmversion; \
@@ -46,7 +50,7 @@ rm -f $(objtree)/.scmversion
 # rpm-pkg
 # ---------------------------------------------------------------------------
 rpm-pkg: FORCE
-	$(MAKE) clean
+#
 	$(CONFIG_SHELL) $(MKSPEC) >$(objtree)/kernel.spec
 	$(call cmd,src_tar,$(KERNELPATH),kernel.spec)
 	+rpmbuild $(RPMOPTS) --target $(UTS_MACHINE) -ta $(KERNELPATH).tar.gz \
@@ -55,7 +59,7 @@ rpm-pkg: FORCE
 # binrpm-pkg
 # ---------------------------------------------------------------------------
 binrpm-pkg: FORCE
-	$(MAKE) KBUILD_SRC=
+#
 	$(CONFIG_SHELL) $(MKSPEC) prebuilt > $(objtree)/binkernel.spec
 	+rpmbuild $(RPMOPTS) --define "_builddir $(objtree)" --target \
 		$(UTS_MACHINE) -bb $(objtree)/binkernel.spec
@@ -83,22 +87,37 @@ quiet_cmd_builddeb = BUILDDEB
 		$(srctree)/scripts/package/builddeb $@
 
 deb-pkg: FORCE
-	$(MAKE) clean
+#
 	$(call cmd,src_tar,$(KDEB_SOURCENAME))
-	$(MAKE) KBUILD_SRC=
+#
 	+$(call cmd,builddeb)
 
 bindeb-pkg: FORCE
-	$(MAKE) KBUILD_SRC=
+#
 	+$(call cmd,builddeb)
 
 clean-dirs += $(objtree)/debian/
 
+# snap-pkg
+# ---------------------------------------------------------------------------
+snap-pkg: FORCE
+	rm -rf $(objtree)/snap
+	mkdir $(objtree)/snap
+#
+	$(call cmd,src_tar,$(KERNELPATH))
+	sed "s@KERNELRELEASE@$(KERNELRELEASE)@; \
+		s@SRCTREE@$(shell realpath $(KERNELPATH).tar.gz)@" \
+		$(srctree)/scripts/package/snapcraft.template > \
+		$(objtree)/snap/snapcraft.yaml
+	cd $(objtree)/snap && \
+	snapcraft --target-arch=$(UTS_MACHINE)
+
+clean-dirs += $(objtree)/snap/
 
 # tarball targets
 # ---------------------------------------------------------------------------
 tar%pkg: FORCE
-	$(MAKE) KBUILD_SRC=
+#
 	$(CONFIG_SHELL) $(srctree)/scripts/package/buildtar $@
 
 clean-dirs += $(objtree)/tar-install/
@@ -138,6 +157,7 @@ help: FORCE
 	@echo '  binrpm-pkg          - Build only the binary kernel RPM package'
 	@echo '  deb-pkg             - Build both source and binary deb kernel packages'
 	@echo '  bindeb-pkg          - Build only the binary kernel deb package'
+	@echo '  snap-pkg            - Build only the binary kernel snap package (will connect to external hosts)'
 	@echo '  tar-pkg             - Build the kernel as an uncompressed tarball'
 	@echo '  targz-pkg           - Build the kernel as a gzip compressed tarball'
 	@echo '  tarbz2-pkg          - Build the kernel as a bzip2 compressed tarball'

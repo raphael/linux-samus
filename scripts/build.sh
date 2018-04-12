@@ -30,6 +30,7 @@ if [[ "$CLEAN" == "1" ]]; then
     cd $LINUX
     git fetch origin
     git checkout .
+    git clean -fd
     git checkout master
     git checkout $TAG
     git pull origin $TAG

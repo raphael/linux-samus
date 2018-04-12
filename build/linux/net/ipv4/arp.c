@@ -437,7 +437,7 @@ static int arp_filter(__be32 sip, __be32 tip, struct net_device *dev)
 	/*unsigned long now; */
 	struct net *net = dev_net(dev);
 
-	rt = ip_route_output(net, sip, tip, 0, 0);
+	rt = ip_route_output(net, sip, tip, 0, l3mdev_master_ifindex_rcu(dev));
 	if (IS_ERR(rt))
 		return 1;
 	if (rt->dst.dev != dev) {
@@ -1425,7 +1425,6 @@ static int arp_seq_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations arp_seq_fops = {
-	.owner		= THIS_MODULE,
 	.open           = arp_seq_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,

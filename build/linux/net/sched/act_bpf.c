@@ -248,10 +248,14 @@ static int tcf_bpf_init_from_efd(struct nlattr **tb, struct tcf_bpf_cfg *cfg)
 
 static void tcf_bpf_cfg_cleanup(const struct tcf_bpf_cfg *cfg)
 {
-	if (cfg->is_ebpf)
-		bpf_prog_put(cfg->filter);
-	else
-		bpf_prog_destroy(cfg->filter);
+	struct bpf_prog *filter = cfg->filter;
+
+	if (filter) {
+		if (cfg->is_ebpf)
+			bpf_prog_put(filter);
+		else
+			bpf_prog_destroy(filter);
+	}
 
 	kfree(cfg->bpf_ops);
 	kfree(cfg->bpf_name);
@@ -352,12 +356,12 @@ static int tcf_bpf_init(struct net *net, struct nlattr *nla,
 	return res;
 out:
 	if (res == ACT_P_CREATED)
-		tcf_idr_cleanup(*act, est);
+		tcf_idr_release(*act, bind);
 
 	return ret;
 }
 
-static void tcf_bpf_cleanup(struct tc_action *act, int bind)
+static void tcf_bpf_cleanup(struct tc_action *act)
 {
 	struct tcf_bpf_cfg tmp;
 
@@ -401,16 +405,14 @@ static __net_init int bpf_init_net(struct net *net)
 	return tc_action_net_init(tn, &act_bpf_ops);
 }
 
-static void __net_exit bpf_exit_net(struct net *net)
+static void __net_exit bpf_exit_net(struct list_head *net_list)
 {
-	struct tc_action_net *tn = net_generic(net, bpf_net_id);
-
-	tc_action_net_exit(tn);
+	tc_action_net_exit(net_list, bpf_net_id);
 }
 
 static struct pernet_operations bpf_net_ops = {
 	.init = bpf_init_net,
-	.exit = bpf_exit_net,
+	.exit_batch = bpf_exit_net,
 	.id   = &bpf_net_id,
 	.size = sizeof(struct tc_action_net),
 };

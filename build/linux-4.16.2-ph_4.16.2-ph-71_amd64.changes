@@ -1,0 +1,39 @@
+Format: 1.8
+Date: Thu, 12 Apr 2018 12:51:54 -0700
+Source: linux-4.16.2-ph
+Binary: linux-image-4.16.2-ph linux-headers-4.16.2-ph linux-libc-dev
+Architecture: source amd64
+Version: 4.16.2-ph-71
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-headers-4.16.2-ph - Linux kernel headers for 4.16.2-ph on ${kernel:debarch}
+ linux-image-4.16.2-ph - Linux kernel, version 4.16.2-ph
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.16.2-ph (4.16.2-ph-71) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 140ca7b544baa909f74f7f57f6c0039f3d5856ef 1032 linux-4.16.2-ph_4.16.2-ph-71.dsc
+ e9ded468ab8d372f464917f592d7c323bcb63bec 494213937 linux-4.16.2-ph_4.16.2-ph.orig.tar.gz
+ 7f75978cd7429ed49d994b0024c36c0c0322f858 1204 linux-4.16.2-ph_4.16.2-ph-71.debian.tar.gz
+ f1620181a1d035446b047cfc3bbde52bd4004fff 11473960 linux-headers-4.16.2-ph_4.16.2-ph-71_amd64.deb
+ 025af16fb0bdc046efd6f6e4a1f135d89f9617e2 32770432 linux-image-4.16.2-ph_4.16.2-ph-71_amd64.deb
+ 985be6ba6da252c46fdae83bea491600164f8c59 985104 linux-libc-dev_4.16.2-ph-71_amd64.deb
+Checksums-Sha256:
+ fbcf76dc11c3d694041bbe78d0b027847e79aa507e18517fbee34761074e1bf7 1032 linux-4.16.2-ph_4.16.2-ph-71.dsc
+ e53560520b8fd5cdfc37ae0c6188ef764dc705c5af3a42ecb35863b0165b6b5f 494213937 linux-4.16.2-ph_4.16.2-ph.orig.tar.gz
+ 5b24d3fce65ee33b50e91f0e86350cecb9fdcd39323ae6c6ab2d9c749819bbaa 1204 linux-4.16.2-ph_4.16.2-ph-71.debian.tar.gz
+ 87d5c47497b7f45cf6fcfb44a9c4637c81102caa2b35a18ef33224ae32c8e060 11473960 linux-headers-4.16.2-ph_4.16.2-ph-71_amd64.deb
+ 2ea9a596552b587daa851784ab589126ab9e5b10e9a96d6140f83905f0f4987f 32770432 linux-image-4.16.2-ph_4.16.2-ph-71_amd64.deb
+ 0b11556d042c4de683456d01759f233b1e5111b47f60f87ca94bb205d3d88023 985104 linux-libc-dev_4.16.2-ph-71_amd64.deb
+Files:
+ 28a496343f15d5f47c712e063be3ed78 1032 kernel optional linux-4.16.2-ph_4.16.2-ph-71.dsc
+ 2d6e4a8c02dc5ef8d857fdcb9b50dfac 494213937 kernel optional linux-4.16.2-ph_4.16.2-ph.orig.tar.gz
+ d5b8eba8c84c6070d8773fdd5d898555 1204 kernel optional linux-4.16.2-ph_4.16.2-ph-71.debian.tar.gz
+ b03f0e79f2ff056a60619cdacf207f7c 11473960 kernel optional linux-headers-4.16.2-ph_4.16.2-ph-71_amd64.deb
+ 80b34cc4989a46e6d1cd1dbda76f092b 32770432 kernel optional linux-image-4.16.2-ph_4.16.2-ph-71_amd64.deb
+ 12f43c621d4ec468c33f83ab23675065 985104 devel optional linux-libc-dev_4.16.2-ph-71_amd64.deb

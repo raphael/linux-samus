@@ -4287,7 +4287,7 @@ static int sky2_vpd_wait(const struct sky2_hw *hw, int cap, u16 busy)
 			dev_err(&hw->pdev->dev, "VPD cycle timed out\n");
 			return -ETIMEDOUT;
 		}
-		mdelay(1);
+		msleep(1);
 	}
 
 	return 0;
@@ -5087,7 +5087,7 @@ static int sky2_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	INIT_WORK(&hw->restart_work, sky2_restart);
 
 	pci_set_drvdata(pdev, hw);
-	pdev->d3_delay = 150;
+	pdev->d3_delay = 200;
 
 	return 0;
 

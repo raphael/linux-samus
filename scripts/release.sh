@@ -28,6 +28,7 @@ fi
 if [[ $2 == "--continue" ]]; then
     NEWPKGREL=$PKGREL
     NEWPKGVER=$PKGVER
+    CLEAN="--noclean"
 else 
     NEWPKGREL=$(($PKGREL+1))
     REGEX='v(4\.[0-9]+)'
@@ -64,14 +65,14 @@ if [[ $2 != "--continue" ]]; then
 fi
 
 echo Clean up
-rm -rf $ROOT/build/archlinux
-rm -rf $ROOT/build/debian
-mkdir -p $ROOT/build/archlinux
-mkdir -p $ROOT/build/debian
+#rm -rf $ROOT/build/archlinux
+#rm -rf $ROOT/build/debian
+#mkdir -p $ROOT/build/archlinux
+#mkdir -p $ROOT/build/debian
 
 echo Build packages
 cd ${ROOT}/scripts
-./build.sh $KERNELVER
+#./build.sh $KERNELVER 
 
 echo Build source
 rm -rf $ROOT/build/linux

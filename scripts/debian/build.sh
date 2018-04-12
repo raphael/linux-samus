@@ -3,6 +3,7 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 LINUX=`readlink -f $DIR/../../build/linux-patched`
 DEBIAN=`readlink -f $LINUX/../debian`
+export LOCALVERSION=""
 
 if [ ! -d $LINUX ]; then
   echo "The tree must be setup first, couldn't find it at $LINUX"
@@ -16,8 +17,9 @@ export DEB_BUILD_OPTIONS=parallel=4
 
 # Don't clean - we just compiled
 cd scripts/package
-#sed -i '/(MAKE) clean/ c\\#' builddeb
-#sed -i '/(MAKE) clean/ c\\#' Makefile
+sed -i '/(MAKE) clean/ c\\#' builddeb
+sed -i '/(MAKE) clean/ c\\#' Makefile
+sed -i '/(MAKE) KBUILD_SRC=$/ c\\#' Makefile
 cd ../..
 
 make deb-pkg -j4
