@@ -1,0 +1,39 @@
+Format: 1.8
+Date: Thu, 19 Apr 2018 11:29:58 -0700
+Source: linux-4.16.3-ph
+Binary: linux-image-4.16.3-ph linux-headers-4.16.3-ph linux-libc-dev
+Architecture: source amd64
+Version: 4.16.3-ph-80
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-headers-4.16.3-ph - Linux kernel headers for 4.16.3-ph on ${kernel:debarch}
+ linux-image-4.16.3-ph - Linux kernel, version 4.16.3-ph
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.16.3-ph (4.16.3-ph-80) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 04976c4ef7d88e8e8dee723c6aa9df8bd138f10a 1032 linux-4.16.3-ph_4.16.3-ph-80.dsc
+ 2beb99a9f8a5ce204bafddf6b0d7bdfc28f3bc25 560533120 linux-4.16.3-ph_4.16.3-ph.orig.tar.gz
+ c8231a491981b61f08c3427eea7b87180a1f21df 1206 linux-4.16.3-ph_4.16.3-ph-80.debian.tar.gz
+ d326efb5ee36621a5a272e406f8542d978830c50 11599280 linux-headers-4.16.3-ph_4.16.3-ph-80_amd64.deb
+ cd9a1a0616630b113f5c671b581ba3486a6e2e98 54405868 linux-image-4.16.3-ph_4.16.3-ph-80_amd64.deb
+ c8320610f59512cfa44512ff56c1a0277c8f67bb 985184 linux-libc-dev_4.16.3-ph-80_amd64.deb
+Checksums-Sha256:
+ 37bac6eb41f0f70baff32153ee98b8ffee5fd190d194c25531b757637f0dd5c1 1032 linux-4.16.3-ph_4.16.3-ph-80.dsc
+ 2d5cd770cd29968f62b7de30f8d6ee38e0fe14d4de20d5db2e90337c1a86a156 560533120 linux-4.16.3-ph_4.16.3-ph.orig.tar.gz
+ 7e0ac084c69e603606f85737524b0e8b67672b859ce5dd64edf3f6c54461a3b9 1206 linux-4.16.3-ph_4.16.3-ph-80.debian.tar.gz
+ 04b1426ccc79ad96c9feee3a07203ddcd8f334bc13e8b010159d6deb05416d46 11599280 linux-headers-4.16.3-ph_4.16.3-ph-80_amd64.deb
+ 74bbfd8720b923aa36c7b88ae1246543352eb4c512326c881bb4bb34a4fd93e2 54405868 linux-image-4.16.3-ph_4.16.3-ph-80_amd64.deb
+ ea00fea0836d2891d0d811a9b997fbbb0837be3f4fbc34881f4820984cd441fa 985184 linux-libc-dev_4.16.3-ph-80_amd64.deb
+Files:
+ 3c6f6d692f05296bb599bebc6f700c26 1032 kernel optional linux-4.16.3-ph_4.16.3-ph-80.dsc
+ 72bf189a4f141a8401e3f9e0ef12fd7c 560533120 kernel optional linux-4.16.3-ph_4.16.3-ph.orig.tar.gz
+ 96f3f0c9ee80962a45ebd247d3a21d83 1206 kernel optional linux-4.16.3-ph_4.16.3-ph-80.debian.tar.gz
+ f7038a2e1b7ece67c02ac0acf870e4d0 11599280 kernel optional linux-headers-4.16.3-ph_4.16.3-ph-80_amd64.deb
+ 88c52a5888f9b85d780d03a08c693577 54405868 kernel optional linux-image-4.16.3-ph_4.16.3-ph-80_amd64.deb
+ a260524a9704f0f16f0400f950a15086 985184 devel optional linux-libc-dev_4.16.3-ph-80_amd64.deb

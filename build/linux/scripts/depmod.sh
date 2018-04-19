@@ -1,4 +1,5 @@
 #!/bin/sh
+exit 0
 # SPDX-License-Identifier: GPL-2.0
 #
 # A depmod wrapper used by the toplevel Makefile

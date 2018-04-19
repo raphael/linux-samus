@@ -31,7 +31,6 @@ if [[ "$CLEAN" == "1" ]]; then
     git fetch origin
     git checkout .
     git clean -fd
-    git checkout master
     git checkout $TAG
     git pull origin $TAG
     if [ $? -ne 0 ]; then
