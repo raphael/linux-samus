@@ -1,0 +1,39 @@
+Format: 1.8
+Date: Fri, 11 May 2018 00:43:48 -0700
+Source: linux-4.16.8-ph
+Binary: linux-image-4.16.8-ph linux-headers-4.16.8-ph linux-libc-dev
+Architecture: source amd64
+Version: 4.16.8-ph-81
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-headers-4.16.8-ph - Linux kernel headers for 4.16.8-ph on ${kernel:debarch}
+ linux-image-4.16.8-ph - Linux kernel, version 4.16.8-ph
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.16.8-ph (4.16.8-ph-81) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 8d90dfb2317ccac16895c30a4abedeab2c6aabf6 1032 linux-4.16.8-ph_4.16.8-ph-81.dsc
+ 5673c7d65584150bb7e440bc5eafb126b19cce55 502574592 linux-4.16.8-ph_4.16.8-ph.orig.tar.gz
+ 3ad579506e1e5a4020a1dcff6950c4b3ef9145c6 1207 linux-4.16.8-ph_4.16.8-ph-81.debian.tar.gz
+ 09fb49836d949ce936a7dc9e41648e2d928028f5 11614892 linux-headers-4.16.8-ph_4.16.8-ph-81_amd64.deb
+ 2bec65a3cd737859b2163ccaabf0ddf697bfa6f6 54679480 linux-image-4.16.8-ph_4.16.8-ph-81_amd64.deb
+ 6b314a6db164b620a96d9c494733d779379b655c 985468 linux-libc-dev_4.16.8-ph-81_amd64.deb
+Checksums-Sha256:
+ 1a442f6874e108a831ec2a3f49287630103e7463920facc3ef33692441abfec2 1032 linux-4.16.8-ph_4.16.8-ph-81.dsc
+ e8a41f48085454e1a367586285e8508d8ab5babb5d966486c2834333f649aa49 502574592 linux-4.16.8-ph_4.16.8-ph.orig.tar.gz
+ 54443724e52a9f680732c36680b398d6c06d8742d58e687d7be56036b4cbef75 1207 linux-4.16.8-ph_4.16.8-ph-81.debian.tar.gz
+ c273cff70a93a72310fefabe2754837d3a2df75c2c5b500d5eb3c195e196131c 11614892 linux-headers-4.16.8-ph_4.16.8-ph-81_amd64.deb
+ 580bf2efc0b492a4f4ee6aa793eced5bb3d7ebe78ca65c8885532021406d746b 54679480 linux-image-4.16.8-ph_4.16.8-ph-81_amd64.deb
+ 24ca248cc50385c55d48be0cdcfe9397a665d3d35e2a834728a90dc2e0f5fedb 985468 linux-libc-dev_4.16.8-ph-81_amd64.deb
+Files:
+ 6dfb617884b245fff15f03b142f5c766 1032 kernel optional linux-4.16.8-ph_4.16.8-ph-81.dsc
+ 1c76b224a2eb3451e1dc73c3fc8c8267 502574592 kernel optional linux-4.16.8-ph_4.16.8-ph.orig.tar.gz
+ 77154b13e1216eb1eb3b2f2b2ce86580 1207 kernel optional linux-4.16.8-ph_4.16.8-ph-81.debian.tar.gz
+ 56cf59e8312329957673d922d73fcec3 11614892 kernel optional linux-headers-4.16.8-ph_4.16.8-ph-81_amd64.deb
+ 066599e6fa41806c4edd8de0b169f695 54679480 kernel optional linux-image-4.16.8-ph_4.16.8-ph-81_amd64.deb
+ 0843975cd27f5db8306b4734b692697c 985468 devel optional linux-libc-dev_4.16.8-ph-81_amd64.deb
