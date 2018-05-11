@@ -53,64 +53,12 @@ Once installed reboot and load the kernel.
 The scripts needed to enable audio and switch between the speakers and 
 headphones are provided in the `scripts/setup/audio` folder.
 
-> *NOTE* The scripts assume that the Broadwell driver is loaded first (index is
-> `0`). To make sure that this is the case edit the file
-> `/etc/modprobe.d/sound.conf` and make sure its content includes:
->
->     options snd_soc_sst_bdw_rt5677_mach index=0
->     options snd-hda-intel index=1
-
-To enable audio:
-
-`scripts/setup/audio/enable-audio.sh`
-```
-amixer -c 0 cset name='DAC1 MIXL DAC1 Switch' on
-amixer -c 0 cset name='DAC1 MIXR DAC1 Switch' on
-```
-
-To switch to speakers (note channel swapping):
-
-`scripts/setup/audio/enable-speakers.sh`
-```
-amixer -c 0 cset name='Headphone Switch' off
-amixer -c 0 cset name='Stereo DAC MIXL DAC1 L Switch' off
-amixer -c 0 cset name='Stereo DAC MIXR DAC1 R Switch' off
-amixer -c 0 cset name='Stereo DAC MIXL DAC1 R Switch' on
-amixer -c 0 cset name='Stereo DAC MIXR DAC1 L Switch' on
-amixer -c 0 cset name='Speaker Switch' on
-```
-
-To switch to headphones (note channel unswapping):
-
-`scripts/setup/audio/enable-headphones.sh`
-```
-amixer -c 0 cset name='Speaker Switch' off
-amixer -c 0 cset name='Stereo DAC MIXL DAC1 R Switch' off
-amixer -c 0 cset name='Stereo DAC MIXR DAC1 L Switch' off
-amixer -c 0 cset name='Stereo DAC MIXL DAC1 L Switch' on
-amixer -c 0 cset name='Stereo DAC MIXR DAC1 R Switch' on
-amixer -c 0 cset name='OUT1 Playback Switch' on
-amixer -c 0 cset name='OUT2 Playback Switch' on
-amixer -c 0 cset name='Headphone Switch' on
-```
-
-The following commands will toggle mute, decrease volume and increase volume
-respectively:
-
-`scripts/setup/audio/mute-toggle.sh`
-```sh
-amixer -q -D pulse sset Master toggle
-```
-
-`scripts/setup/audio/volume-down.sh`
-```sh
-amixer -q -D pulse sset Master 5%-
-```
-
-`scripts/setup/audio/volume-up.sh`
-```sh
-amixer -q -D pulse sset Master 5%+
-```
+- Enable audio: `scripts/setup/audio/enable-audio.sh`
+- Switch to speakers: `scripts/setup/audio/enable-speakers.sh`
+- Switch to headphones: `scripts/setup/audio/enable-headphones.sh`
+- Toggle mute: `scripts/setup/audio/mute-toggle.sh`
+- Decrease volume: `scripts/setup/audio/volume-down.sh`
+- Increase volume: `scripts/setup/audio/volume-up.sh`
 
 #### Users upgrading from pre-4.7 Samus kernel
 
