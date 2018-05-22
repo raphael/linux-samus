@@ -1,0 +1,39 @@
+Format: 1.8
+Date: Mon, 21 May 2018 19:02:39 -0700
+Source: linux-4.16.10-ph
+Binary: linux-image-4.16.10-ph linux-headers-4.16.10-ph linux-libc-dev
+Architecture: source amd64
+Version: 4.16.10-ph-82
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-headers-4.16.10-ph - Linux kernel headers for 4.16.10-ph on ${kernel:debarch}
+ linux-image-4.16.10-ph - Linux kernel, version 4.16.10-ph
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.16.10-ph (4.16.10-ph-82) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ dc973c91faaad39d639e59b8b06de19d8d1d705b 1050 linux-4.16.10-ph_4.16.10-ph-82.dsc
+ c3f7a8cca6f1887337d097bc8cae71a44fcc8997 503141820 linux-4.16.10-ph_4.16.10-ph.orig.tar.gz
+ b3e211d2705097b8a41412009b2473b76bd3a5e6 1207 linux-4.16.10-ph_4.16.10-ph-82.debian.tar.gz
+ 9ab4561b010b76c1e912ba9e08eb206b80cae2d0 11614042 linux-headers-4.16.10-ph_4.16.10-ph-82_amd64.deb
+ ab9b9af83812b728ad33f160aac8adc236addf51 54684514 linux-image-4.16.10-ph_4.16.10-ph-82_amd64.deb
+ aa5d248cbe7423e5ed6ac3f5afc6631d0a290c43 985292 linux-libc-dev_4.16.10-ph-82_amd64.deb
+Checksums-Sha256:
+ ab74035eab7a9bdc522aef149810d739c9efb549bf8a5363208eefa58176f336 1050 linux-4.16.10-ph_4.16.10-ph-82.dsc
+ 7b67045fea97967d65005ae3da2622f09c7fbd7fd9172bb0660f1fe83e262750 503141820 linux-4.16.10-ph_4.16.10-ph.orig.tar.gz
+ 09c1446a862e27ecb4935c2d75404a3acf11776bd372170f9e4e8b651a98e5a6 1207 linux-4.16.10-ph_4.16.10-ph-82.debian.tar.gz
+ 2eb19dc442d38558e07da260e480008d0755ef93b6c5485caa1e45422bf63216 11614042 linux-headers-4.16.10-ph_4.16.10-ph-82_amd64.deb
+ ed99a032fb151e08dc20eeebd797f968d88ce92a6d6c775218d634b7da6f1bdb 54684514 linux-image-4.16.10-ph_4.16.10-ph-82_amd64.deb
+ 49591d563648c61af33336ed15c28a326519acfdb27d09fdc7a9bffe7b68e60c 985292 linux-libc-dev_4.16.10-ph-82_amd64.deb
+Files:
+ 080e0c3863a6e2b8225b69e867b60ee6 1050 kernel optional linux-4.16.10-ph_4.16.10-ph-82.dsc
+ bddf53412f8be9b6e56760154f99d525 503141820 kernel optional linux-4.16.10-ph_4.16.10-ph.orig.tar.gz
+ 85b4ed95d511b2fe223ea6d80e50323e 1207 kernel optional linux-4.16.10-ph_4.16.10-ph-82.debian.tar.gz
+ 18380d5f1a375a2f6a8475fa5ffb820e 11614042 kernel optional linux-headers-4.16.10-ph_4.16.10-ph-82_amd64.deb
+ 280b9636849ced4068b6775e18994ea8 54684514 kernel optional linux-image-4.16.10-ph_4.16.10-ph-82_amd64.deb
+ 2c9ccfe0df63ea93cb40d81f3dfe8fee 985292 devel optional linux-libc-dev_4.16.10-ph-82_amd64.deb
