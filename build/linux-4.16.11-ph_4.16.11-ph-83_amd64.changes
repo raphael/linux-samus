@@ -1,0 +1,39 @@
+Format: 1.8
+Date: Thu, 24 May 2018 14:02:15 -0700
+Source: linux-4.16.11-ph
+Binary: linux-image-4.16.11-ph linux-headers-4.16.11-ph linux-libc-dev
+Architecture: source amd64
+Version: 4.16.11-ph-83
+Distribution: vivid
+Urgency: low
+Maintainer: Anonymous <root@chromia>
+Changed-By: Anonymous <root@chromia>
+Description:
+ linux-headers-4.16.11-ph - Linux kernel headers for 4.16.11-ph on ${kernel:debarch}
+ linux-image-4.16.11-ph - Linux kernel, version 4.16.11-ph
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-4.16.11-ph (4.16.11-ph-83) vivid; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 0f28aae55419ad848ee73c3b1823d67f84685626 1050 linux-4.16.11-ph_4.16.11-ph-83.dsc
+ 04d57d588f3c4eb25ffa63cc193136eaf5734bb4 502845254 linux-4.16.11-ph_4.16.11-ph.orig.tar.gz
+ a4806620bdeec54b31b5113dfe25d4dcca100f0d 1209 linux-4.16.11-ph_4.16.11-ph-83.debian.tar.gz
+ ae2461f967e04f2c7c6b11758bab6dfe57d8740f 11615454 linux-headers-4.16.11-ph_4.16.11-ph-83_amd64.deb
+ 5d9c32db325716963b31e7f755702770d2eeffcf 54683722 linux-image-4.16.11-ph_4.16.11-ph-83_amd64.deb
+ 920d3cea7df56092907bd39d2a6b53c81209649a 985542 linux-libc-dev_4.16.11-ph-83_amd64.deb
+Checksums-Sha256:
+ 25dc6a2c33ade2facd7191e31122e8c514298bb6c39b7230b443bd169489c3d6 1050 linux-4.16.11-ph_4.16.11-ph-83.dsc
+ 4d726779f0e14051ec18aa55f1ef600092c2f5a0738fd281bbf433fe8c4a420c 502845254 linux-4.16.11-ph_4.16.11-ph.orig.tar.gz
+ 9644709e97fcd048c037b521a74ebfd443b053a0d73677e477bed00b690926f5 1209 linux-4.16.11-ph_4.16.11-ph-83.debian.tar.gz
+ fffc62616f59153e506be58f80b51ab5d45b79fe81537ce88e9fbc919cd7a0d9 11615454 linux-headers-4.16.11-ph_4.16.11-ph-83_amd64.deb
+ bf655d9fd097f2e204f24f18cacafa6a2dc65d3a787bf9d834a7e448693b8ac9 54683722 linux-image-4.16.11-ph_4.16.11-ph-83_amd64.deb
+ ca87926ed5d538afb43cfd917489cc9c5e74a3abcffc56be7fb0370c91bb3ca7 985542 linux-libc-dev_4.16.11-ph-83_amd64.deb
+Files:
+ db561c1ed27f2a4aa89021834926e990 1050 kernel optional linux-4.16.11-ph_4.16.11-ph-83.dsc
+ 7a922a6a11187ad8073d7bc9cc2e54dd 502845254 kernel optional linux-4.16.11-ph_4.16.11-ph.orig.tar.gz
+ 79df0418f414893efbd93f5cdc838a31 1209 kernel optional linux-4.16.11-ph_4.16.11-ph-83.debian.tar.gz
+ 904e974c7ffad339227d77a9c3e68810 11615454 kernel optional linux-headers-4.16.11-ph_4.16.11-ph-83_amd64.deb
+ b1ffc9b7d9cf78a4dd6cd2cf04d6962e 54683722 kernel optional linux-image-4.16.11-ph_4.16.11-ph-83_amd64.deb
+ 70da5dc9b322a6bd5cd13cf717401f5c 985542 devel optional linux-libc-dev_4.16.11-ph-83_amd64.deb
