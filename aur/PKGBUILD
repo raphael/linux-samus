@@ -245,6 +245,6 @@ for _p in ${pkgname[@]}; do
   }"
 done
 
-md5sums=('245cfbb919fd252c9e14cbab8354239b'
+md5sums=('37d76b827fefdac593f81d0f22698f3c'
          '98a45d56fafa7748fc45af1b028339d8'
          '09e3f7f5d048b3ae737f71019e8a064a')
